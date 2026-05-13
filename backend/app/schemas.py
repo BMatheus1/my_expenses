@@ -12,6 +12,15 @@ class ExpenseCreate(BaseModel):
     date: date
 
 
+class ExpenseUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    description: str = Field(min_length=2, max_length=100)
+    amount: float = Field(gt=0)
+    category: str = Field(min_length=2, max_length=50)
+    date: date
+
+
 class ExpenseResponse(BaseModel):
     id: str
     description: str

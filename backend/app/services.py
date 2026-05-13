@@ -2,9 +2,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.schemas import ExpenseCreate, ExpenseResponse
-
-
-_expenses: list[ExpenseResponse] = []
+from app.storage import read_expenses, write_expenses
 
 
 def get_app_status() -> dict:
@@ -15,23 +13,22 @@ def get_app_status() -> dict:
 
 
 def create_expense(expense_data: ExpenseCreate) -> ExpenseResponse:
-    expense = ExpenseResponse(
+    new_expense = ExpenseResponse(
         id=str(uuid4()),
         description=expense_data.description,
-        amount=expense_data.amount,
+        amount=round(float(expense_data.amount), 2),
         category=expense_data.category,
         date=expense_data.date,
         created_at=datetime.now(timezone.utc),
     )
 
-    _expenses.append(expense)
+    expenses = read_expenses()
+    expenses.insert(0, new_expense)
 
-    return expense
+    write_expenses(expenses)
+
+    return new_expense
 
 
 def list_expenses() -> list[ExpenseResponse]:
-    return sorted(
-        _expenses,
-        key=lambda expense: expense.date,
-        reverse=True,
-    )
+    return read_expenses()

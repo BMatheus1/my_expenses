@@ -1,12 +1,23 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routes import router
+from app.storage import ensure_storage_file
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    ensure_storage_file()
+    yield
+
 
 app = FastAPI(
     title=settings.app_name,
     debug=settings.app_debug,
+    lifespan=lifespan,
 )
 
 allowed_origins = [

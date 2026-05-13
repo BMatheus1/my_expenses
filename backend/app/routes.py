@@ -6,8 +6,12 @@ from app.services import create_expense, get_app_status, list_expenses
 router = APIRouter()
 
 
-@router.get("/health", response_model=HealthResponse, tags=["Health"])
-def health_check() -> dict:
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    tags=["Health"],
+)
+def health_check():
     return get_app_status()
 
 
@@ -17,7 +21,7 @@ def health_check() -> dict:
     status_code=status.HTTP_201_CREATED,
     tags=["Expenses"],
 )
-def add_expense(expense_data: ExpenseCreate) -> ExpenseResponse:
+def add_expense(expense_data: ExpenseCreate):
     return create_expense(expense_data)
 
 
@@ -26,5 +30,5 @@ def add_expense(expense_data: ExpenseCreate) -> ExpenseResponse:
     response_model=list[ExpenseResponse],
     tags=["Expenses"],
 )
-def get_expenses() -> list[ExpenseResponse]:
+def get_expenses():
     return list_expenses()

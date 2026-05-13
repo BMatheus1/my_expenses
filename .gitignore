@@ -2,15 +2,25 @@
 backend/.venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# Backend local data
+backend/data/*.json
+!backend/data/.gitkeep
 
 # Next.js
 frontend/.next/
 frontend/node_modules/
+frontend/out/
 
 # Env
 .env
 .env.local
+backend/.env
+frontend/.env.local
 
-# OS
+# OS / editor
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/

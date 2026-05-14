@@ -5,12 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routes import router
-from app.storage import ensure_storage_file
+from app.storage import initialize_database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ensure_storage_file()
+    initialize_database()
     yield
 
 

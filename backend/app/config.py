@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_debug: bool = True
     api_prefix: str = "/api"
-    data_file: str = "data/expenses.json"
+    database_file: str = "data/expenses.db"
+    legacy_json_file: str = "data/expenses.json"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -22,8 +23,17 @@ class Settings(BaseSettings):
         return Path(__file__).resolve().parent.parent
 
     @property
-    def data_file_path(self) -> Path:
-        file_path = Path(self.data_file)
+    def database_file_path(self) -> Path:
+        file_path = Path(self.database_file)
+
+        if file_path.is_absolute():
+            return file_path
+
+        return self.backend_dir / file_path
+
+    @property
+    def legacy_json_file_path(self) -> Path:
+        file_path = Path(self.legacy_json_file)
 
         if file_path.is_absolute():
             return file_path

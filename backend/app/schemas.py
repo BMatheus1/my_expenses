@@ -40,6 +40,24 @@ class AuthResponse(BaseModel):
     user: UserResponse
 
 
+class ExpenseCategoryCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(min_length=2, max_length=50)
+
+
+class ExpenseCategoryResponse(BaseModel):
+    name: str
+
+
+class ExpenseCategoryRecord(BaseModel):
+    id: str
+    user_id: str
+    name: str
+    name_normalized: str
+    created_at: datetime
+
+
 class ExpenseCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

@@ -5,7 +5,13 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from app.config import settings
-from app.schemas import ExpenseRecord, ExpenseResponse, IncomeRecord, UserRecord
+from app.schemas import (
+    ExpenseCategoryRecord,
+    ExpenseRecord,
+    ExpenseResponse,
+    IncomeRecord,
+    UserRecord,
+)
 
 
 def get_database_path() -> Path:
@@ -34,6 +40,7 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 def initialize_database() -> None:
     with get_connection() as connection:
         create_users_table(connection)
+        create_expense_categories_table(connection)
         create_expenses_table(connection)
         create_incomes_table(connection)
         ensure_expenses_user_id_column(connection)
@@ -55,6 +62,102 @@ def create_users_table(connection: sqlite3.Connection) -> None:
         """
     )
 
+def create_expense_categories_table(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS expense_categories (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            name_normalized TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(user_id, name_normalized),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+
+def list_expense_category_names(user_id: str) -> list[str]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT name
+            FROM expense_categories
+            WHERE user_id = ?
+            ORDER BY name COLLATE NOCASE
+            """,
+            (user_id,),
+        ).fetchall()
+
+    return [row["name"] for row in rows]
+
+
+def list_used_expense_category_names(user_id: str) -> list[str]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT DISTINCT category
+            FROM expenses
+            WHERE user_id = ?
+            ORDER BY category COLLATE NOCASE
+            """,
+            (user_id,),
+        ).fetchall()
+
+    return [row["category"] for row in rows]
+
+
+def get_expense_category_record_by_normalized_name(
+    user_id: str,
+    name_normalized: str,
+) -> ExpenseCategoryRecord | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                name,
+                name_normalized,
+                created_at
+            FROM expense_categories
+            WHERE user_id = ? AND name_normalized = ?
+            """,
+            (user_id, name_normalized),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return ExpenseCategoryRecord.model_validate(dict(row))
+
+
+def create_expense_category_record(
+    category: ExpenseCategoryRecord,
+) -> ExpenseCategoryRecord:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO expense_categories (
+                id,
+                user_id,
+                name,
+                name_normalized,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                category.id,
+                category.user_id,
+                category.name,
+                category.name_normalized,
+                category.created_at.isoformat(),
+            ),
+        )
+
+    return category
 
 def create_expenses_table(connection: sqlite3.Connection) -> None:
     connection.execute(

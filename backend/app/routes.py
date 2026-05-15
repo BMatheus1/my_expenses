@@ -15,7 +15,10 @@ from app.schemas import (
     IncomeResponse,
     IncomeUpdate,
     UserResponse,
+    ExpenseCategoryCreate,
+    ExpenseCategoryResponse,
 )
+
 from app.services import (
     create_expense,
     create_income,
@@ -26,6 +29,8 @@ from app.services import (
     list_incomes,
     update_expense,
     update_income,
+    create_expense_category,
+    list_expense_categories,
 )
 
 router = APIRouter()
@@ -76,6 +81,28 @@ def google_login(login_data: GoogleLoginRequest):
 def get_me(current_user: UserResponse = Depends(get_current_user)):
     return current_user
 
+@router.get(
+    "/expense-categories",
+    response_model=list[ExpenseCategoryResponse],
+    tags=["Expense Categories"],
+)
+def get_expense_categories(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return list_expense_categories(current_user.id)
+
+
+@router.post(
+    "/expense-categories",
+    response_model=ExpenseCategoryResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Expense Categories"],
+)
+def add_expense_category(
+    category_data: ExpenseCategoryCreate,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return create_expense_category(category_data, current_user.id)
 
 @router.get(
     "/expenses",

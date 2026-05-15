@@ -1,5 +1,7 @@
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from app.config import settings
@@ -10,14 +12,23 @@ def get_database_path() -> Path:
     return settings.database_file_path
 
 
-def get_connection() -> sqlite3.Connection:
+@contextmanager
+def get_connection() -> Iterator[sqlite3.Connection]:
     database_path = get_database_path()
     database_path.parent.mkdir(parents=True, exist_ok=True)
 
     connection = sqlite3.connect(database_path)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
 
-    return connection
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def initialize_database() -> None:
@@ -50,12 +61,13 @@ def create_expenses_table(connection: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS expenses (
             id TEXT PRIMARY KEY,
-            user_id TEXT,
+            user_id TEXT NOT NULL,
             description TEXT NOT NULL,
             amount REAL NOT NULL,
             category TEXT NOT NULL,
             date TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
     )
@@ -71,7 +83,8 @@ def create_incomes_table(connection: sqlite3.Connection) -> None:
             amount REAL NOT NULL,
             source TEXT NOT NULL,
             date TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
     )
@@ -84,35 +97,44 @@ def ensure_expenses_user_id_column(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE expenses ADD COLUMN user_id TEXT")
 
 
-def get_table_columns(connection: sqlite3.Connection, table_name: str) -> set[str]:
+def get_table_columns(
+    connection: sqlite3.Connection,
+    table_name: str,
+) -> set[str]:
     rows = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+
     return {row["name"] for row in rows}
 
 
 def migrate_legacy_json_to_sqlite() -> None:
+    if not settings.legacy_import_email:
+        return
+
     legacy_json_path = settings.legacy_json_file_path
 
     if not legacy_json_path.exists():
         return
 
+    legacy_user = get_user_record_by_email(settings.legacy_import_email)
+
+    if legacy_user is None:
+        return
+
+    legacy_expenses = load_legacy_expenses(legacy_json_path)
+
+    if not legacy_expenses:
+        return
+
     with get_connection() as connection:
         expenses_count = connection.execute(
-            "SELECT COUNT(*) FROM expenses"
+            "SELECT COUNT(*) FROM expenses WHERE user_id = ?",
+            (legacy_user.id,),
         ).fetchone()[0]
 
         if expenses_count > 0:
             return
 
-        raw_content = legacy_json_path.read_text(encoding="utf-8").strip()
-
-        if not raw_content:
-            return
-
-        legacy_expenses = json.loads(raw_content)
-
-        for item in legacy_expenses:
-            expense = ExpenseResponse.model_validate(item)
-
+        for expense in legacy_expenses:
             connection.execute(
                 """
                 INSERT INTO expenses (
@@ -128,7 +150,7 @@ def migrate_legacy_json_to_sqlite() -> None:
                 """,
                 (
                     expense.id,
-                    None,
+                    legacy_user.id,
                     expense.description,
                     expense.amount,
                     expense.category,
@@ -136,6 +158,17 @@ def migrate_legacy_json_to_sqlite() -> None:
                     expense.created_at.isoformat(),
                 ),
             )
+
+
+def load_legacy_expenses(file_path: Path) -> list[ExpenseResponse]:
+    raw_content = file_path.read_text(encoding="utf-8").strip()
+
+    if not raw_content:
+        return []
+
+    data = json.loads(raw_content)
+
+    return [ExpenseResponse.model_validate(item) for item in data]
 
 
 def create_user_record(user: UserRecord) -> UserRecord:
@@ -179,7 +212,7 @@ def get_user_record_by_email(email: str) -> UserRecord | None:
             FROM users
             WHERE email = ?
             """,
-            (email,),
+            (email.strip().lower(),),
         ).fetchone()
 
     if row is None:
@@ -317,7 +350,10 @@ def update_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
 def delete_expense_record(expense_id: str, user_id: str) -> bool:
     with get_connection() as connection:
         cursor = connection.execute(
-            "DELETE FROM expenses WHERE id = ? AND user_id = ?",
+            """
+            DELETE FROM expenses
+            WHERE id = ? AND user_id = ?
+            """,
             (expense_id, user_id),
         )
 
@@ -430,7 +466,10 @@ def update_income_record(income: IncomeRecord) -> IncomeRecord:
 def delete_income_record(income_id: str, user_id: str) -> bool:
     with get_connection() as connection:
         cursor = connection.execute(
-            "DELETE FROM incomes WHERE id = ? AND user_id = ?",
+            """
+            DELETE FROM incomes
+            WHERE id = ? AND user_id = ?
+            """,
             (income_id, user_id),
         )
 

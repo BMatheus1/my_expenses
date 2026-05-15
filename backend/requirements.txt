@@ -3,3 +3,7 @@ uvicorn[standard]
 pydantic
 pydantic-settings
 python-dotenv
+PyJWT
+bcrypt
+google-auth
+email-validator

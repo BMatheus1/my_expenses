@@ -1,17 +1,31 @@
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Depends, Response, status
 
+from app.auth import get_current_user
+from app.auth_service import login_user, login_with_google, register_user
 from app.schemas import (
+    AuthLoginRequest,
+    AuthRegisterRequest,
+    AuthResponse,
     ExpenseCreate,
     ExpenseResponse,
     ExpenseUpdate,
+    GoogleLoginRequest,
     HealthResponse,
+    IncomeCreate,
+    IncomeResponse,
+    IncomeUpdate,
+    UserResponse,
 )
 from app.services import (
     create_expense,
+    create_income,
     delete_expense,
+    delete_income,
     get_app_status,
     list_expenses,
+    list_incomes,
     update_expense,
+    update_income,
 )
 
 router = APIRouter()
@@ -26,13 +40,50 @@ def health_check():
     return get_app_status()
 
 
+@router.post(
+    "/auth/register",
+    response_model=AuthResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Auth"],
+)
+def register(user_data: AuthRegisterRequest):
+    return register_user(user_data)
+
+
+@router.post(
+    "/auth/login",
+    response_model=AuthResponse,
+    tags=["Auth"],
+)
+def login(login_data: AuthLoginRequest):
+    return login_user(login_data)
+
+
+@router.post(
+    "/auth/google",
+    response_model=AuthResponse,
+    tags=["Auth"],
+)
+def google_login(login_data: GoogleLoginRequest):
+    return login_with_google(login_data)
+
+
+@router.get(
+    "/auth/me",
+    response_model=UserResponse,
+    tags=["Auth"],
+)
+def get_me(current_user: UserResponse = Depends(get_current_user)):
+    return current_user
+
+
 @router.get(
     "/expenses",
     response_model=list[ExpenseResponse],
     tags=["Expenses"],
 )
-def get_expenses():
-    return list_expenses()
+def get_expenses(current_user: UserResponse = Depends(get_current_user)):
+    return list_expenses(current_user.id)
 
 
 @router.post(
@@ -41,8 +92,11 @@ def get_expenses():
     status_code=status.HTTP_201_CREATED,
     tags=["Expenses"],
 )
-def add_expense(expense_data: ExpenseCreate):
-    return create_expense(expense_data)
+def add_expense(
+    expense_data: ExpenseCreate,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return create_expense(expense_data, current_user.id)
 
 
 @router.put(
@@ -50,8 +104,12 @@ def add_expense(expense_data: ExpenseCreate):
     response_model=ExpenseResponse,
     tags=["Expenses"],
 )
-def edit_expense(expense_id: str, expense_data: ExpenseUpdate):
-    return update_expense(expense_id, expense_data)
+def edit_expense(
+    expense_id: str,
+    expense_data: ExpenseUpdate,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return update_expense(expense_id, expense_data, current_user.id)
 
 
 @router.delete(
@@ -59,6 +117,59 @@ def edit_expense(expense_id: str, expense_data: ExpenseUpdate):
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["Expenses"],
 )
-def remove_expense(expense_id: str):
-    delete_expense(expense_id)
+def remove_expense(
+    expense_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    delete_expense(expense_id, current_user.id)
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/incomes",
+    response_model=list[IncomeResponse],
+    tags=["Incomes"],
+)
+def get_incomes(current_user: UserResponse = Depends(get_current_user)):
+    return list_incomes(current_user.id)
+
+
+@router.post(
+    "/incomes",
+    response_model=IncomeResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Incomes"],
+)
+def add_income(
+    income_data: IncomeCreate,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return create_income(income_data, current_user.id)
+
+
+@router.put(
+    "/incomes/{income_id}",
+    response_model=IncomeResponse,
+    tags=["Incomes"],
+)
+def edit_income(
+    income_id: str,
+    income_data: IncomeUpdate,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return update_income(income_id, income_data, current_user.id)
+
+
+@router.delete(
+    "/incomes/{income_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Incomes"],
+)
+def remove_income(
+    income_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    delete_income(income_id, current_user.id)
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)

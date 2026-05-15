@@ -8,9 +8,15 @@ class Settings(BaseSettings):
     app_name: str = "My Expenses API"
     app_env: str = "development"
     app_debug: bool = True
+
     api_prefix: str = "/api"
     database_file: str = "data/expenses.db"
     legacy_json_file: str = "data/expenses.json"
+
+    secret_key: str = "troque-essa-chave"
+    access_token_expire_minutes: int = 60 * 24 * 7
+
+    google_client_id: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

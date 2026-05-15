@@ -46,8 +46,18 @@ class ExpenseCategoryCreate(BaseModel):
     name: str = Field(min_length=2, max_length=50)
 
 
+class ExpenseCategoryUpdate(ExpenseCategoryCreate):
+    pass
+
+
 class ExpenseCategoryResponse(BaseModel):
+    id: str | None = None
     name: str
+    is_default: bool = False
+    is_custom: bool = False
+    is_used: bool = False
+    can_edit: bool = False
+    can_delete: bool = False
 
 
 class ExpenseCategoryRecord(BaseModel):

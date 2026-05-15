@@ -6,6 +6,9 @@ from app.schemas import (
     AuthLoginRequest,
     AuthRegisterRequest,
     AuthResponse,
+    ExpenseCategoryCreate,
+    ExpenseCategoryResponse,
+    ExpenseCategoryUpdate,
     ExpenseCreate,
     ExpenseResponse,
     ExpenseUpdate,
@@ -15,22 +18,21 @@ from app.schemas import (
     IncomeResponse,
     IncomeUpdate,
     UserResponse,
-    ExpenseCategoryCreate,
-    ExpenseCategoryResponse,
 )
-
 from app.services import (
     create_expense,
+    create_expense_category,
     create_income,
     delete_expense,
+    delete_expense_category,
     delete_income,
     get_app_status,
+    list_expense_categories,
     list_expenses,
     list_incomes,
     update_expense,
+    update_expense_category,
     update_income,
-    create_expense_category,
-    list_expense_categories,
 )
 
 router = APIRouter()
@@ -81,6 +83,7 @@ def google_login(login_data: GoogleLoginRequest):
 def get_me(current_user: UserResponse = Depends(get_current_user)):
     return current_user
 
+
 @router.get(
     "/expense-categories",
     response_model=list[ExpenseCategoryResponse],
@@ -103,6 +106,38 @@ def add_expense_category(
     current_user: UserResponse = Depends(get_current_user),
 ):
     return create_expense_category(category_data, current_user.id)
+
+
+@router.put(
+    "/expense-categories/{category_id}",
+    response_model=ExpenseCategoryResponse,
+    tags=["Expense Categories"],
+)
+def edit_expense_category(
+    category_id: str,
+    category_data: ExpenseCategoryUpdate,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return update_expense_category(
+        category_id=category_id,
+        category_data=category_data,
+        user_id=current_user.id,
+    )
+
+
+@router.delete(
+    "/expense-categories/{category_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Expense Categories"],
+)
+def remove_expense_category(
+    category_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    delete_expense_category(category_id, current_user.id)
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 @router.get(
     "/expenses",

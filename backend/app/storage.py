@@ -47,7 +47,225 @@ def initialize_database() -> None:
 
     migrate_legacy_json_to_sqlite()
 
+def create_expense_categories_table(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS expense_categories (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            name_normalized TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(user_id, name_normalized),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
 
+
+def list_custom_expense_category_records(
+    user_id: str,
+) -> list[ExpenseCategoryRecord]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                name,
+                name_normalized,
+                created_at
+            FROM expense_categories
+            WHERE user_id = ?
+            ORDER BY name COLLATE NOCASE
+            """,
+            (user_id,),
+        ).fetchall()
+
+    return [ExpenseCategoryRecord.model_validate(dict(row)) for row in rows]
+
+
+def list_used_expense_category_names(user_id: str) -> list[str]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT DISTINCT category
+            FROM expenses
+            WHERE user_id = ?
+            ORDER BY category COLLATE NOCASE
+            """,
+            (user_id,),
+        ).fetchall()
+
+    return [row["category"] for row in rows]
+
+
+def count_expenses_by_category(user_id: str, category_name: str) -> int:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM expenses
+            WHERE user_id = ? AND category = ?
+            """,
+            (user_id, category_name),
+        ).fetchone()
+
+    return int(row["total"])
+
+
+def get_expense_category_record_by_id(
+    category_id: str,
+    user_id: str,
+) -> ExpenseCategoryRecord | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                name,
+                name_normalized,
+                created_at
+            FROM expense_categories
+            WHERE id = ? AND user_id = ?
+            """,
+            (category_id, user_id),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return ExpenseCategoryRecord.model_validate(dict(row))
+
+
+def get_expense_category_record_by_normalized_name(
+    user_id: str,
+    name_normalized: str,
+) -> ExpenseCategoryRecord | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                name,
+                name_normalized,
+                created_at
+            FROM expense_categories
+            WHERE user_id = ? AND name_normalized = ?
+            """,
+            (user_id, name_normalized),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return ExpenseCategoryRecord.model_validate(dict(row))
+
+
+def create_expense_category_record(
+    category: ExpenseCategoryRecord,
+) -> ExpenseCategoryRecord:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO expense_categories (
+                id,
+                user_id,
+                name,
+                name_normalized,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                category.id,
+                category.user_id,
+                category.name,
+                category.name_normalized,
+                category.created_at.isoformat(),
+            ),
+        )
+
+    return category
+
+
+def update_expense_category_record(
+    category_id: str,
+    user_id: str,
+    name: str,
+    name_normalized: str,
+) -> ExpenseCategoryRecord | None:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE expense_categories
+            SET
+                name = ?,
+                name_normalized = ?
+            WHERE id = ? AND user_id = ?
+            """,
+            (
+                name,
+                name_normalized,
+                category_id,
+                user_id,
+            ),
+        )
+
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                name,
+                name_normalized,
+                created_at
+            FROM expense_categories
+            WHERE id = ? AND user_id = ?
+            """,
+            (category_id, user_id),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return ExpenseCategoryRecord.model_validate(dict(row))
+
+
+def update_expenses_category_name(
+    user_id: str,
+    old_category_name: str,
+    new_category_name: str,
+) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE expenses
+            SET category = ?
+            WHERE user_id = ? AND category = ?
+            """,
+            (
+                new_category_name,
+                user_id,
+                old_category_name,
+            ),
+        )
+
+
+def delete_expense_category_record(category_id: str, user_id: str) -> bool:
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            DELETE FROM expense_categories
+            WHERE id = ? AND user_id = ?
+            """,
+            (category_id, user_id),
+        )
+
+        return cursor.rowcount > 0
+    
 def create_users_table(connection: sqlite3.Connection) -> None:
     connection.execute(
         """

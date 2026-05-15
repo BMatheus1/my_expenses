@@ -1,3 +1,4 @@
+import unicodedata
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -7,6 +8,7 @@ from app.schemas import (
     ExpenseCategoryCreate,
     ExpenseCategoryRecord,
     ExpenseCategoryResponse,
+    ExpenseCategoryUpdate,
     ExpenseCreate,
     ExpenseRecord,
     ExpenseResponse,
@@ -17,19 +19,24 @@ from app.schemas import (
     IncomeUpdate,
 )
 from app.storage import (
+    count_expenses_by_category,
     create_expense_category_record,
     create_expense_record,
     create_income_record,
+    delete_expense_category_record,
     delete_expense_record,
     delete_income_record,
+    get_expense_category_record_by_id,
     get_expense_category_record_by_normalized_name,
     get_expense_record_by_id,
     get_income_record_by_id,
-    list_expense_category_names,
+    list_custom_expense_category_records,
     list_expense_records,
     list_income_records,
     list_used_expense_category_names,
+    update_expense_category_record,
     update_expense_record,
+    update_expenses_category_name,
     update_income_record,
 )
 
@@ -54,21 +61,70 @@ def get_app_status() -> dict:
 
 
 def list_expense_categories(user_id: str) -> list[ExpenseCategoryResponse]:
-    custom_categories = list_expense_category_names(user_id)
-    used_categories = list_used_expense_category_names(user_id)
+    custom_categories = list_custom_expense_category_records(user_id)
+    used_category_names = list_used_expense_category_names(user_id)
 
-    category_names = merge_category_names(
-        [
-            *DEFAULT_EXPENSE_CATEGORIES,
-            *custom_categories,
-            *used_categories,
-        ]
-    )
+    categories: list[ExpenseCategoryResponse] = []
+    existing_keys: set[str] = set()
 
-    return [
-        ExpenseCategoryResponse(name=category_name)
-        for category_name in category_names
-    ]
+    for default_category in DEFAULT_EXPENSE_CATEGORIES:
+        category_key = normalize_category_key(default_category)
+        is_used = count_expenses_by_category(user_id, default_category) > 0
+
+        categories.append(
+            ExpenseCategoryResponse(
+                id=None,
+                name=default_category,
+                is_default=True,
+                is_custom=False,
+                is_used=is_used,
+                can_edit=False,
+                can_delete=False,
+            )
+        )
+        existing_keys.add(category_key)
+
+    for custom_category in custom_categories:
+        category_key = normalize_category_key(custom_category.name)
+
+        if category_key in existing_keys:
+            continue
+
+        is_used = count_expenses_by_category(user_id, custom_category.name) > 0
+
+        categories.append(
+            ExpenseCategoryResponse(
+                id=custom_category.id,
+                name=custom_category.name,
+                is_default=False,
+                is_custom=True,
+                is_used=is_used,
+                can_edit=True,
+                can_delete=not is_used,
+            )
+        )
+        existing_keys.add(category_key)
+
+    for used_category_name in used_category_names:
+        category_key = normalize_category_key(used_category_name)
+
+        if category_key in existing_keys:
+            continue
+
+        categories.append(
+            ExpenseCategoryResponse(
+                id=None,
+                name=used_category_name,
+                is_default=False,
+                is_custom=False,
+                is_used=True,
+                can_edit=False,
+                can_delete=False,
+            )
+        )
+        existing_keys.add(category_key)
+
+    return categories
 
 
 def create_expense_category(
@@ -79,12 +135,7 @@ def create_expense_category(
     name_normalized = normalize_category_key(category_name)
 
     validate_category_name(category_name)
-
-    if is_expense_category_registered(category_name, user_id):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Essa categoria já existe.",
-        )
+    ensure_category_name_is_available(name_normalized, user_id)
 
     category = ExpenseCategoryRecord(
         id=str(uuid4()),
@@ -96,7 +147,84 @@ def create_expense_category(
 
     created_category = create_expense_category_record(category)
 
-    return ExpenseCategoryResponse(name=created_category.name)
+    return ExpenseCategoryResponse(
+        id=created_category.id,
+        name=created_category.name,
+        is_default=False,
+        is_custom=True,
+        is_used=False,
+        can_edit=True,
+        can_delete=True,
+    )
+
+
+def update_expense_category(
+    category_id: str,
+    category_data: ExpenseCategoryUpdate,
+    user_id: str,
+) -> ExpenseCategoryResponse:
+    current_category = get_expense_category_record_by_id(category_id, user_id)
+
+    if current_category is None:
+        raise_not_found_error("Categoria não encontrada.")
+
+    new_category_name = normalize_category_name(category_data.name)
+    new_name_normalized = normalize_category_key(new_category_name)
+
+    validate_category_name(new_category_name)
+    ensure_category_name_is_available(
+        name_normalized=new_name_normalized,
+        user_id=user_id,
+        ignored_category_id=category_id,
+    )
+
+    updated_category = update_expense_category_record(
+        category_id=category_id,
+        user_id=user_id,
+        name=new_category_name,
+        name_normalized=new_name_normalized,
+    )
+
+    if updated_category is None:
+        raise_not_found_error("Categoria não encontrada.")
+
+    update_expenses_category_name(
+        user_id=user_id,
+        old_category_name=current_category.name,
+        new_category_name=updated_category.name,
+    )
+
+    is_used = count_expenses_by_category(user_id, updated_category.name) > 0
+
+    return ExpenseCategoryResponse(
+        id=updated_category.id,
+        name=updated_category.name,
+        is_default=False,
+        is_custom=True,
+        is_used=is_used,
+        can_edit=True,
+        can_delete=not is_used,
+    )
+
+
+def delete_expense_category(category_id: str, user_id: str) -> None:
+    category = get_expense_category_record_by_id(category_id, user_id)
+
+    if category is None:
+        raise_not_found_error("Categoria não encontrada.")
+
+    is_used = count_expenses_by_category(user_id, category.name) > 0
+
+    if is_used:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Não é possível excluir uma categoria que já possui gastos.",
+        )
+
+    deleted = delete_expense_category_record(category_id, user_id)
+
+    if not deleted:
+        raise_not_found_error("Categoria não encontrada.")
 
 
 def list_expenses(user_id: str) -> list[ExpenseResponse]:
@@ -256,6 +384,34 @@ def ensure_expense_category_registered(
     return created_category.name
 
 
+def ensure_category_name_is_available(
+    name_normalized: str,
+    user_id: str,
+    ignored_category_id: str | None = None,
+) -> None:
+    if is_default_category_key(name_normalized):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Essa categoria já existe.",
+        )
+
+    existing_category = get_expense_category_record_by_normalized_name(
+        user_id=user_id,
+        name_normalized=name_normalized,
+    )
+
+    if existing_category is None:
+        return
+
+    if ignored_category_id and existing_category.id == ignored_category_id:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Essa categoria já existe.",
+    )
+
+
 def validate_category_name(category_name: str) -> None:
     if normalize_category_key(category_name) in RESERVED_CATEGORY_NAMES:
         raise HTTPException(
@@ -264,19 +420,11 @@ def validate_category_name(category_name: str) -> None:
         )
 
 
-def is_expense_category_registered(category_name: str, user_id: str) -> bool:
-    category_key = normalize_category_key(category_name)
-    categories = list_expense_categories(user_id)
-
-    return any(
-        normalize_category_key(category.name) == category_key
-        for category in categories
-    )
-
-
 def is_default_category(category_name: str) -> bool:
-    category_key = normalize_category_key(category_name)
+    return is_default_category_key(normalize_category_key(category_name))
 
+
+def is_default_category_key(category_key: str) -> bool:
     return any(
         normalize_category_key(default_category) == category_key
         for default_category in DEFAULT_EXPENSE_CATEGORIES
@@ -293,23 +441,6 @@ def find_default_category_name(category_name: str) -> str:
     return category_name
 
 
-def merge_category_names(category_names: list[str]) -> list[str]:
-    categories: list[str] = []
-    existing_keys: set[str] = set()
-
-    for category_name in category_names:
-        normalized_name = normalize_category_name(category_name)
-        category_key = normalize_category_key(normalized_name)
-
-        if not normalized_name or category_key in existing_keys:
-            continue
-
-        categories.append(normalized_name)
-        existing_keys.add(category_key)
-
-    return categories
-
-
 def normalize_category_name(category_name: str) -> str:
     normalized_name = " ".join(category_name.strip().split())
 
@@ -320,7 +451,13 @@ def normalize_category_name(category_name: str) -> str:
 
 
 def normalize_category_key(category_name: str) -> str:
-    return " ".join(category_name.strip().split()).casefold()
+    without_accents = "".join(
+        character
+        for character in unicodedata.normalize("NFKD", category_name)
+        if not unicodedata.combining(character)
+    )
+
+    return " ".join(without_accents.strip().split()).casefold()
 
 
 def to_expense_response(expense: ExpenseRecord) -> ExpenseResponse:

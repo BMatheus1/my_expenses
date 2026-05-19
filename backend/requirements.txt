@@ -7,3 +7,4 @@ PyJWT
 bcrypt
 google-auth
 email-validator
+psycopg[binary]

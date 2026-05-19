@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Response, status
-
 from app.auth import get_current_user
 from app.auth_service import login_user, login_with_google, register_user
+from app.business_routes import router as business_router
+
 from app.schemas import (
     AuthLoginRequest,
     AuthRegisterRequest,
@@ -36,7 +37,7 @@ from app.services import (
 )
 
 router = APIRouter()
-
+router.include_router(business_router)
 
 @router.get(
     "/health",

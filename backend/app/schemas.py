@@ -10,9 +10,15 @@ class UserResponse(BaseModel):
     created_at: datetime
 
 
-class UserRecord(UserResponse):
+class UserRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    email: EmailStr
     password_hash: str | None = None
     provider: str = "credentials"
+    created_at: datetime
 
 
 class AuthRegisterRequest(BaseModel):
@@ -61,6 +67,8 @@ class ExpenseCategoryResponse(BaseModel):
 
 
 class ExpenseCategoryRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     user_id: str
     name: str
@@ -90,8 +98,16 @@ class ExpenseResponse(BaseModel):
     created_at: datetime
 
 
-class ExpenseRecord(ExpenseResponse):
+class ExpenseRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
     user_id: str
+    description: str
+    amount: float
+    category: str
+    date: date
+    created_at: datetime
 
 
 class IncomeCreate(BaseModel):
@@ -116,8 +132,16 @@ class IncomeResponse(BaseModel):
     created_at: datetime
 
 
-class IncomeRecord(IncomeResponse):
+class IncomeRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
     user_id: str
+    description: str
+    amount: float
+    source: str
+    date: date
+    created_at: datetime
 
 
 class HealthResponse(BaseModel):

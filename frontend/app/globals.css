@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fafaf9;
+  --foreground: #1c1917;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-input {
+  width: 100%;
+  border-radius: 1.25rem;
+  border: 1px solid #e7e5e4;
+  background: #fafaf9;
+  padding: 0.8rem 1rem;
+  color: #1c1917;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.app-input:focus {
+  border-color: #059669;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgb(5 150 105 / 12%);
+}
+
+.app-button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #047857;
+  padding: 0.8rem 1.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.app-button-primary:hover {
+  background: #065f46;
+  transform: translateY(-1px);
+}
+
+.app-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid #d6d3d1;
+  background: #ffffff;
+  padding: 0.8rem 1.2rem;
+  font-weight: 700;
+  color: #44403c;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.app-button-secondary:hover {
+  background: #f5f5f4;
+  transform: translateY(-1px);
+}
+
+.app-button-primary:disabled,
+.app-button-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}

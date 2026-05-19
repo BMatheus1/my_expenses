@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
 
     database_url: str
+
     legacy_json_file: str = "data/expenses.json"
     legacy_import_email: str = ""
 
@@ -37,7 +38,10 @@ class Settings(BaseSettings):
     def validate_database_url(cls, value: str) -> str:
         database_url = value.strip()
 
-        if not database_url.startswith(("postgresql://", "postgres://")):
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+        if not database_url.startswith("postgresql://"):
             raise ValueError("DATABASE_URL deve apontar para um banco PostgreSQL.")
 
         return database_url
@@ -45,10 +49,12 @@ class Settings(BaseSettings):
     @field_validator("secret_key")
     @classmethod
     def validate_secret_key(cls, value: str) -> str:
-        if len(value.strip()) < 32:
+        secret_key = value.strip()
+
+        if len(secret_key) < 32:
             raise ValueError("SECRET_KEY deve ter pelo menos 32 caracteres.")
 
-        return value.strip()
+        return secret_key
 
     @property
     def backend_dir(self) -> Path:

@@ -30,3 +30,11 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix=settings.api_prefix)
+
+@app.get("/")
+def read_root():
+    return {
+        "message": "My Expenses API online",
+        "docs": "/docs",
+        "health": "/api/health",
+    }

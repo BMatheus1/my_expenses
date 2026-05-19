@@ -29,7 +29,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router, prefix=settings.api_prefix)
+
+@app.on_event("startup")
+def on_startup():
+    initialize_database()
+
 
 @app.get("/")
 def read_root():
@@ -38,3 +42,6 @@ def read_root():
         "docs": "/docs",
         "health": "/api/health",
     }
+
+app.include_router(router, prefix=settings.api_prefix)
+

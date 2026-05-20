@@ -20,29 +20,31 @@ type SidebarProps = {
   onLogout: () => void;
 };
 
-const MENU_ITEMS: Array<{
+type MenuItem = {
   view: AppView;
   label: string;
-  shortLabel: string;
   description: string;
-}> = [
+  shortLabel: string;
+};
+
+const PERSONAL_FINANCE_ITEMS: MenuItem[] = [
   {
     view: "incomes",
     label: "Ganhos",
-    shortLabel: "+ $",
-    description: "Entradas",
+    description: "Entradas de dinheiro",
+    shortLabel: "+",
   },
   {
     view: "expenses",
     label: "Gastos",
-    shortLabel: "- $",
-    description: "Lista e cadastro",
+    description: "Despesas pessoais",
+    shortLabel: "-",
   },
   {
     view: "reports",
     label: "Relatórios",
+    description: "Resumo e gráficos",
     shortLabel: "R",
-    description: "Gráficos",
   },
 ];
 
@@ -53,11 +55,17 @@ export function Sidebar({
   onLogout,
 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(true);
   const [isBusinessMenuOpen, setIsBusinessMenuOpen] = useState(true);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
     null,
   );
+
+  const isWalletActive =
+    activeView === "incomes" ||
+    activeView === "expenses" ||
+    activeView === "reports";
 
   const isBusinessActive = activeView === "businesses";
 
@@ -83,6 +91,20 @@ export function Sidebar({
       window.removeEventListener(BUSINESS_REFRESH_EVENT, handleRefresh);
     };
   }, [loadBusinesses]);
+
+  function openWalletArea() {
+    if (isCollapsed) {
+      onActiveViewChange("expenses");
+      return;
+    }
+
+    setIsWalletMenuOpen((currentValue) => !currentValue);
+  }
+
+  function handleWalletItemClick(view: AppView) {
+    onActiveViewChange(view);
+    setSelectedBusinessId(null);
+  }
 
   function openBusinessArea() {
     onActiveViewChange("businesses");
@@ -131,115 +153,94 @@ export function Sidebar({
           </button>
         </div>
 
-        <nav className="mt-8 space-y-2">
-          {MENU_ITEMS.map((item) => (
-            <SidebarButton
-              key={item.view}
-              item={item}
-              isActive={activeView === item.view}
-              isCollapsed={isCollapsed}
-              onClick={() => onActiveViewChange(item.view)}
-            />
-          ))}
+        <nav className="mt-8 space-y-3">
+          <SidebarGroupButton
+            title="Minha Carteira"
+            description="Ganhos, gastos e relatórios"
+            shortLabel="C"
+            isActive={isWalletActive}
+            isCollapsed={isCollapsed}
+            isOpen={isWalletMenuOpen}
+            onClick={openWalletArea}
+          />
 
-          <div className="pt-3">
-            <button
-              type="button"
-              onClick={() => {
-                if (isCollapsed) {
-                  openBusinessArea();
-                  return;
-                }
+          {!isCollapsed && isWalletMenuOpen ? (
+            <div className="space-y-2 border-l border-stone-200 pl-5">
+              {PERSONAL_FINANCE_ITEMS.map((item) => (
+                <SidebarSubItem
+                  key={item.view}
+                  item={item}
+                  isActive={activeView === item.view}
+                  onClick={() => handleWalletItemClick(item.view)}
+                />
+              ))}
+            </div>
+          ) : null}
 
-                setIsBusinessMenuOpen((currentValue) => !currentValue);
-              }}
-              className={`flex w-full items-center gap-3 rounded-3xl px-4 py-3 text-left transition ${
-                isBusinessActive
-                  ? "bg-emerald-700 text-white shadow-sm"
-                  : "text-stone-600 hover:bg-stone-100 hover:text-stone-950"
-              }`}
-            >
-              <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
-                  isBusinessActive
-                    ? "bg-white text-emerald-700"
-                    : "bg-stone-100 text-stone-700"
-                }`}
+          <SidebarGroupButton
+            title="Meus Negócios"
+            description="Estoque e fichas"
+            shortLabel="N"
+            isActive={isBusinessActive}
+            isCollapsed={isCollapsed}
+            isOpen={isBusinessMenuOpen}
+            onClick={() => {
+              if (isCollapsed) {
+                openBusinessArea();
+                return;
+              }
+
+              setIsBusinessMenuOpen((currentValue) => !currentValue);
+            }}
+          />
+
+          {!isCollapsed && isBusinessMenuOpen ? (
+            <div className="space-y-2 border-l border-stone-200 pl-5">
+              <button
+                type="button"
+                onClick={handleCreateBusiness}
+                className="w-full rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 px-4 py-3 text-left text-sm font-black text-emerald-800 transition hover:border-emerald-700 hover:bg-emerald-100"
               >
-                N
-              </span>
+                + Criar novo negócio
+              </button>
 
-              {!isCollapsed ? (
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="block truncate font-bold">
-                      Meus Negócios
+              {businesses.length === 0 ? (
+                <p className="rounded-2xl bg-stone-50 px-4 py-3 text-xs font-semibold text-stone-400">
+                  Nenhum negócio criado
+                </p>
+              ) : null}
+
+              {businesses.map((business) => {
+                const isSelected =
+                  isBusinessActive && selectedBusinessId === business.id;
+
+                return (
+                  <button
+                    key={business.id}
+                    type="button"
+                    onClick={() => handleSelectBusiness(business.id)}
+                    className={`w-full rounded-2xl px-4 py-3 text-left transition ${
+                      isSelected
+                        ? "bg-stone-900 text-white"
+                        : "text-stone-600 hover:bg-stone-50 hover:text-stone-950"
+                    }`}
+                  >
+                    <span className="block truncate text-sm font-black">
+                      {business.name}
                     </span>
 
                     <span
                       className={`mt-0.5 block truncate text-xs ${
-                        isBusinessActive ? "text-emerald-50" : "text-stone-400"
+                        isSelected ? "text-stone-300" : "text-stone-400"
                       }`}
                     >
-                      Estoque e fichas
+                      {business.type}
                     </span>
-                  </span>
-
-                  <span className="text-sm font-black">
-                    {isBusinessMenuOpen ? "−" : "+"}
-                  </span>
-                </span>
-              ) : null}
-            </button>
-
-            {!isCollapsed && isBusinessMenuOpen ? (
-              <div className="mt-2 space-y-2 border-l border-stone-200 pl-5">
-                <button
-                  type="button"
-                  onClick={handleCreateBusiness}
-                  className="w-full rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 px-4 py-3 text-left text-sm font-black text-emerald-800 transition hover:border-emerald-700 hover:bg-emerald-100"
-                >
-                  + Criar novo negócio
-                </button>
-
-                {businesses.length === 0 ? (
-                  <p className="rounded-2xl bg-stone-50 px-4 py-3 text-xs font-semibold text-stone-400">
-                    Nenhum negócio criado
-                  </p>
-                ) : null}
-
-                {businesses.map((business) => {
-                  const isSelected =
-                    isBusinessActive && selectedBusinessId === business.id;
-
-                  return (
-                    <button
-                      key={business.id}
-                      type="button"
-                      onClick={() => handleSelectBusiness(business.id)}
-                      className={`w-full rounded-2xl px-4 py-3 text-left transition ${
-                        isSelected
-                          ? "bg-stone-900 text-white"
-                          : "text-stone-600 hover:bg-stone-50 hover:text-stone-950"
-                      }`}
-                    >
-                      <span className="block truncate text-sm font-black">
-                        {business.name}
-                      </span>
-
-                      <span
-                        className={`mt-0.5 block truncate text-xs ${
-                          isSelected ? "text-stone-300" : "text-stone-400"
-                        }`}
-                      >
-                        {business.type}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </nav>
 
         <div className="mt-auto space-y-3">
@@ -268,24 +269,23 @@ export function Sidebar({
   );
 }
 
-type SidebarButtonProps = {
-  item: {
-    view: AppView;
-    label: string;
-    shortLabel: string;
-    description: string;
-  };
-  isActive: boolean;
-  isCollapsed: boolean;
-  onClick: () => void;
-};
-
-function SidebarButton({
-  item,
+function SidebarGroupButton({
+  title,
+  description,
+  shortLabel,
   isActive,
   isCollapsed,
+  isOpen,
   onClick,
-}: SidebarButtonProps) {
+}: {
+  title: string;
+  description: string;
+  shortLabel: string;
+  isActive: boolean;
+  isCollapsed: boolean;
+  isOpen: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
@@ -301,22 +301,68 @@ function SidebarButton({
           isActive ? "bg-white text-emerald-700" : "bg-stone-100 text-stone-700"
         }`}
       >
-        {item.shortLabel}
+        {shortLabel}
       </span>
 
       {!isCollapsed ? (
-        <span className="min-w-0">
-          <span className="block truncate font-bold">{item.label}</span>
+        <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block truncate font-bold">{title}</span>
 
-          <span
-            className={`mt-0.5 block truncate text-xs ${
-              isActive ? "text-emerald-50" : "text-stone-400"
-            }`}
-          >
-            {item.description}
+            <span
+              className={`mt-0.5 block truncate text-xs ${
+                isActive ? "text-emerald-50" : "text-stone-400"
+              }`}
+            >
+              {description}
+            </span>
           </span>
+
+          <span className="text-sm font-black">{isOpen ? "−" : "+"}</span>
         </span>
       ) : null}
+    </button>
+  );
+}
+
+function SidebarSubItem({
+  item,
+  isActive,
+  onClick,
+}: {
+  item: MenuItem;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
+        isActive
+          ? "bg-stone-900 text-white"
+          : "text-stone-600 hover:bg-stone-50 hover:text-stone-950"
+      }`}
+    >
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
+          isActive ? "bg-white text-stone-900" : "bg-stone-100 text-stone-600"
+        }`}
+      >
+        {item.shortLabel}
+      </span>
+
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-black">{item.label}</span>
+
+        <span
+          className={`mt-0.5 block truncate text-xs ${
+            isActive ? "text-stone-300" : "text-stone-400"
+          }`}
+        >
+          {item.description}
+        </span>
+      </span>
     </button>
   );
 }

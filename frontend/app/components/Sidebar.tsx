@@ -11,7 +11,12 @@ import {
 import type { Business } from "@/app/types/business";
 import type { User } from "../types/auth";
 
-export type AppView = "expenses" | "incomes" | "reports" | "businesses";
+export type AppView =
+  | "expenses"
+  | "incomes"
+  | "reports"
+  | "businesses"
+  | "settings";
 
 type SidebarProps = {
   activeView: AppView;
@@ -68,6 +73,7 @@ export function Sidebar({
     activeView === "reports";
 
   const isBusinessActive = activeView === "businesses";
+  const isSettingsActive = activeView === "settings";
 
   const loadBusinesses = useCallback(async () => {
     try {
@@ -111,6 +117,11 @@ export function Sidebar({
     setIsBusinessMenuOpen(true);
   }
 
+  function openSettings() {
+    onActiveViewChange("settings");
+    setSelectedBusinessId(null);
+  }
+
   function handleCreateBusiness() {
     openBusinessArea();
     setSelectedBusinessId(null);
@@ -125,31 +136,40 @@ export function Sidebar({
 
   return (
     <aside
-      className={`sticky top-0 hidden h-screen shrink-0 border-r border-stone-200 bg-white p-4 shadow-sm transition-all lg:block ${
+      className={`sticky top-0 hidden h-screen shrink-0 border-r p-4 shadow-sm transition-all lg:block ${
         isCollapsed ? "w-24" : "w-72"
       }`}
+      style={{
+        backgroundColor: "var(--app-surface)",
+        borderColor: "var(--app-border)",
+      }}
     >
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between gap-3">
           {!isCollapsed ? (
             <div>
-              <h1 className="text-xl font-black tracking-tight text-stone-950">
+              <h1 className="app-title text-xl font-black tracking-tight">
                 My Expenses
               </h1>
 
-              <p className="mt-1 text-sm text-stone-500">
-                Controle financeiro
-              </p>
+              <p className="app-muted mt-1 text-sm">Controle financeiro</p>
             </div>
           ) : null}
 
           <button
             type="button"
             onClick={() => setIsCollapsed((currentValue) => !currentValue)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-sm font-black text-stone-700 transition hover:bg-stone-100"
+            className="app-btn app-btn-soft group h-11 w-11 rounded-2xl text-sm shadow-sm"
             aria-label={isCollapsed ? "Expandir menu" : "Recolher menu"}
+            title={isCollapsed ? "Expandir menu" : "Recolher menu"}
           >
-            {isCollapsed ? ">" : "<"}
+            <span
+              className={`text-xl font-black leading-none transition-transform duration-200 group-hover:scale-110 ${
+                isCollapsed ? "rotate-180" : ""
+              }`}
+            >
+              ❮
+            </span>
           </button>
         </div>
 
@@ -165,7 +185,10 @@ export function Sidebar({
           />
 
           {!isCollapsed && isWalletMenuOpen ? (
-            <div className="space-y-2 border-l border-stone-200 pl-5">
+            <div
+              className="space-y-2 border-l pl-5"
+              style={{ borderColor: "var(--app-border)" }}
+            >
               {PERSONAL_FINANCE_ITEMS.map((item) => (
                 <SidebarSubItem
                   key={item.view}
@@ -195,17 +218,20 @@ export function Sidebar({
           />
 
           {!isCollapsed && isBusinessMenuOpen ? (
-            <div className="space-y-2 border-l border-stone-200 pl-5">
+            <div
+              className="space-y-2 border-l pl-5"
+              style={{ borderColor: "var(--app-border)" }}
+            >
               <button
                 type="button"
                 onClick={handleCreateBusiness}
-                className="w-full rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 px-4 py-3 text-left text-sm font-black text-emerald-800 transition hover:border-emerald-700 hover:bg-emerald-100"
+                className="app-brand-soft w-full rounded-2xl border border-dashed px-4 py-3 text-left text-sm font-black transition hover:shadow-sm"
               >
                 + Criar novo negócio
               </button>
 
               {businesses.length === 0 ? (
-                <p className="rounded-2xl bg-stone-50 px-4 py-3 text-xs font-semibold text-stone-400">
+                <p className="app-card-soft rounded-2xl px-4 py-3 text-xs font-semibold">
                   Nenhum negócio criado
                 </p>
               ) : null}
@@ -221,19 +247,15 @@ export function Sidebar({
                     onClick={() => handleSelectBusiness(business.id)}
                     className={`w-full rounded-2xl px-4 py-3 text-left transition ${
                       isSelected
-                        ? "bg-stone-900 text-white"
-                        : "text-stone-600 hover:bg-stone-50 hover:text-stone-950"
+                        ? "app-sidebar-item-active"
+                        : "app-sidebar-item"
                     }`}
                   >
                     <span className="block truncate text-sm font-black">
                       {business.name}
                     </span>
 
-                    <span
-                      className={`mt-0.5 block truncate text-xs ${
-                        isSelected ? "text-stone-300" : "text-stone-400"
-                      }`}
-                    >
+                    <span className="mt-0.5 block truncate text-xs opacity-75">
                       {business.type}
                     </span>
                   </button>
@@ -244,13 +266,41 @@ export function Sidebar({
         </nav>
 
         <div className="mt-auto space-y-3">
+          <button
+            type="button"
+            onClick={openSettings}
+            className={`flex w-full items-center gap-3 rounded-3xl px-4 py-3 text-left transition ${
+              isSettingsActive ? "app-sidebar-item-active" : "app-sidebar-item"
+            }`}
+          >
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
+                isSettingsActive ? "bg-white" : "app-brand-soft"
+              }`}
+              style={{ color: isSettingsActive ? "var(--brand-primary)" : undefined }}
+            >
+              ⚙
+            </span>
+
+            {!isCollapsed ? (
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-black">
+                  Configurações
+                </span>
+                <span className="mt-0.5 block truncate text-xs opacity-75">
+                  Tema e aparência
+                </span>
+              </span>
+            ) : null}
+          </button>
+
           {!isCollapsed ? (
-            <div className="rounded-3xl border border-stone-200 bg-stone-50 p-4">
-              <p className="truncate text-sm font-black text-stone-950">
+            <div className="app-card-soft rounded-3xl p-4">
+              <p className="app-title truncate text-sm font-black">
                 {currentUser.name}
               </p>
 
-              <p className="mt-1 truncate text-xs text-stone-500">
+              <p className="app-muted mt-1 truncate text-xs">
                 {currentUser.email}
               </p>
             </div>
@@ -259,7 +309,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onLogout}
-            className="flex w-full items-center justify-center rounded-full border border-stone-200 px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50"
+            className="app-button-secondary w-full px-4 py-3 text-sm"
           >
             {isCollapsed ? "S" : "Sair"}
           </button>
@@ -291,15 +341,14 @@ function SidebarGroupButton({
       type="button"
       onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-3xl px-4 py-3 text-left transition ${
-        isActive
-          ? "bg-emerald-700 text-white shadow-sm"
-          : "text-stone-600 hover:bg-stone-100 hover:text-stone-950"
+        isActive ? "app-sidebar-item-active" : "app-sidebar-item"
       }`}
     >
       <span
         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
-          isActive ? "bg-white text-emerald-700" : "bg-stone-100 text-stone-700"
+          isActive ? "bg-white" : "app-brand-soft"
         }`}
+        style={{ color: isActive ? "var(--brand-primary)" : undefined }}
       >
         {shortLabel}
       </span>
@@ -308,12 +357,7 @@ function SidebarGroupButton({
         <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
           <span className="min-w-0">
             <span className="block truncate font-bold">{title}</span>
-
-            <span
-              className={`mt-0.5 block truncate text-xs ${
-                isActive ? "text-emerald-50" : "text-stone-400"
-              }`}
-            >
+            <span className="mt-0.5 block truncate text-xs opacity-75">
               {description}
             </span>
           </span>
@@ -339,27 +383,21 @@ function SidebarSubItem({
       type="button"
       onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
-        isActive
-          ? "bg-stone-900 text-white"
-          : "text-stone-600 hover:bg-stone-50 hover:text-stone-950"
+        isActive ? "app-sidebar-item-active" : "app-sidebar-item"
       }`}
     >
       <span
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
-          isActive ? "bg-white text-stone-900" : "bg-stone-100 text-stone-600"
+          isActive ? "bg-white" : "app-brand-soft"
         }`}
+        style={{ color: isActive ? "var(--brand-primary)" : undefined }}
       >
         {item.shortLabel}
       </span>
 
       <span className="min-w-0">
         <span className="block truncate text-sm font-black">{item.label}</span>
-
-        <span
-          className={`mt-0.5 block truncate text-xs ${
-            isActive ? "text-stone-300" : "text-stone-400"
-          }`}
-        >
+        <span className="mt-0.5 block truncate text-xs opacity-75">
           {item.description}
         </span>
       </span>

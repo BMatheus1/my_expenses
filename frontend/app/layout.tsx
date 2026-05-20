@@ -16,7 +16,49 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "My Expenses",
   description: "Controle mensal simples de gastos.",
+  icons: {   
+    icon: [
+      {
+        url: "/logo.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
+    ],
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
+
+const THEME_BOOTSTRAP_SCRIPT = `
+(function () {
+  try {
+    var availableThemes = [
+      "emerald",
+      "ocean",
+      "royal",
+      "violet",
+      "rose",
+      "sunset",
+      "amber",
+      "teal",
+      "graphite",
+      "midnight"
+    ];
+
+    var savedTheme = window.localStorage.getItem("my-expenses-theme");
+    var savedMode = window.localStorage.getItem("my-expenses-color-mode");
+
+    var theme = availableThemes.indexOf(savedTheme) >= 0 ? savedTheme : "emerald";
+    var mode = savedMode === "dark" ? "dark" : "light";
+
+    document.documentElement.dataset.appTheme = theme;
+    document.documentElement.dataset.appMode = mode;
+  } catch (error) {
+    document.documentElement.dataset.appTheme = "emerald";
+    document.documentElement.dataset.appMode = "light";
+  }
+})();
+`;
 
 export default function RootLayout({
   children,
@@ -26,9 +68,15 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable}`}
     >
-      <body className="min-h-full">{children}</body>
+      <head>
+        <meta name="theme-color" content="#f8fafc" />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+      </head>
+
+      <body>{children}</body>
     </html>
   );
 }

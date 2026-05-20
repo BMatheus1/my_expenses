@@ -40,6 +40,7 @@ import { ExpenseForm } from "./ExpenseForm";
 import { ExpenseList } from "./ExpenseList";
 import { IncomesView } from "./IncomesView";
 import { ReportsView } from "./ReportsView";
+import SettingsPage from "./settings/SettingsPage";
 import type { AppView } from "./Sidebar";
 import { SummaryCards } from "./SummaryCards";
 import { Toast } from "./Toast";
@@ -639,7 +640,9 @@ export function ExpensesDashboard({
       onActiveViewChange={setActiveView}
       onLogout={onLogout}
     >
-      {activeView === "businesses" ? (
+      {activeView === "settings" ? (
+        <SettingsPage />
+      ) : activeView === "businesses" ? (
         <BusinessWorkspace />
       ) : activeView === "reports" ? (
         <ReportsView

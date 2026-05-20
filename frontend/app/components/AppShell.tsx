@@ -22,7 +22,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <main className="min-h-screen bg-stone-50 text-stone-900">
+    <main className="app-shell">
       <div className="flex min-h-screen">
         <Sidebar
           activeView={activeView}

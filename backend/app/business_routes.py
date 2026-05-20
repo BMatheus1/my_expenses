@@ -4,6 +4,7 @@ from app.auth import get_current_user
 from app.business_schemas import (
     BusinessCreate,
     BusinessDashboardResponse,
+    BusinessDeleteConfirmation,
     BusinessMaterialCreate,
     BusinessMaterialResponse,
     BusinessMaterialUpdate,
@@ -68,12 +69,17 @@ def edit_business(
     return update_user_business(business_id, business_data, current_user.id)
 
 
-@router.delete("/{business_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/{business_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
 def remove_business(
     business_id: str,
+    confirmation_data: BusinessDeleteConfirmation,
     current_user: UserResponse = Depends(get_current_user),
 ):
-    delete_user_business(business_id, current_user.id)
+    delete_user_business(
+        business_id=business_id,
+        confirmation_data=confirmation_data,
+        user_id=current_user.id,
+    )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

@@ -695,3 +695,19 @@ def load_legacy_expenses(file_path: Path) -> list[ExpenseResponse]:
     data = json.loads(raw_content)
 
     return [ExpenseResponse.model_validate(item) for item in data]
+
+def get_user_record_by_id(user_id: str) -> UserRecord | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT id, name, email, password_hash, provider, created_at
+            FROM users
+            WHERE id = %s
+            """,
+            (user_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return UserRecord.model_validate(row)

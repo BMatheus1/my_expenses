@@ -15,6 +15,11 @@ class BusinessUpdate(BusinessCreate):
     pass
 
 
+class BusinessDeleteConfirmation(BaseModel):
+    password: str | None = Field(default=None, min_length=6, max_length=72)
+    google_credential: str | None = Field(default=None, min_length=10)
+
+
 class BusinessResponse(BaseModel):
     id: str
     name: str

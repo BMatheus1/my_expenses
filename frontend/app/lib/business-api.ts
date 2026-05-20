@@ -2,6 +2,7 @@ import type {
   Business,
   BusinessCreatePayload,
   BusinessDashboard,
+  BusinessDeletePayload,
   BusinessMaterial,
   BusinessMaterialCreatePayload,
   BusinessRecipeItemCreatePayload,
@@ -10,6 +11,8 @@ import type {
   BusinessSaleCreatePayload,
   BusinessService,
   BusinessServiceCreatePayload,
+  BusinessServiceUpdatePayload,
+  BusinessUpdatePayload,
 } from "@/app/types/business";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -38,29 +41,51 @@ async function businessRequest<T>(
 
   const token = getTokenFromStorage();
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method: options.method ?? "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    throw new ApiError(
+      "Não foi possível conectar ao backend. Verifique se a API está rodando e se a URL em NEXT_PUBLIC_API_URL está correta.",
+      0,
+    );
+  }
 
   if (response.status === 204) {
     return undefined as T;
   }
 
-  const data = await response.json().catch(() => null);
+  const rawText = await response.text();
+  const data = parseJsonSafely(rawText);
 
   if (!response.ok) {
-    throw new ApiError(getErrorMessage(data), response.status);
+    throw new ApiError(getErrorMessage(data, rawText), response.status);
   }
 
   return data as T;
 }
 
-function getErrorMessage(data: unknown): string {
+function parseJsonSafely(text: string): unknown {
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function getErrorMessage(data: unknown, fallbackText = ""): string {
   if (
     data &&
     typeof data === "object" &&
@@ -68,6 +93,10 @@ function getErrorMessage(data: unknown): string {
     typeof data.detail === "string"
   ) {
     return data.detail;
+  }
+
+  if (fallbackText) {
+    return fallbackText;
   }
 
   return "Não foi possível concluir a operação.";
@@ -200,7 +229,7 @@ export function createBusiness(payload: BusinessCreatePayload) {
 
 export function updateBusiness(
   businessId: string,
-  payload: BusinessCreatePayload,
+  payload: BusinessUpdatePayload,
 ) {
   return businessRequest<Business>(`/businesses/${businessId}`, {
     method: "PUT",
@@ -208,14 +237,20 @@ export function updateBusiness(
   });
 }
 
-export function deleteBusiness(businessId: string) {
-  return businessRequest<void>(`/businesses/${businessId}`, {
-    method: "DELETE",
+export function deleteBusiness(
+  businessId: string,
+  payload: BusinessDeletePayload,
+) {
+  return businessRequest<void>(`/businesses/${businessId}/delete`, {
+    method: "POST",
+    body: payload,
   });
 }
 
 export function getBusinessDashboard(businessId: string) {
-  return businessRequest<BusinessDashboard>(`/businesses/${businessId}/dashboard`);
+  return businessRequest<BusinessDashboard>(
+    `/businesses/${businessId}/dashboard`,
+  );
 }
 
 export function listBusinessMaterials(businessId: string) {
@@ -285,7 +320,7 @@ export function createBusinessService(
 export function updateBusinessService(
   businessId: string,
   serviceId: string,
-  payload: BusinessServiceCreatePayload,
+  payload: BusinessServiceUpdatePayload,
 ) {
   return businessRequest<BusinessService>(
     `/businesses/${businessId}/services/${serviceId}`,

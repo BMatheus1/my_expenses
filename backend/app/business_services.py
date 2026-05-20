@@ -1,5 +1,9 @@
 from fastapi import HTTPException, status
-
+import bcrypt
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
+from app.config import settings
+from app.storage import get_user_record_by_id
 from app.business_repository import (
     calculate_margin,
     create_business,
@@ -30,6 +34,7 @@ from app.business_schemas import (
     BusinessCreate,
     BusinessDashboardResponse,
     BusinessDashboardSummary,
+    BusinessDeleteConfirmation,
     BusinessMaterialCreate,
     BusinessMaterialResponse,
     BusinessMaterialUpdate,
@@ -78,7 +83,14 @@ def update_user_business(
     return BusinessResponse.model_validate(business)
 
 
-def delete_user_business(business_id: str, user_id: str) -> None:
+def delete_user_business(
+    business_id: str,
+    confirmation_data: BusinessDeleteConfirmation,
+    user_id: str,
+) -> None:
+    ensure_business_exists(business_id, user_id)
+    ensure_sensitive_action_confirmed(confirmation_data, user_id)
+
     deleted = delete_business(business_id, user_id)
 
     if not deleted:
@@ -445,3 +457,77 @@ def raise_not_found(message: str) -> None:
         status_code=status.HTTP_404_NOT_FOUND,
         detail=message,
     )
+
+def ensure_sensitive_action_confirmed(
+    confirmation_data: BusinessDeleteConfirmation,
+    user_id: str,
+) -> None:
+    user = get_user_record_by_id(user_id)
+
+    if user is None:
+        raise_not_found("Usuário não encontrado.")
+
+    if confirmation_data.password:
+        if validate_user_password(confirmation_data.password, user.password_hash):
+            return
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Senha incorreta.",
+        )
+
+    if confirmation_data.google_credential:
+        validate_google_confirmation(
+            google_credential=confirmation_data.google_credential,
+            expected_email=user.email,
+        )
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Confirme a exclusão com senha ou conta Google.",
+    )
+
+
+def validate_user_password(
+    password: str,
+    password_hash: str | None,
+) -> bool:
+    if not password_hash:
+        return False
+
+    return bcrypt.checkpw(
+        password.encode("utf-8"),
+        password_hash.encode("utf-8"),
+    )
+
+
+def validate_google_confirmation(
+    google_credential: str,
+    expected_email: str,
+) -> None:
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Login com Google não configurado no backend.",
+        )
+
+    try:
+        token_info = id_token.verify_oauth2_token(
+            google_credential,
+            google_requests.Request(),
+            settings.google_client_id,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Não foi possível confirmar sua conta Google.",
+        ) from error
+
+    token_email = str(token_info.get("email", "")).strip().lower()
+
+    if token_email != expected_email.strip().lower():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="A conta Google confirmada não pertence ao usuário atual.",
+        )

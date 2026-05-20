@@ -12,6 +12,13 @@ export type BusinessCreatePayload = {
   description?: string | null;
 };
 
+export type BusinessUpdatePayload = BusinessCreatePayload;
+
+export type BusinessDeletePayload = {
+  password?: string | null;
+  google_credential?: string | null;
+};
+
 export type BusinessMaterial = {
   id: string;
   business_id: string;
@@ -61,6 +68,8 @@ export type BusinessServiceCreatePayload = {
   estimated_minutes?: number | null;
   notes?: string | null;
 };
+
+export type BusinessServiceUpdatePayload = BusinessServiceCreatePayload;
 
 export type BusinessRecipeItem = {
   id: string;

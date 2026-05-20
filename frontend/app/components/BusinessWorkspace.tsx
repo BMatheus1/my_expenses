@@ -3,13 +3,16 @@
 import {
   type FormEvent,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
 import {
   BUSINESS_NAVIGATION_EVENT,
+  BUSINESS_REFRESH_EVENT,
   type BusinessNavigationPayload,
   consumeBusinessNavigationPayload,
   dispatchBusinessCreated,
@@ -20,18 +23,25 @@ import {
   createBusinessMaterial,
   createBusinessSale,
   createBusinessService,
+  deleteBusiness,
   deleteBusinessMaterial,
+  deleteBusinessService,
+  deleteServiceMaterial,
   getBusinessDashboard,
   listBusinessMaterials,
   listBusinesses,
   listBusinessSales,
   listBusinessServices,
+  updateBusiness,
   updateBusinessMaterial,
+  updateBusinessService,
+  updateServiceMaterial,
 } from "@/app/lib/business-api";
 import type {
   Business,
   BusinessDashboard,
   BusinessMaterial,
+  BusinessRecipeItem,
   BusinessSale,
   BusinessService,
 } from "@/app/types/business";
@@ -78,6 +88,44 @@ type SaleFormState = {
   notes: string;
 };
 
+type DeleteBusinessMode = "password" | "google";
+
+type GoogleCredentialResponse = {
+  credential?: string;
+};
+
+type GoogleButtonOptions = {
+  theme?: "outline" | "filled_blue" | "filled_black";
+  size?: "large" | "medium" | "small";
+  text?: "signin_with" | "signup_with" | "continue_with" | "signin";
+  shape?: "rectangular" | "pill" | "circle" | "square";
+  width?: number;
+};
+
+type GoogleIdentityServices = {
+  accounts?: {
+    id?: {
+      initialize: (config: {
+        client_id: string;
+        callback: (response: GoogleCredentialResponse) => void;
+      }) => void;
+      renderButton: (
+        parent: HTMLElement,
+        options: GoogleButtonOptions,
+      ) => void;
+    };
+  };
+};
+
+function getGoogleIdentityService() {
+  const windowWithGoogle = window as unknown as {
+    google?: GoogleIdentityServices;
+  };
+
+  return windowWithGoogle.google?.accounts?.id;
+}
+
+
 const TIPOS_NEGOCIO = [
   "Beleza",
   "Alimentação",
@@ -109,6 +157,7 @@ const FORMAS_PAGAMENTO = [
   "Outro",
 ];
 
+const GOOGLE_SCRIPT_ID = "google-identity-services-script";
 const hoje = new Date().toISOString().slice(0, 10);
 
 const negocioInicial: BusinessFormState = {
@@ -173,6 +222,15 @@ export default function BusinessWorkspace() {
     negocioInicial,
   );
 
+  const [editandoNegocio, setEditandoNegocio] = useState(false);
+  const [negocioEdicaoForm, setNegocioEdicaoForm] =
+    useState<BusinessFormState>(negocioInicial);
+
+  const [deleteBusinessModalOpen, setDeleteBusinessModalOpen] = useState(false);
+  const [deleteBusinessMode, setDeleteBusinessMode] =
+    useState<DeleteBusinessMode>("password");
+  const [deletePassword, setDeletePassword] = useState("");
+
   const [materialForm, setMaterialForm] = useState<MaterialFormState>(
     materialInicial,
   );
@@ -183,9 +241,16 @@ export default function BusinessWorkspace() {
   const [servicoForm, setServicoForm] = useState<ServiceFormState>(
     servicoInicial,
   );
-  const [fichaForm, setFichaForm] = useState<RecipeFormState>(fichaInicial);
-  const [vendaForm, setVendaForm] = useState<SaleFormState>(vendaInicial);
+  const [servicoEmEdicaoId, setServicoEmEdicaoId] = useState<string | null>(
+    null,
+  );
 
+  const [fichaForm, setFichaForm] = useState<RecipeFormState>(fichaInicial);
+  const [itemFichaEmEdicaoId, setItemFichaEmEdicaoId] = useState<string | null>(
+    null,
+  );
+
+  const [vendaForm, setVendaForm] = useState<SaleFormState>(vendaInicial);
   const [buscaEstoque, setBuscaEstoque] = useState("");
   const [categoriaEstoque, setCategoriaEstoque] = useState("Todas");
 
@@ -247,9 +312,78 @@ export default function BusinessWorkspace() {
     };
   }, [materiais]);
 
+  const carregarDadosDoNegocio = useCallback(async (businessId: string) => {
+    try {
+      setErro(null);
+
+      const [
+        dashboardCarregado,
+        materiaisCarregados,
+        servicosCarregados,
+        vendasCarregadas,
+      ] = await Promise.all([
+        getBusinessDashboard(businessId),
+        listBusinessMaterials(businessId),
+        listBusinessServices(businessId),
+        listBusinessSales(businessId),
+      ]);
+
+      setDashboard(dashboardCarregado);
+      setMateriais(materiaisCarregados);
+      setServicos(servicosCarregados);
+      setVendas(vendasCarregadas);
+
+      setFichaForm((formAtual) => ({
+        ...formAtual,
+        service_id: formAtual.service_id || servicosCarregados[0]?.id || "",
+        material_id: formAtual.material_id || materiaisCarregados[0]?.id || "",
+      }));
+
+      setVendaForm((formAtual) => ({
+        ...formAtual,
+        service_id: formAtual.service_id || servicosCarregados[0]?.id || "",
+      }));
+    } catch (error) {
+      setErro(getErrorMessage(error));
+    }
+  }, []);
+
+  const carregarNegocios = useCallback(async () => {
+    try {
+      setCarregando(true);
+      setErro(null);
+
+      const negociosCarregados = await listBusinesses();
+
+      setNegocios(negociosCarregados);
+
+      if (negociosCarregados.length > 0) {
+        setNegocioSelecionadoId(
+          (valorAtual) => valorAtual ?? negociosCarregados[0].id,
+        );
+        setCriandoNegocio(false);
+      } else {
+        setNegocioSelecionadoId(null);
+        setCriandoNegocio(true);
+      }
+    } catch (error) {
+      setErro(getErrorMessage(error));
+    } finally {
+      setCarregando(false);
+    }
+  }, []);
+
+  const atualizarNegocioSelecionado = useCallback(async () => {
+    if (!negocioSelecionadoId) {
+      return;
+    }
+
+    await carregarDadosDoNegocio(negocioSelecionadoId);
+  }, [carregarDadosDoNegocio, negocioSelecionadoId]);
+
   useEffect(() => {
     carregarNegocios();
-  }, []);
+  }, [carregarNegocios]);
 
   useEffect(() => {
     if (!negocioSelecionadoId) {
@@ -257,7 +391,7 @@ export default function BusinessWorkspace() {
     }
 
     carregarDadosDoNegocio(negocioSelecionadoId);
-  }, [negocioSelecionadoId]);
+  }, [carregarDadosDoNegocio, negocioSelecionadoId]);
 
   useEffect(() => {
     function applyNavigationPayload(payload: BusinessNavigationPayload | null) {
@@ -299,74 +433,6 @@ export default function BusinessWorkspace() {
     };
   }, []);
 
-  async function carregarNegocios() {
-    try {
-      setCarregando(true);
-      setErro(null);
-
-      const negociosCarregados = await listBusinesses();
-
-      setNegocios(negociosCarregados);
-
-      if (negociosCarregados.length > 0) {
-        setNegocioSelecionadoId(
-          (valorAtual) => valorAtual ?? negociosCarregados[0].id,
-        );
-        setCriandoNegocio(false);
-      } else {
-        setCriandoNegocio(true);
-      }
-    } catch (error) {
-      setErro(getErrorMessage(error));
-    } finally {
-      setCarregando(false);
-    }
-  }
-
-  async function carregarDadosDoNegocio(businessId: string) {
-    try {
-      setErro(null);
-
-      const [
-        dashboardCarregado,
-        materiaisCarregados,
-        servicosCarregados,
-        vendasCarregadas,
-      ] = await Promise.all([
-        getBusinessDashboard(businessId),
-        listBusinessMaterials(businessId),
-        listBusinessServices(businessId),
-        listBusinessSales(businessId),
-      ]);
-
-      setDashboard(dashboardCarregado);
-      setMateriais(materiaisCarregados);
-      setServicos(servicosCarregados);
-      setVendas(vendasCarregadas);
-
-      setFichaForm((formAtual) => ({
-        ...formAtual,
-        service_id: formAtual.service_id || servicosCarregados[0]?.id || "",
-        material_id: formAtual.material_id || materiaisCarregados[0]?.id || "",
-      }));
-
-      setVendaForm((formAtual) => ({
-        ...formAtual,
-        service_id: formAtual.service_id || servicosCarregados[0]?.id || "",
-      }));
-    } catch (error) {
-      setErro(getErrorMessage(error));
-    }
-  }
-
-  async function atualizarNegocioSelecionado() {
-    if (!negocioSelecionadoId) {
-      return;
-    }
-
-    await carregarDadosDoNegocio(negocioSelecionadoId);
-  }
-
   async function handleCriarNegocio(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -392,6 +458,96 @@ export default function BusinessWorkspace() {
       setAbaAtiva("resumo");
       setSucesso("Negócio criado com sucesso.");
       dispatchBusinessCreated(novoNegocio.id);
+    } catch (error) {
+      setErro(getErrorMessage(error));
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function handleEditarNegocio(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!negocioSelecionadoId) {
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      setErro(null);
+
+      const negocioAtualizado = await updateBusiness(negocioSelecionadoId, {
+        name: negocioEdicaoForm.name,
+        type: negocioEdicaoForm.type,
+        description: negocioEdicaoForm.description || null,
+      });
+
+      setNegocios((listaAtual) =>
+        listaAtual.map((negocio) =>
+          negocio.id === negocioAtualizado.id ? negocioAtualizado : negocio,
+        ),
+      );
+
+      setEditandoNegocio(false);
+      setSucesso("Negócio atualizado com sucesso.");
+      dispatchBusinessRefresh();
+    } catch (error) {
+      setErro(getErrorMessage(error));
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function handleExcluirNegocioComSenha(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!negocioSelecionadoId) {
+      return;
+    }
+
+    await excluirNegocio({
+      password: deletePassword,
+      google_credential: null,
+    });
+  }
+
+  async function handleExcluirNegocioComGoogleCredential(credential: string) {
+  await excluirNegocio({
+    password: null,
+    google_credential: credential,
+  });
+}
+
+  async function excluirNegocio(payload: {
+    password?: string | null;
+    google_credential?: string | null;
+  }) {
+    if (!negocioSelecionadoId) {
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      setErro(null);
+
+      await deleteBusiness(negocioSelecionadoId, payload);
+
+      const negociosAtualizados = await listBusinesses();
+
+      setNegocios(negociosAtualizados);
+      setDeleteBusinessModalOpen(false);
+      setDeletePassword("");
+      dispatchBusinessRefresh();
+
+      if (negociosAtualizados.length > 0) {
+        setNegocioSelecionadoId(negociosAtualizados[0].id);
+        setCriandoNegocio(false);
+      } else {
+        setNegocioSelecionadoId(null);
+        setCriandoNegocio(true);
+      }
+
+      setSucesso("Negócio excluído com segurança.");
     } catch (error) {
       setErro(getErrorMessage(error));
     } finally {
@@ -474,29 +630,7 @@ export default function BusinessWorkspace() {
     }
   }
 
-  function iniciarEdicaoMaterial(material: BusinessMaterial) {
-    setMaterialEmEdicaoId(material.id);
-    setMaterialForm({
-      name: material.name,
-      category: material.category,
-      stock_quantity: String(material.stock_quantity).replace(".", ","),
-      unit: material.unit,
-      total_cost: String(material.total_cost).replace(".", ","),
-      supplier: material.supplier ?? "",
-      purchase_date: material.purchase_date,
-      notes: material.notes ?? "",
-    });
-    setAbaAtiva("estoque");
-    setErro(null);
-    setSucesso(null);
-  }
-
-  function limparFormularioMaterial() {
-    setMaterialEmEdicaoId(null);
-    setMaterialForm(materialInicial);
-  }
-
-  async function handleCriarServico(event: FormEvent<HTMLFormElement>) {
+  async function handleSalvarServico(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!negocioSelecionadoId) {
@@ -507,7 +641,7 @@ export default function BusinessWorkspace() {
       setSalvando(true);
       setErro(null);
 
-      await createBusinessService(negocioSelecionadoId, {
+      const payload = {
         name: servicoForm.name,
         category: servicoForm.category,
         price: toNumber(servicoForm.price),
@@ -515,10 +649,21 @@ export default function BusinessWorkspace() {
           ? Number(servicoForm.estimated_minutes)
           : null,
         notes: servicoForm.notes || null,
-      });
+      };
 
-      setServicoForm(servicoInicial);
-      setSucesso("Serviço ou produto criado com sucesso.");
+      if (servicoEmEdicaoId) {
+        await updateBusinessService(
+          negocioSelecionadoId,
+          servicoEmEdicaoId,
+          payload,
+        );
+        setSucesso("Serviço atualizado com sucesso.");
+      } else {
+        await createBusinessService(negocioSelecionadoId, payload);
+        setSucesso("Serviço ou produto criado com sucesso.");
+      }
+
+      limparFormularioServico();
       await atualizarNegocioSelecionado();
     } catch (error) {
       setErro(getErrorMessage(error));
@@ -527,9 +672,39 @@ export default function BusinessWorkspace() {
     }
   }
 
-  async function handleAdicionarMaterialNaFicha(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  async function handleExcluirServico(service: BusinessService) {
+    if (!negocioSelecionadoId) {
+      return;
+    }
+
+    const confirmou = window.confirm(
+      `Excluir "${service.name}"? As fichas ligadas a esse serviço também serão removidas.`,
+    );
+
+    if (!confirmou) {
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      setErro(null);
+
+      await deleteBusinessService(negocioSelecionadoId, service.id);
+
+      if (servicoEmEdicaoId === service.id) {
+        limparFormularioServico();
+      }
+
+      setSucesso("Serviço excluído com sucesso.");
+      await atualizarNegocioSelecionado();
+    } catch (error) {
+      setErro(getErrorMessage(error));
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function handleSalvarItemFicha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!negocioSelecionadoId) {
@@ -545,17 +720,60 @@ export default function BusinessWorkspace() {
       setSalvando(true);
       setErro(null);
 
-      await addMaterialToService(negocioSelecionadoId, fichaForm.service_id, {
-        material_id: fichaForm.material_id,
-        quantity_used: toNumber(fichaForm.quantity_used),
-      });
+      if (itemFichaEmEdicaoId) {
+        await updateServiceMaterial(
+          negocioSelecionadoId,
+          fichaForm.service_id,
+          itemFichaEmEdicaoId,
+          {
+            quantity_used: toNumber(fichaForm.quantity_used),
+          },
+        );
+        setSucesso("Item da ficha atualizado com sucesso.");
+      } else {
+        await addMaterialToService(negocioSelecionadoId, fichaForm.service_id, {
+          material_id: fichaForm.material_id,
+          quantity_used: toNumber(fichaForm.quantity_used),
+        });
+        setSucesso("Material adicionado à ficha de custo.");
+      }
 
-      setFichaForm((formAtual) => ({
-        ...formAtual,
-        quantity_used: "",
-      }));
+      limparFormularioFicha();
+      await atualizarNegocioSelecionado();
+    } catch (error) {
+      setErro(getErrorMessage(error));
+    } finally {
+      setSalvando(false);
+    }
+  }
 
-      setSucesso("Material adicionado à ficha de custo.");
+  async function handleExcluirItemFicha(
+    service: BusinessService,
+    item: BusinessRecipeItem,
+  ) {
+    if (!negocioSelecionadoId) {
+      return;
+    }
+
+    const confirmou = window.confirm(
+      `Remover "${item.material_name}" da ficha de "${service.name}"?`,
+    );
+
+    if (!confirmou) {
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      setErro(null);
+
+      await deleteServiceMaterial(negocioSelecionadoId, service.id, item.id);
+
+      if (itemFichaEmEdicaoId === item.id) {
+        limparFormularioFicha();
+      }
+
+      setSucesso("Item removido da ficha de custo.");
       await atualizarNegocioSelecionado();
     } catch (error) {
       setErro(getErrorMessage(error));
@@ -599,6 +817,85 @@ export default function BusinessWorkspace() {
     }
   }
 
+  function abrirEdicaoNegocio() {
+    if (!negocioSelecionado) {
+      return;
+    }
+
+    setNegocioEdicaoForm({
+      name: negocioSelecionado.name,
+      type: negocioSelecionado.type,
+      description: negocioSelecionado.description ?? "",
+    });
+    setEditandoNegocio(true);
+  }
+
+  function iniciarEdicaoMaterial(material: BusinessMaterial) {
+    setMaterialEmEdicaoId(material.id);
+    setMaterialForm({
+      name: material.name,
+      category: material.category,
+      stock_quantity: String(material.stock_quantity).replace(".", ","),
+      unit: material.unit,
+      total_cost: String(material.total_cost).replace(".", ","),
+      supplier: material.supplier ?? "",
+      purchase_date: material.purchase_date,
+      notes: material.notes ?? "",
+    });
+    setAbaAtiva("estoque");
+    setErro(null);
+    setSucesso(null);
+  }
+
+  function iniciarEdicaoServico(service: BusinessService) {
+    setServicoEmEdicaoId(service.id);
+    setServicoForm({
+      name: service.name,
+      category: service.category,
+      price: String(service.price).replace(".", ","),
+      estimated_minutes: service.estimated_minutes
+        ? String(service.estimated_minutes)
+        : "",
+      notes: service.notes ?? "",
+    });
+    setAbaAtiva("servicos");
+    setErro(null);
+    setSucesso(null);
+  }
+
+  function iniciarEdicaoItemFicha(
+    service: BusinessService,
+    item: BusinessRecipeItem,
+  ) {
+    setItemFichaEmEdicaoId(item.id);
+    setFichaForm({
+      service_id: service.id,
+      material_id: item.material_id,
+      quantity_used: String(item.quantity_used).replace(".", ","),
+    });
+    setAbaAtiva("servicos");
+    setErro(null);
+    setSucesso(null);
+  }
+
+  function limparFormularioMaterial() {
+    setMaterialEmEdicaoId(null);
+    setMaterialForm(materialInicial);
+  }
+
+  function limparFormularioServico() {
+    setServicoEmEdicaoId(null);
+    setServicoForm(servicoInicial);
+  }
+
+  function limparFormularioFicha() {
+    setItemFichaEmEdicaoId(null);
+    setFichaForm((formAtual) => ({
+      ...formAtual,
+      quantity_used: "",
+    }));
+  }
+
   return (
     <section className="space-y-6">
       {erro ? (
@@ -635,6 +932,8 @@ export default function BusinessWorkspace() {
               servicos: servicos.length,
               vendas: vendas.length,
             }}
+            onEdit={abrirEdicaoNegocio}
+            onDelete={() => setDeleteBusinessModalOpen(true)}
           />
 
           <TabNavigation activeTab={abaAtiva} onChange={setAbaAtiva} />
@@ -678,12 +977,20 @@ export default function BusinessWorkspace() {
               servicos={servicos}
               servicoForm={servicoForm}
               fichaForm={fichaForm}
+              servicoEmEdicaoId={servicoEmEdicaoId}
+              itemFichaEmEdicaoId={itemFichaEmEdicaoId}
               servicoSelecionadoParaFicha={servicoSelecionadoParaFicha}
               saving={salvando}
               onServiceChange={setServicoForm}
               onRecipeChange={setFichaForm}
-              onServiceSubmit={handleCriarServico}
-              onRecipeSubmit={handleAdicionarMaterialNaFicha}
+              onServiceSubmit={handleSalvarServico}
+              onRecipeSubmit={handleSalvarItemFicha}
+              onCancelServiceEdit={limparFormularioServico}
+              onCancelRecipeEdit={limparFormularioFicha}
+              onEditService={iniciarEdicaoServico}
+              onDeleteService={handleExcluirServico}
+              onEditRecipeItem={iniciarEdicaoItemFicha}
+              onDeleteRecipeItem={handleExcluirItemFicha}
             />
           ) : null}
 
@@ -704,6 +1011,34 @@ export default function BusinessWorkspace() {
       {!criandoNegocio && !negocioSelecionado && !carregando ? (
         <EmptyBusinessState onCreate={() => setCriandoNegocio(true)} />
       ) : null}
+
+      {editandoNegocio ? (
+        <EditBusinessModal
+          form={negocioEdicaoForm}
+          saving={salvando}
+          onChange={setNegocioEdicaoForm}
+          onClose={() => setEditandoNegocio(false)}
+          onSubmit={handleEditarNegocio}
+        />
+      ) : null}
+
+      {deleteBusinessModalOpen && negocioSelecionado ? (
+        <DeleteBusinessModal
+          businessName={negocioSelecionado.name}
+          mode={deleteBusinessMode}
+          password={deletePassword}
+          saving={salvando}
+          googleEnabled={Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)}
+          onModeChange={setDeleteBusinessMode}
+          onPasswordChange={setDeletePassword}
+          onClose={() => {
+            setDeleteBusinessModalOpen(false);
+            setDeletePassword("");
+          }}
+          onSubmitPassword={handleExcluirNegocioComSenha}
+          onGoogleCredential={handleExcluirNegocioComGoogleCredential}
+        />
+      ) : null}
     </section>
   );
 }
@@ -722,13 +1057,11 @@ function CreateBusinessCard({
   return (
     <SectionCard>
       <div className="mb-6">
-        <p className="text-sm font-bold text-emerald-700">
-          Novo negócio
-        </p>
-        <h1 className="text-2xl font-black tracking-tight text-stone-950">
+        <p className="text-sm font-bold text-emerald-700">Novo negócio</p>
+        <h1 className="texto-quebra text-2xl font-black tracking-tight text-stone-950">
           Crie uma área para controlar custos, estoque, serviços e vendas
         </h1>
-        <p className="mt-2 text-sm text-stone-500">
+        <p className="mt-2 texto-quebra text-sm text-stone-500">
           Ideal para salão, marmitaria, loja, artesanato, manutenção, construção
           e qualquer atividade que precise calcular custo por venda.
         </p>
@@ -769,9 +1102,167 @@ function CreateBusinessCard({
   );
 }
 
+function EditBusinessModal({
+  form,
+  saving,
+  onChange,
+  onClose,
+  onSubmit,
+}: {
+  form: BusinessFormState;
+  saving: boolean;
+  onChange: (form: BusinessFormState) => void;
+  onClose: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Modal title="Editar negócio" onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-4">
+        <InputField
+          label="Nome do negócio"
+          value={form.name}
+          onChange={(value) => onChange({ ...form, name: value })}
+          required
+        />
+
+        <SelectField
+          label="Tipo"
+          value={form.type}
+          onChange={(value) => onChange({ ...form, type: value })}
+          options={TIPOS_NEGOCIO}
+        />
+
+        <TextareaField
+          label="Descrição"
+          value={form.description}
+          onChange={(value) => onChange({ ...form, description: value })}
+        />
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <SecondaryButton type="button" onClick={onClose}>
+            Cancelar
+          </SecondaryButton>
+
+          <PrimaryButton disabled={saving}>
+            {saving ? "Salvando..." : "Salvar alterações"}
+          </PrimaryButton>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function DeleteBusinessModal({
+  businessName,
+  mode,
+  password,
+  saving,
+  googleEnabled,
+  onModeChange,
+  onPasswordChange,
+  onClose,
+  onSubmitPassword,
+  onGoogleCredential,
+}: {
+  businessName: string;
+  mode: DeleteBusinessMode;
+  password: string;
+  saving: boolean;
+  googleEnabled: boolean;
+  onModeChange: (mode: DeleteBusinessMode) => void;
+  onPasswordChange: (value: string) => void;
+  onClose: () => void;
+  onSubmitPassword: (event: FormEvent<HTMLFormElement>) => void;
+  onGoogleCredential: (credential: string) => void;
+}) {
+  return (
+    <Modal title="Excluir negócio" onClose={onClose}>
+      <div className="space-y-5">
+        <div className="rounded-3xl border border-red-200 bg-red-50 p-4">
+          <p className="texto-quebra text-sm font-bold text-red-800">
+            Você está prestes a excluir o negócio{" "}
+            <span className="font-black">{businessName}</span>.
+          </p>
+          <p className="mt-2 texto-quebra text-sm text-red-700">
+            Essa ação remove materiais, serviços, fichas e vendas desse negócio.
+            Para sua segurança, confirme com senha ou conta Google.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => onModeChange("password")}
+            className={`rounded-2xl border px-4 py-3 text-sm font-black transition ${
+              mode === "password"
+                ? "border-stone-900 bg-stone-900 text-white"
+                : "border-stone-200 text-stone-600 hover:bg-stone-50"
+            }`}
+          >
+            Confirmar com senha
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onModeChange("google")}
+            className={`rounded-2xl border px-4 py-3 text-sm font-black transition ${
+              mode === "google"
+                ? "border-stone-900 bg-stone-900 text-white"
+                : "border-stone-200 text-stone-600 hover:bg-stone-50"
+            }`}
+          >
+            Confirmar com Google
+          </button>
+        </div>
+
+        {mode === "password" ? (
+          <form onSubmit={onSubmitPassword} className="space-y-4">
+            <InputField
+              label="Digite sua senha"
+              type="password"
+              value={password}
+              onChange={onPasswordChange}
+              required
+            />
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <SecondaryButton type="button" onClick={onClose}>
+                Cancelar
+              </SecondaryButton>
+
+              <DangerButton type="submit" disabled={saving}>
+                {saving ? "Excluindo..." : "Excluir negócio"}
+              </DangerButton>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            {!googleEnabled ? (
+              <div className="rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+                Login com Google não está configurado no frontend.
+              </div>
+            ) : (
+              <GoogleDeleteButton
+                disabled={saving}
+                onCredential={onGoogleCredential}
+              />
+            )}
+
+            <SecondaryButton type="button" onClick={onClose}>
+              Cancelar
+            </SecondaryButton>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 function BusinessHeader({
   business,
   stats,
+  onEdit,
+  onDelete,
 }: {
   business: Business;
   stats: {
@@ -779,35 +1270,152 @@ function BusinessHeader({
     servicos: number;
     vendas: number;
   };
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   return (
-    <header className="overflow-hidden rounded-3xl border border-emerald-100 bg-emerald-800 p-6 text-white shadow-sm">
+    <header className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-100">
+          <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
             {business.type}
           </p>
-          <h1 className="mt-2 texto-quebra text-3xl font-black tracking-tight">
+          <h1 className="mt-2 texto-quebra text-3xl font-black tracking-tight text-stone-950">
             {business.name}
           </h1>
           {business.description ? (
-            <p className="mt-2 max-w-3xl texto-quebra text-sm text-emerald-50">
+            <p className="mt-2 max-w-3xl texto-quebra text-sm text-stone-500">
               {business.description}
             </p>
           ) : (
-            <p className="mt-2 max-w-3xl text-sm text-emerald-50">
+            <p className="mt-2 max-w-3xl text-sm text-stone-500">
               Controle inteligente de estoque, fichas de custo e lucro bruto.
             </p>
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-2 rounded-3xl bg-white/10 p-2 backdrop-blur">
-          <HeaderMiniStat label="Estoque" value={stats.materiais} />
-          <HeaderMiniStat label="Serviços" value={stats.servicos} />
-          <HeaderMiniStat label="Vendas" value={stats.vendas} />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-full border border-stone-200 px-4 py-2 text-sm font-black text-stone-700 transition hover:bg-stone-50"
+          >
+            Editar
+          </button>
+
+          <button
+            type="button"
+            onClick={onDelete}
+            className="rounded-full border border-red-200 px-4 py-2 text-sm font-black text-red-600 transition hover:bg-red-50"
+          >
+            Excluir
+          </button>
         </div>
       </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <HeaderMiniStat label="Itens no estoque" value={stats.materiais} />
+        <HeaderMiniStat label="Serviços" value={stats.servicos} />
+        <HeaderMiniStat label="Vendas" value={stats.vendas} />
+      </div>
     </header>
+  );
+}
+function GoogleDeleteButton({
+  disabled,
+  onCredential,
+}: {
+  disabled: boolean;
+  onCredential: (credential: string) => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const renderedContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!container || disabled) {
+      return;
+    }
+
+    const buttonContainer = container;
+
+    if (renderedContainerRef.current === buttonContainer) {
+      return;
+    }
+
+    let active = true;
+
+    async function renderGoogleButton() {
+      try {
+        const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+        if (!googleClientId) {
+          setError("NEXT_PUBLIC_GOOGLE_CLIENT_ID não está configurado.");
+          return;
+        }
+
+        await loadGoogleScript();
+
+        if (!active) {
+          return;
+        }
+
+        const googleId = getGoogleIdentityService();
+
+        if (!googleId) {
+          setError("Login com Google não foi carregado.");
+          return;
+        }
+
+        googleId.initialize({
+          client_id: googleClientId,
+          callback: (response: GoogleCredentialResponse) => {
+            if (!response.credential) {
+              setError("Não foi possível confirmar a conta Google.");
+              return;
+            }
+
+            onCredential(response.credential);
+          },
+        });
+
+        googleId.renderButton(buttonContainer, {
+          theme: "outline",
+          size: "large",
+          text: "continue_with",
+          shape: "pill",
+          width: 320,
+        });
+
+        renderedContainerRef.current = buttonContainer;
+      } catch (error) {
+        setError(getErrorMessage(error));
+      }
+    }
+
+    renderGoogleButton();
+
+    return () => {
+      active = false;
+    };
+  }, [container, disabled, onCredential]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex min-h-12 justify-center" ref={setContainer} />
+
+      {disabled ? (
+        <p className="text-center text-sm font-semibold text-stone-500">
+          Confirmando...
+        </p>
+      ) : null}
+
+      {error ? (
+        <p className="texto-quebra rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -819,9 +1427,9 @@ function HeaderMiniStat({
   value: number;
 }) {
   return (
-    <div className="min-w-20 rounded-2xl bg-white/10 px-4 py-3 text-center">
-      <p className="text-lg font-black">{value}</p>
-      <p className="text-xs font-semibold text-emerald-50">{label}</p>
+    <div className="rounded-3xl bg-stone-50 px-4 py-3">
+      <p className="text-lg font-black text-stone-950">{value}</p>
+      <p className="text-xs font-semibold text-stone-500">{label}</p>
     </div>
   );
 }
@@ -955,7 +1563,7 @@ function ResumoTab({
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid gap-6 xl:grid-cols-2">
         <SectionCard>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
@@ -963,7 +1571,7 @@ function ResumoTab({
                 Painel inteligente
               </h2>
               <p className="mt-1 text-sm text-stone-500">
-                Uma leitura rápida para saber se o negócio está organizado para vender.
+                Uma leitura rápida para saber se o negócio está pronto para vender.
               </p>
             </div>
 
@@ -1000,7 +1608,7 @@ function ResumoTab({
             <h3 className="font-black text-emerald-950">
               Próxima melhor ação
             </h3>
-            <p className="mt-2 text-sm text-emerald-800">
+            <p className="mt-2 texto-quebra text-sm text-emerald-800">
               {getNextActionMessage({
                 materiais,
                 servicos,
@@ -1129,7 +1737,7 @@ function EstoqueTab({
         <MetricCard
           label="Valor em estoque"
           value={formatCurrency(estatisticas.valorEmEstoque)}
-          hint="Quantidade atual × custo unitário"
+          hint="Quantidade atual x custo unitário"
         />
         <MetricCard
           label="Categorias"
@@ -1143,7 +1751,7 @@ function EstoqueTab({
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+      <div className="grid gap-6 xl:grid-cols-2">
         <SectionCard>
           <div className="mb-5 flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -1151,9 +1759,11 @@ function EstoqueTab({
                 {materialEmEdicaoId ? "Editar material" : "Novo material"}
               </p>
               <h2 className="texto-quebra text-xl font-black tracking-tight text-stone-950">
-                {materialEmEdicaoId ? "Corrigir item do estoque" : "Adicionar ao estoque"}
+                {materialEmEdicaoId
+                  ? "Corrigir item do estoque"
+                  : "Adicionar ao estoque"}
               </h2>
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-1 texto-quebra text-sm text-stone-500">
                 Informe a quantidade comprada e o valor pago para calcular o custo unitário.
               </p>
             </div>
@@ -1186,7 +1796,7 @@ function EstoqueTab({
               required
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <InputField
                 label="Quantidade"
                 value={form.stock_quantity}
@@ -1268,7 +1878,7 @@ function EstoqueTab({
               <h2 className="text-xl font-black tracking-tight text-stone-950">
                 Estoque organizado
               </h2>
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-1 texto-quebra text-sm text-stone-500">
                 Consulte, filtre, edite ou exclua materiais cadastrados.
               </p>
             </div>
@@ -1278,7 +1888,7 @@ function EstoqueTab({
             </Badge>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="grid gap-3 md:grid-cols-2">
             <InputField
               label="Buscar material"
               value={busca}
@@ -1319,36 +1929,77 @@ function ServicosTab({
   servicos,
   servicoForm,
   fichaForm,
+  servicoEmEdicaoId,
+  itemFichaEmEdicaoId,
   servicoSelecionadoParaFicha,
   saving,
   onServiceChange,
   onRecipeChange,
   onServiceSubmit,
   onRecipeSubmit,
+  onCancelServiceEdit,
+  onCancelRecipeEdit,
+  onEditService,
+  onDeleteService,
+  onEditRecipeItem,
+  onDeleteRecipeItem,
 }: {
   materiais: BusinessMaterial[];
   servicos: BusinessService[];
   servicoForm: ServiceFormState;
   fichaForm: RecipeFormState;
+  servicoEmEdicaoId: string | null;
+  itemFichaEmEdicaoId: string | null;
   servicoSelecionadoParaFicha: BusinessService | null;
   saving: boolean;
   onServiceChange: (form: ServiceFormState) => void;
   onRecipeChange: (form: RecipeFormState) => void;
   onServiceSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onRecipeSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancelServiceEdit: () => void;
+  onCancelRecipeEdit: () => void;
+  onEditService: (service: BusinessService) => void;
+  onDeleteService: (service: BusinessService) => void;
+  onEditRecipeItem: (
+    service: BusinessService,
+    item: BusinessRecipeItem,
+  ) => void;
+  onDeleteRecipeItem: (
+    service: BusinessService,
+    item: BusinessRecipeItem,
+  ) => void;
 }) {
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+      <div className="grid gap-6 xl:grid-cols-2">
         <SectionCard>
-          <h2 className="text-xl font-black tracking-tight text-stone-950">
-            Criar serviço ou produto
-          </h2>
-          <p className="mt-1 text-sm text-stone-500">
-            Cadastre o que você vende. Depois monte a ficha com os materiais usados.
-          </p>
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-emerald-700">
+                {servicoEmEdicaoId ? "Editar serviço" : "Novo serviço"}
+              </p>
+              <h2 className="texto-quebra text-xl font-black tracking-tight text-stone-950">
+                {servicoEmEdicaoId
+                  ? "Corrigir serviço ou produto"
+                  : "Criar serviço ou produto"}
+              </h2>
+              <p className="mt-1 texto-quebra text-sm text-stone-500">
+                Cadastre o que você vende. Depois monte a ficha com os materiais usados.
+              </p>
+            </div>
 
-          <form onSubmit={onServiceSubmit} className="mt-5 space-y-4">
+            {servicoEmEdicaoId ? (
+              <button
+                type="button"
+                onClick={onCancelServiceEdit}
+                className="shrink-0 rounded-full border border-stone-200 px-3 py-2 text-xs font-bold text-stone-600 transition hover:bg-stone-50"
+              >
+                Cancelar
+              </button>
+            ) : null}
+          </div>
+
+          <form onSubmit={onServiceSubmit} className="space-y-4">
             <InputField
               label="Nome"
               value={servicoForm.name}
@@ -1403,20 +2054,41 @@ function ServicosTab({
             />
 
             <PrimaryButton disabled={saving}>
-              {saving ? "Salvando..." : "Criar serviço"}
+              {saving
+                ? "Salvando..."
+                : servicoEmEdicaoId
+                  ? "Salvar serviço"
+                  : "Criar serviço"}
             </PrimaryButton>
           </form>
         </SectionCard>
 
         <SectionCard>
-          <h2 className="text-xl font-black tracking-tight text-stone-950">
-            Ficha de custo inteligente
-          </h2>
-          <p className="mt-1 text-sm text-stone-500">
-            Informe quanto de cada material é consumido em uma venda.
-          </p>
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-emerald-700">
+                {itemFichaEmEdicaoId ? "Editar item da ficha" : "Ficha de custo"}
+              </p>
+              <h2 className="texto-quebra text-xl font-black tracking-tight text-stone-950">
+                Ficha de custo inteligente
+              </h2>
+              <p className="mt-1 texto-quebra text-sm text-stone-500">
+                Informe quanto de cada material é consumido em uma venda.
+              </p>
+            </div>
 
-          <form onSubmit={onRecipeSubmit} className="mt-5 space-y-4">
+            {itemFichaEmEdicaoId ? (
+              <button
+                type="button"
+                onClick={onCancelRecipeEdit}
+                className="shrink-0 rounded-full border border-stone-200 px-3 py-2 text-xs font-bold text-stone-600 transition hover:bg-stone-50"
+              >
+                Cancelar
+              </button>
+            ) : null}
+          </div>
+
+          <form onSubmit={onRecipeSubmit} className="space-y-4">
             <SelectField
               label="Serviço ou produto"
               value={fichaForm.service_id}
@@ -1457,12 +2129,20 @@ function ServicosTab({
             />
 
             <PrimaryButton disabled={saving || !servicos.length || !materiais.length}>
-              {saving ? "Adicionando..." : "Adicionar à ficha"}
+              {saving
+                ? "Salvando..."
+                : itemFichaEmEdicaoId
+                  ? "Salvar item da ficha"
+                  : "Adicionar à ficha"}
             </PrimaryButton>
           </form>
 
           {servicoSelecionadoParaFicha ? (
-            <FichaResumo service={servicoSelecionadoParaFicha} />
+            <FichaResumo
+              service={servicoSelecionadoParaFicha}
+              onEditItem={onEditRecipeItem}
+              onDeleteItem={onDeleteRecipeItem}
+            />
           ) : null}
         </SectionCard>
       </div>
@@ -1478,7 +2158,14 @@ function ServicosTab({
           ) : null}
 
           {servicos.map((service) => (
-            <ServiceDetailsCard key={service.id} service={service} />
+            <ServiceDetailsCard
+              key={service.id}
+              service={service}
+              onEditService={onEditService}
+              onDeleteService={onDeleteService}
+              onEditRecipeItem={onEditRecipeItem}
+              onDeleteRecipeItem={onDeleteRecipeItem}
+            />
           ))}
         </div>
       </SectionCard>
@@ -1504,12 +2191,12 @@ function VendasTab({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+    <div className="grid gap-6 xl:grid-cols-2">
       <SectionCard>
         <h2 className="text-xl font-black tracking-tight text-stone-950">
           Registrar venda
         </h2>
-        <p className="mt-1 text-sm text-stone-500">
+        <p className="mt-1 texto-quebra text-sm text-stone-500">
           Ao registrar, o sistema calcula lucro bruto e baixa o estoque usado na ficha.
         </p>
 
@@ -1582,9 +2269,7 @@ function VendasTab({
 
         {servicoSelecionadoParaVenda ? (
           <div className="mt-5 rounded-3xl border border-stone-200 bg-stone-50 p-4 text-sm">
-            <p className="font-black text-stone-900">
-              Prévia da venda
-            </p>
+            <p className="font-black text-stone-900">Prévia da venda</p>
             <div className="mt-3 grid gap-2">
               <InfoLine
                 label="Custo material por unidade"
@@ -1627,7 +2312,15 @@ function VendasTab({
   );
 }
 
-function FichaResumo({ service }: { service: BusinessService }) {
+function FichaResumo({
+  service,
+  onEditItem,
+  onDeleteItem,
+}: {
+  service: BusinessService;
+  onEditItem: (service: BusinessService, item: BusinessRecipeItem) => void;
+  onDeleteItem: (service: BusinessService, item: BusinessRecipeItem) => void;
+}) {
   return (
     <div className="mt-6 rounded-3xl border border-stone-200 bg-stone-50 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1635,7 +2328,7 @@ function FichaResumo({ service }: { service: BusinessService }) {
           <h3 className="texto-quebra font-black text-stone-950">
             Ficha atual: {service.name}
           </h3>
-          <p className="mt-1 text-sm text-stone-500">
+          <p className="mt-1 texto-quebra text-sm text-stone-500">
             Custo total: {formatCurrency(service.material_cost)} • Lucro bruto:{" "}
             {formatCurrency(service.gross_profit)}
           </p>
@@ -1657,86 +2350,16 @@ function FichaResumo({ service }: { service: BusinessService }) {
         ) : null}
 
         {service.materials.map((item) => (
-          <div
+          <RecipeItemRow
             key={item.id}
-            className="flex items-center justify-between gap-3 rounded-2xl bg-white p-3 text-sm"
-          >
-            <div className="min-w-0">
-              <p className="texto-quebra font-bold text-stone-800">
-                {item.material_name}
-              </p>
-              <p className="text-stone-500">
-                {formatNumber(item.quantity_used)} {item.unit} ×{" "}
-                {formatCurrency(item.unit_cost)}
-              </p>
-            </div>
-            <p className="shrink-0 font-black text-stone-950">
-              {formatCurrency(item.total_cost)}
-            </p>
-          </div>
+            service={service}
+            item={item}
+            onEdit={onEditItem}
+            onDelete={onDeleteItem}
+          />
         ))}
       </div>
     </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <article className="min-w-0 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-      <p className="truncate text-sm font-bold text-stone-500">
-        {label}
-      </p>
-      <p className="mt-2 texto-quebra text-2xl font-black tracking-tight text-stone-950">
-        {value}
-      </p>
-      {hint ? (
-        <p className="mt-1 texto-quebra text-xs font-semibold text-stone-400">
-          {hint}
-        </p>
-      ) : null}
-    </article>
-  );
-}
-
-function HealthCard({
-  title,
-  value,
-  description,
-  actionLabel,
-  onAction,
-}: {
-  title: string;
-  value: string;
-  description: string;
-  actionLabel?: string;
-  onAction?: () => void;
-}) {
-  return (
-    <article className="min-w-0 rounded-3xl border border-stone-200 bg-white p-4">
-      <p className="truncate text-sm font-bold text-stone-500">{title}</p>
-      <p className="mt-2 texto-quebra text-2xl font-black text-stone-950">
-        {value}
-      </p>
-      <p className="mt-1 texto-quebra text-xs text-stone-500">{description}</p>
-
-      {actionLabel && onAction ? (
-        <button
-          type="button"
-          onClick={onAction}
-          className="mt-4 rounded-full bg-stone-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-stone-700"
-        >
-          {actionLabel}
-        </button>
-      ) : null}
-    </article>
   );
 }
 
@@ -1832,7 +2455,8 @@ function ServiceResumeCard({ service }: { service: BusinessService }) {
         <InfoLine
           label="Capacidade"
           value={
-            service.current_capacity === null || service.current_capacity === undefined
+            service.current_capacity === null ||
+            service.current_capacity === undefined
               ? "-"
               : `${service.current_capacity}x`
           }
@@ -1842,12 +2466,30 @@ function ServiceResumeCard({ service }: { service: BusinessService }) {
   );
 }
 
-function ServiceDetailsCard({ service }: { service: BusinessService }) {
+function ServiceDetailsCard({
+  service,
+  onEditService,
+  onDeleteService,
+  onEditRecipeItem,
+  onDeleteRecipeItem,
+}: {
+  service: BusinessService;
+  onEditService: (service: BusinessService) => void;
+  onDeleteService: (service: BusinessService) => void;
+  onEditRecipeItem: (
+    service: BusinessService,
+    item: BusinessRecipeItem,
+  ) => void;
+  onDeleteRecipeItem: (
+    service: BusinessService,
+    item: BusinessRecipeItem,
+  ) => void;
+}) {
   return (
     <article className="min-w-0 rounded-3xl border border-stone-200 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-xs font-black uppercase tracking-[0.2em] text-stone-400">
+          <p className="truncate text-xs font-black uppercase tracking-widest text-stone-400">
             {service.category}
           </p>
           <h3 className="mt-1 texto-quebra text-lg font-black text-stone-950">
@@ -1855,9 +2497,27 @@ function ServiceDetailsCard({ service }: { service: BusinessService }) {
           </h3>
         </div>
 
-        <span className="shrink-0 rounded-full bg-stone-900 px-3 py-1 text-sm font-black text-white">
-          {formatCurrency(service.price)}
-        </span>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <span className="rounded-full bg-stone-900 px-3 py-1 text-sm font-black text-white">
+            {formatCurrency(service.price)}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => onEditService(service)}
+            className="rounded-full border border-stone-200 px-3 py-2 text-xs font-bold text-stone-600 transition hover:bg-stone-50"
+          >
+            Editar
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onDeleteService(service)}
+            className="rounded-full border border-red-200 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50"
+          >
+            Excluir
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 grid min-w-0 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
@@ -1865,9 +2525,10 @@ function ServiceDetailsCard({ service }: { service: BusinessService }) {
         <InfoLine label="Lucro bruto" value={formatCurrency(service.gross_profit)} />
         <InfoLine label="Margem" value={`${formatNumber(service.gross_margin_percent)}%`} />
         <InfoLine
-          label="Dá para fazer"
+          label="Capacidade"
           value={
-            service.current_capacity === null || service.current_capacity === undefined
+            service.current_capacity === null ||
+            service.current_capacity === undefined
               ? "-"
               : `${service.current_capacity}x`
           }
@@ -1882,26 +2543,64 @@ function ServiceDetailsCard({ service }: { service: BusinessService }) {
         ) : null}
 
         {service.materials.map((item) => (
-          <div
+          <RecipeItemRow
             key={item.id}
-            className="flex items-center justify-between gap-3 rounded-2xl bg-stone-50 p-3 text-sm"
-          >
-            <div className="min-w-0">
-              <p className="texto-quebra font-bold text-stone-800">
-                {item.material_name}
-              </p>
-              <p className="text-stone-500">
-                Usa {formatNumber(item.quantity_used)} {item.unit}
-              </p>
-            </div>
-
-            <p className="shrink-0 font-black text-stone-950">
-              {formatCurrency(item.total_cost)}
-            </p>
-          </div>
+            service={service}
+            item={item}
+            onEdit={onEditRecipeItem}
+            onDelete={onDeleteRecipeItem}
+          />
         ))}
       </div>
     </article>
+  );
+}
+
+function RecipeItemRow({
+  service,
+  item,
+  onEdit,
+  onDelete,
+}: {
+  service: BusinessService;
+  item: BusinessRecipeItem;
+  onEdit: (service: BusinessService, item: BusinessRecipeItem) => void;
+  onDelete: (service: BusinessService, item: BusinessRecipeItem) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-stone-50 p-3 text-sm">
+      <div className="min-w-0">
+        <p className="texto-quebra font-bold text-stone-800">
+          {item.material_name}
+        </p>
+        <p className="texto-quebra text-stone-500">
+          Usa {formatNumber(item.quantity_used)} {item.unit} x{" "}
+          {formatCurrency(item.unit_cost)}
+        </p>
+      </div>
+
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <p className="font-black text-stone-950">
+          {formatCurrency(item.total_cost)}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => onEdit(service, item)}
+          className="rounded-full border border-stone-200 px-3 py-2 text-xs font-bold text-stone-600 transition hover:bg-white"
+        >
+          Editar
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onDelete(service, item)}
+          className="rounded-full border border-red-200 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50"
+        >
+          Excluir
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1933,6 +2632,64 @@ function SaleCard({ sale }: { sale: BusinessSale }) {
   );
 }
 
+function MetricCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <article className="min-w-0 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+      <p className="truncate text-sm font-bold text-stone-500">{label}</p>
+      <p className="mt-2 texto-quebra text-2xl font-black tracking-tight text-stone-950">
+        {value}
+      </p>
+      {hint ? (
+        <p className="mt-1 texto-quebra text-xs font-semibold text-stone-400">
+          {hint}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+function HealthCard({
+  title,
+  value,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  value: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <article className="min-w-0 rounded-3xl border border-stone-200 bg-white p-4">
+      <p className="truncate text-sm font-bold text-stone-500">{title}</p>
+      <p className="mt-2 texto-quebra text-2xl font-black text-stone-950">
+        {value}
+      </p>
+      <p className="mt-1 texto-quebra text-xs text-stone-500">{description}</p>
+
+      {actionLabel && onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-4 rounded-full bg-stone-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-stone-700"
+        >
+          {actionLabel}
+        </button>
+      ) : null}
+    </article>
+  );
+}
+
 function AlertRow({
   title,
   description,
@@ -1943,7 +2700,9 @@ function AlertRow({
   return (
     <div className="min-w-0 rounded-2xl border border-amber-200 bg-amber-50 p-4">
       <p className="texto-quebra font-black text-amber-950">{title}</p>
-      <p className="mt-1 texto-quebra text-sm text-amber-800">{description}</p>
+      <p className="mt-1 texto-quebra text-sm text-amber-800">
+        {description}
+      </p>
     </div>
   );
 }
@@ -1956,11 +2715,11 @@ function InfoLine({
   value: string;
 }) {
   return (
-    <div className="min-w-0">
-      <p className="truncate text-xs font-black uppercase tracking-wide text-stone-400">
+    <div className="min-w-0 rounded-2xl bg-stone-50 px-3 py-2">
+      <p className="texto-quebra text-xs font-black uppercase text-stone-400">
         {label}
       </p>
-      <p className="texto-quebra font-bold text-stone-800">
+      <p className="mt-1 texto-quebra text-sm font-bold text-stone-800">
         {value}
       </p>
     </div>
@@ -2052,11 +2811,7 @@ function SelectField({
         onChange={(event) => onChange(event.target.value)}
         className="w-full min-w-0 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-600"
       >
-        {placeholder ? (
-          <option value="">
-            {placeholder}
-          </option>
-        ) : null}
+        {placeholder ? <option value="">{placeholder}</option> : null}
 
         {options.map((option) => {
           const normalizedOption =
@@ -2087,6 +2842,49 @@ function PrimaryButton({
       type="submit"
       disabled={disabled}
       className="w-full rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {children}
+    </button>
+  );
+}
+
+function SecondaryButton({
+  children,
+  type = "button",
+  onClick,
+}: {
+  children: ReactNode;
+  type?: "button" | "submit";
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      className="w-full rounded-2xl border border-stone-200 px-5 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50"
+    >
+      {children}
+    </button>
+  );
+}
+
+function DangerButton({
+  children,
+  type = "button",
+  disabled,
+  onClick,
+}: {
+  children: ReactNode;
+  type?: "button" | "submit";
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      className="w-full rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </button>
@@ -2130,7 +2928,7 @@ function EmptyBusinessState({ onCreate }: { onCreate: () => void }) {
   return (
     <SectionCard>
       <div className="text-center">
-        <p className="text-sm font-black uppercase tracking-[0.2em] text-emerald-700">
+        <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
           Meus Negócios
         </p>
         <h1 className="mt-2 text-2xl font-black tracking-tight text-stone-950">
@@ -2160,6 +2958,38 @@ function SectionCard({ children }: { children: ReactNode }) {
   );
 }
 
+function Modal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950 bg-opacity-40 p-4">
+      <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-xl">
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <h2 className="texto-quebra text-xl font-black text-stone-950">
+            {title}
+          </h2>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-stone-200 px-3 py-2 text-sm font-black text-stone-600 transition hover:bg-stone-50"
+          >
+            Fechar
+          </button>
+        </div>
+
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function Badge({
   children,
   tone,
@@ -2180,6 +3010,14 @@ function Badge({
       {children}
     </span>
   );
+}
+
+function dispatchBusinessRefresh() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new Event(BUSINESS_REFRESH_EVENT));
 }
 
 function getNextActionMessage({
@@ -2240,6 +3078,53 @@ function toNumber(value: string): number {
   }
 
   return numberValue;
+}
+
+
+function loadGoogleScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") {
+      reject(new Error("Google só pode ser usado no navegador."));
+      return;
+    }
+
+    if (getGoogleIdentityService()) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.getElementById(GOOGLE_SCRIPT_ID);
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), {
+        once: true,
+      });
+      existingScript.addEventListener(
+        "error",
+        () => {
+          reject(new Error("Não foi possível carregar o Google."));
+        },
+        {
+          once: true,
+        },
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+
+    script.id = GOOGLE_SCRIPT_ID;
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => resolve();
+    script.onerror = () => {
+      reject(new Error("Não foi possível carregar o Google."));
+    };
+
+    document.body.appendChild(script);
+  });
 }
 
 function formatCurrency(value: number): string {

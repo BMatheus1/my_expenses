@@ -95,3 +95,9 @@ select {
   overflow-wrap: anywhere;
   word-break: normal;
 }
+
+.texto-quebra {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}

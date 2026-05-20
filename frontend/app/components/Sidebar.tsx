@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { listBusinesses } from "@/app/lib/business-api";
 import {
   BUSINESS_REFRESH_EVENT,
   navigateToBusiness,
   navigateToCreateBusiness,
 } from "@/app/lib/business-navigation";
-import { listBusinesses } from "@/app/lib/business-api";
 import type { Business } from "@/app/types/business";
 import type { User } from "../types/auth";
 
@@ -55,9 +55,20 @@ export function Sidebar({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isBusinessMenuOpen, setIsBusinessMenuOpen] = useState(true);
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
+    null,
+  );
 
   const isBusinessActive = activeView === "businesses";
+
+  const loadBusinesses = useCallback(async () => {
+    try {
+      const loadedBusinesses = await listBusinesses();
+      setBusinesses(loadedBusinesses);
+    } catch {
+      setBusinesses([]);
+    }
+  }, []);
 
   useEffect(() => {
     loadBusinesses();
@@ -71,16 +82,7 @@ export function Sidebar({
     return () => {
       window.removeEventListener(BUSINESS_REFRESH_EVENT, handleRefresh);
     };
-  }, []);
-
-  async function loadBusinesses() {
-    try {
-      const loadedBusinesses = await listBusinesses();
-      setBusinesses(loadedBusinesses);
-    } catch {
-      setBusinesses([]);
-    }
-  }
+  }, [loadBusinesses]);
 
   function openBusinessArea() {
     onActiveViewChange("businesses");

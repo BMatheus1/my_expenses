@@ -31,6 +31,7 @@ import {
   sanitizeMoneyInput,
 } from "../utils/formatters";
 import { AppShell } from "./AppShell";
+import BusinessWorkspace from "./BusinessWorkspace";
 import { CategoryManagerModal } from "./CategoryManagerModal";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ConfirmModal } from "./ConfirmModal";
@@ -638,7 +639,9 @@ export function ExpensesDashboard({
       onActiveViewChange={setActiveView}
       onLogout={onLogout}
     >
-      {activeView === "reports" ? (
+      {activeView === "businesses" ? (
+        <BusinessWorkspace />
+      ) : activeView === "reports" ? (
         <ReportsView
           expenses={expenses}
           incomes={incomes}

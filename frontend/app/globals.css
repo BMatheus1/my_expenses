@@ -89,3 +89,9 @@ select {
   opacity: 0.6;
   transform: none;
 }
+
+.texto-quebra {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}

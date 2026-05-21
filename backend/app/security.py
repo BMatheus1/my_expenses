@@ -1,160 +1,162 @@
-from functools import lru_cache
-from pathlib import Path
+from __future__ import annotations
 
-from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from dataclasses import dataclass
+from math import ceil
+from time import monotonic
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent
-ENV_FILE = BACKEND_DIR / ".env"
+from fastapi import HTTPException, Request, status
+from fastapi.responses import JSONResponse, Response
+from starlette.middleware.base import RequestResponseEndpoint
+
+from app.config import settings
 
 
-class Settings(BaseSettings):
-    app_name: str = "My Expenses API"
-    app_env: str = "development"
-    app_debug: bool = False
+@dataclass
+class RateLimitBucket:
+    attempts: int
+    reset_at: float
 
-    api_prefix: str = "/api"
 
-    database_url: str
+class InMemoryRateLimiter:
+    def __init__(self) -> None:
+        self._buckets: dict[str, RateLimitBucket] = {}
 
-    legacy_json_file: str = "data/expenses.json"
-    legacy_import_email: str = ""
+    def check(self, key: str, max_requests: int, window_seconds: int) -> None:
+        now = monotonic()
+        self._cleanup_expired_buckets(now)
 
-    secret_key: str
-    access_token_expire_minutes: int = 60 * 24
+        bucket = self._buckets.get(key)
 
-    google_client_id: str = ""
+        if bucket is None or now >= bucket.reset_at:
+            self._buckets[key] = RateLimitBucket(
+                attempts=1,
+                reset_at=now + window_seconds,
+            )
+            return
 
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
-    cors_methods: str = "GET,POST,PUT,DELETE,OPTIONS"
-    cors_headers: str = "Authorization,Content-Type"
+        bucket.attempts += 1
 
-    rate_limit_enabled: bool = True
-    auth_rate_limit_requests: int = 8
-    auth_rate_limit_window_seconds: int = 60
-    write_rate_limit_requests: int = 120
-    write_rate_limit_window_seconds: int = 60
+        if bucket.attempts <= max_requests:
+            return
 
-    max_request_body_bytes: int = 1_000_000
-    security_headers_enabled: bool = True
-    hsts_enabled: bool = True
-    hsts_max_age_seconds: int = 31_536_000
+        retry_after_seconds = max(1, ceil(bucket.reset_at - now))
 
-    model_config = SettingsConfigDict(
-        env_file=ENV_FILE,
-        env_file_encoding="utf-8",
-        extra="ignore",
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Muitas tentativas em pouco tempo. Aguarde alguns instantes e tente novamente.",
+            headers={"Retry-After": str(retry_after_seconds)},
+        )
+
+    def _cleanup_expired_buckets(self, now: float) -> None:
+        expired_keys = [
+            key for key, bucket in self._buckets.items() if now >= bucket.reset_at
+        ]
+
+        for key in expired_keys:
+            del self._buckets[key]
+
+
+rate_limiter = InMemoryRateLimiter()
+
+
+def get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+
+    if request.client is None:
+        return "unknown"
+
+    return request.client.host
+
+
+def build_rate_limit_dependency(
+    name: str,
+    max_requests: int,
+    window_seconds: int,
+):
+    async def enforce_rate_limit(request: Request) -> None:
+        if not settings.rate_limit_enabled:
+            return
+
+        client_ip = get_client_ip(request)
+        key = f"{name}:{client_ip}"
+        rate_limiter.check(key, max_requests, window_seconds)
+
+    return enforce_rate_limit
+
+
+auth_rate_limit = build_rate_limit_dependency(
+    name="auth",
+    max_requests=settings.auth_rate_limit_requests,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+)
+
+write_rate_limit = build_rate_limit_dependency(
+    name="write",
+    max_requests=settings.write_rate_limit_requests,
+    window_seconds=settings.write_rate_limit_window_seconds,
+)
+
+
+async def security_middleware(
+    request: Request,
+    call_next: RequestResponseEndpoint,
+) -> Response:
+    blocked_response = block_large_request(request)
+
+    if blocked_response is not None:
+        return blocked_response
+
+    response = await call_next(request)
+    apply_security_headers(response)
+
+    return response
+
+
+def block_large_request(request: Request) -> JSONResponse | None:
+    content_length = request.headers.get("content-length")
+
+    if not content_length:
+        return None
+
+    try:
+        request_size = int(content_length)
+    except ValueError:
+        return None
+
+    if request_size <= settings.max_request_body_bytes:
+        return None
+
+    return JSONResponse(
+        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        content={"detail": "Requisição grande demais."},
     )
 
-    @field_validator("app_env")
-    @classmethod
-    def validate_app_env(cls, value: str) -> str:
-        app_env = value.strip().lower()
-        allowed_environments = {"development", "test", "staging", "production"}
 
-        if app_env not in allowed_environments:
-            raise ValueError(
-                "APP_ENV deve ser development, test, staging ou production."
+def apply_security_headers(response: Response) -> None:
+    if not settings.security_headers_enabled:
+        return
+
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "same-origin"
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=(), payment=()"
+    )
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-site"
+
+    if settings.is_production:
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'none'; "
+            "form-action 'none'"
+        )
+
+        if settings.hsts_enabled:
+            response.headers["Strict-Transport-Security"] = (
+                f"max-age={settings.hsts_max_age_seconds}; includeSubDomains; preload"
             )
-
-        return app_env
-
-    @field_validator("database_url")
-    @classmethod
-    def validate_database_url(cls, value: str) -> str:
-        database_url = value.strip()
-
-        if database_url.startswith("postgres://"):
-            database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-        if not database_url.startswith("postgresql://"):
-            raise ValueError("DATABASE_URL deve apontar para um banco PostgreSQL.")
-
-        return database_url
-
-    @field_validator("secret_key")
-    @classmethod
-    def validate_secret_key(cls, value: str) -> str:
-        secret_key = value.strip()
-
-        if len(secret_key) < 32:
-            raise ValueError("SECRET_KEY deve ter pelo menos 32 caracteres.")
-
-        insecure_values = {
-            "CHANGE_ME_TO_A_RANDOM_SECRET_WITH_32_CHARS_MINIMUM",
-            "your-secret-key",
-            "secret",
-        }
-
-        if secret_key in insecure_values:
-            raise ValueError("SECRET_KEY precisa ser um valor secreto real.")
-
-        return secret_key
-
-    @field_validator("access_token_expire_minutes")
-    @classmethod
-    def validate_token_expiration(cls, value: int) -> int:
-        if value < 15:
-            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES deve ser no mínimo 15.")
-
-        if value > 60 * 24 * 7:
-            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES não deve passar de 7 dias.")
-
-        return value
-
-    @field_validator("max_request_body_bytes")
-    @classmethod
-    def validate_max_request_body_bytes(cls, value: int) -> int:
-        if value < 10_000:
-            raise ValueError("MAX_REQUEST_BODY_BYTES está baixo demais.")
-
-        return value
-
-    @property
-    def is_production(self) -> bool:
-        return self.app_env == "production"
-
-    @property
-    def backend_dir(self) -> Path:
-        return BACKEND_DIR
-
-    @property
-    def legacy_json_file_path(self) -> Path:
-        return self.resolve_backend_path(self.legacy_json_file)
-
-    @property
-    def cors_origin_list(self) -> list[str]:
-        origins = self.parse_csv(self.cors_origins)
-
-        if self.is_production and "*" in origins:
-            raise ValueError("CORS_ORIGINS não pode usar * em produção.")
-
-        return origins
-
-    @property
-    def cors_method_list(self) -> list[str]:
-        return self.parse_csv(self.cors_methods)
-
-    @property
-    def cors_header_list(self) -> list[str]:
-        return self.parse_csv(self.cors_headers)
-
-    @staticmethod
-    def parse_csv(value: str) -> list[str]:
-        return [item.strip() for item in value.split(",") if item.strip()]
-
-    def resolve_backend_path(self, file_path: str) -> Path:
-        path = Path(file_path)
-
-        if path.is_absolute():
-            return path
-
-        return self.backend_dir / path
-
-
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
-
-
-settings = get_settings()

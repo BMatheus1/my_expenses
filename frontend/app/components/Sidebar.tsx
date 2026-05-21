@@ -16,7 +16,8 @@ export type AppView =
   | "incomes"
   | "reports"
   | "businesses"
-  | "settings";
+  | "appearance-settings"
+  | "security-settings";
 
 type SidebarProps = {
   activeView: AppView;
@@ -53,6 +54,21 @@ const PERSONAL_FINANCE_ITEMS: MenuItem[] = [
   },
 ];
 
+const SETTINGS_ITEMS: MenuItem[] = [
+  {
+    view: "appearance-settings",
+    label: "Aparência e tema",
+    description: "Cores e modo escuro",
+    shortLabel: "🎨",
+  },
+  {
+    view: "security-settings",
+    label: "Segurança",
+    description: "Sessão e proteção",
+    shortLabel: "🔐",
+  },
+];
+
 export function Sidebar({
   activeView,
   currentUser,
@@ -62,6 +78,7 @@ export function Sidebar({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(true);
   const [isBusinessMenuOpen, setIsBusinessMenuOpen] = useState(true);
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
     null,
@@ -73,7 +90,9 @@ export function Sidebar({
     activeView === "reports";
 
   const isBusinessActive = activeView === "businesses";
-  const isSettingsActive = activeView === "settings";
+
+  const isSettingsActive =
+    activeView === "appearance-settings" || activeView === "security-settings";
 
   const loadBusinesses = useCallback(async () => {
     try {
@@ -85,10 +104,10 @@ export function Sidebar({
   }, []);
 
   useEffect(() => {
-    loadBusinesses();
+    void loadBusinesses();
 
     function handleRefresh() {
-      loadBusinesses();
+      void loadBusinesses();
     }
 
     window.addEventListener(BUSINESS_REFRESH_EVENT, handleRefresh);
@@ -97,6 +116,10 @@ export function Sidebar({
       window.removeEventListener(BUSINESS_REFRESH_EVENT, handleRefresh);
     };
   }, [loadBusinesses]);
+
+  function handleToggleSidebar() {
+    setIsCollapsed((currentValue) => !currentValue);
+  }
 
   function openWalletArea() {
     if (isCollapsed) {
@@ -115,23 +138,43 @@ export function Sidebar({
   function openBusinessArea() {
     onActiveViewChange("businesses");
     setIsBusinessMenuOpen(true);
+    setSelectedBusinessId(null);
   }
 
-  function openSettings() {
-    onActiveViewChange("settings");
-    setSelectedBusinessId(null);
+  function handleBusinessGroupClick() {
+    if (isCollapsed) {
+      openBusinessArea();
+      return;
+    }
+
+    setIsBusinessMenuOpen((currentValue) => !currentValue);
   }
 
   function handleCreateBusiness() {
     openBusinessArea();
-    setSelectedBusinessId(null);
     navigateToCreateBusiness();
   }
 
   function handleSelectBusiness(businessId: string) {
-    openBusinessArea();
+    onActiveViewChange("businesses");
+    setIsBusinessMenuOpen(true);
     setSelectedBusinessId(businessId);
     navigateToBusiness(businessId);
+  }
+
+  function handleSettingsGroupClick() {
+    if (isCollapsed) {
+      setIsCollapsed(false);
+      setIsSettingsMenuOpen(true);
+      return;
+    }
+
+    setIsSettingsMenuOpen((currentValue) => !currentValue);
+  }
+
+  function handleSettingsItemClick(view: AppView) {
+    onActiveViewChange(view);
+    setSelectedBusinessId(null);
   }
 
   return (
@@ -145,7 +188,7 @@ export function Sidebar({
       }}
     >
       <div className="flex min-h-0 w-full flex-col">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex shrink-0 items-center justify-between gap-3">
           {!isCollapsed ? (
             <div>
               <h1 className="app-title text-xl font-black tracking-tight">
@@ -158,7 +201,7 @@ export function Sidebar({
 
           <button
             type="button"
-            onClick={() => setIsCollapsed((currentValue) => !currentValue)}
+            onClick={handleToggleSidebar}
             className="app-btn app-btn-soft group h-11 w-11 rounded-2xl text-sm shadow-sm"
             aria-label={isCollapsed ? "Expandir menu" : "Recolher menu"}
             title={isCollapsed ? "Expandir menu" : "Recolher menu"}
@@ -207,14 +250,7 @@ export function Sidebar({
             isActive={isBusinessActive}
             isCollapsed={isCollapsed}
             isOpen={isBusinessMenuOpen}
-            onClick={() => {
-              if (isCollapsed) {
-                openBusinessArea();
-                return;
-              }
-
-              setIsBusinessMenuOpen((currentValue) => !currentValue);
-            }}
+            onClick={handleBusinessGroupClick}
           />
 
           {!isCollapsed && isBusinessMenuOpen ? (
@@ -265,37 +301,37 @@ export function Sidebar({
           ) : null}
         </nav>
 
-        <div
+        <footer
           className="shrink-0 space-y-3 border-t pt-4"
           style={{ borderColor: "var(--app-border)" }}
         >
-          <button
-            type="button"
-            onClick={openSettings}
-            className={`flex w-full items-center gap-3 rounded-3xl px-4 py-3 text-left transition ${
-              isSettingsActive ? "app-sidebar-item-active" : "app-sidebar-item"
-            }`}
-          >
-            <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
-                isSettingsActive ? "bg-white" : "app-brand-soft"
-              }`}
-              style={{ color: isSettingsActive ? "var(--brand-primary)" : undefined }}
-            >
-              ⚙
-            </span>
+          <SidebarGroupButton
+            title="Configurações"
+            description="Aparência e segurança"
+            shortLabel="⚙"
+            isActive={isSettingsActive}
+            isCollapsed={isCollapsed}
+            isOpen={isSettingsMenuOpen}
+            onClick={handleSettingsGroupClick}
+            compact
+          />
 
-            {!isCollapsed ? (
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-black">
-                  Configurações
-                </span>
-                <span className="mt-0.5 block truncate text-xs opacity-75">
-                  Tema e aparência
-                </span>
-              </span>
-            ) : null}
-          </button>
+          {!isCollapsed && isSettingsMenuOpen ? (
+            <div
+              className="space-y-2 border-l pl-5"
+              style={{ borderColor: "var(--app-border)" }}
+            >
+              {SETTINGS_ITEMS.map((item) => (
+                <SidebarSubItem
+                  key={item.view}
+                  item={item}
+                  isActive={activeView === item.view}
+                  onClick={() => handleSettingsItemClick(item.view)}
+                  compact
+                />
+              ))}
+            </div>
+          ) : null}
 
           {!isCollapsed ? (
             <div className="app-card-soft rounded-3xl p-4">
@@ -317,10 +353,9 @@ export function Sidebar({
             title="Sair"
           >
             <span aria-hidden="true">⎋</span>
-
             {!isCollapsed ? <span>Sair</span> : null}
           </button>
-        </div>
+        </footer>
       </div>
     </aside>
   );
@@ -334,6 +369,7 @@ function SidebarGroupButton({
   isCollapsed,
   isOpen,
   onClick,
+  compact = false,
 }: {
   title: string;
   description: string;
@@ -342,19 +378,22 @@ function SidebarGroupButton({
   isCollapsed: boolean;
   isOpen: boolean;
   onClick: () => void;
+  compact?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-3xl px-4 py-3 text-left transition ${
-        isActive ? "app-sidebar-item-active" : "app-sidebar-item"
-      }`}
+      className={`flex w-full items-center gap-3 rounded-3xl px-4 text-left transition ${
+        compact ? "py-2.5" : "py-3"
+      } ${isActive ? "app-sidebar-item-active" : "app-sidebar-item"}`}
+      aria-label={title}
+      title={title}
     >
       <span
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
-          isActive ? "bg-white" : "app-brand-soft"
-        }`}
+        className={`flex shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
+          compact ? "h-9 w-9" : "h-10 w-10"
+        } ${isActive ? "bg-white" : "app-brand-soft"}`}
         style={{ color: isActive ? "var(--brand-primary)" : undefined }}
       >
         {shortLabel}
@@ -364,6 +403,7 @@ function SidebarGroupButton({
         <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
           <span className="min-w-0">
             <span className="block truncate font-bold">{title}</span>
+
             <span className="mt-0.5 block truncate text-xs opacity-75">
               {description}
             </span>
@@ -380,23 +420,25 @@ function SidebarSubItem({
   item,
   isActive,
   onClick,
+  compact = false,
 }: {
   item: MenuItem;
   isActive: boolean;
   onClick: () => void;
+  compact?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
-        isActive ? "app-sidebar-item-active" : "app-sidebar-item"
-      }`}
+      className={`flex w-full items-center gap-3 rounded-2xl px-4 text-left transition ${
+        compact ? "py-2.5" : "py-3"
+      } ${isActive ? "app-sidebar-item-active" : "app-sidebar-item"}`}
     >
       <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
-          isActive ? "bg-white" : "app-brand-soft"
-        }`}
+        className={`flex shrink-0 items-center justify-center rounded-xl text-xs font-black ${
+          compact ? "h-7 w-7" : "h-8 w-8"
+        } ${isActive ? "bg-white" : "app-brand-soft"}`}
         style={{ color: isActive ? "var(--brand-primary)" : undefined }}
       >
         {item.shortLabel}
@@ -404,9 +446,12 @@ function SidebarSubItem({
 
       <span className="min-w-0">
         <span className="block truncate text-sm font-black">{item.label}</span>
-        <span className="mt-0.5 block truncate text-xs opacity-75">
-          {item.description}
-        </span>
+
+        {!compact ? (
+          <span className="mt-0.5 block truncate text-xs opacity-75">
+            {item.description}
+          </span>
+        ) : null}
       </span>
     </button>
   );

@@ -9,3 +9,5 @@ google-auth
 requests
 email-validator
 psycopg[binary]
+pytest
+httpx

@@ -640,8 +640,18 @@ export function ExpensesDashboard({
       onActiveViewChange={setActiveView}
       onLogout={onLogout}
     >
-      {activeView === "settings" ? (
-        <SettingsPage currentUser={currentUser} onLogout={onLogout} />
+      {activeView === "appearance-settings" ? (
+        <SettingsPage
+          section="appearance"
+          currentUser={currentUser}
+          onLogout={onLogout}
+        />
+      ) : activeView === "security-settings" ? (
+        <SettingsPage
+          section="security"
+          currentUser={currentUser}
+          onLogout={onLogout}
+        />
       ) : activeView === "businesses" ? (
         <BusinessWorkspace />
       ) : activeView === "reports" ? (

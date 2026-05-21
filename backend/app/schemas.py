@@ -21,6 +21,17 @@ class UserRecord(BaseModel):
     created_at: datetime
 
 
+class RefreshTokenRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    token_hash: str
+    expires_at: datetime
+    created_at: datetime
+    revoked_at: datetime | None = None
+
+
 class AuthRegisterRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

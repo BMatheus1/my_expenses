@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
-  clearAuthToken,
   getCurrentUser,
+  logoutCurrentSession,
   setUnauthorizedHandler,
 } from "../lib/api";
 import {
@@ -30,7 +30,7 @@ export function AuthGate() {
   const [securitySettingsVersion, setSecuritySettingsVersion] = useState(0);
 
   const handleLogout = useCallback(() => {
-    clearAuthToken();
+    void logoutCurrentSession();
     setCurrentUser(null);
   }, []);
 
@@ -48,14 +48,14 @@ export function AuthGate() {
         const user = await getCurrentUser();
         setCurrentUser(user);
       } catch {
-        handleLogout();
+        setCurrentUser(null);
       } finally {
         setIsCheckingSession(false);
       }
     }
 
     void checkSession();
-  }, [handleLogout]);
+  }, []);
 
   useEffect(() => {
     function handleSecuritySettingsChange() {

@@ -8,6 +8,7 @@ from app.business_repository import initialize_business_database
 from app.config import settings
 from app.routes import router
 from app.security import security_middleware
+from app.session_repository import initialize_refresh_token_database
 from app.storage import initialize_database
 
 
@@ -15,6 +16,7 @@ from app.storage import initialize_database
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     initialize_database()
     initialize_business_database()
+    initialize_refresh_token_database()
     yield
 
 

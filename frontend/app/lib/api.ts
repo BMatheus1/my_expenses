@@ -31,7 +31,13 @@ type ApiValidationError = {
 
 type UnauthorizedHandler = () => void;
 
+type ApiRequestConfig = {
+  skipAuthHeader?: boolean;
+  skipAuthRefresh?: boolean;
+};
+
 let unauthorizedHandler: UnauthorizedHandler | null = null;
+let refreshPromise: Promise<boolean> | null = null;
 
 export class ApiError extends Error {
   statusCode: number;
@@ -59,12 +65,61 @@ export function clearAuthToken() {
   clearStoredAuthToken();
 }
 
+export async function logoutCurrentSession(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    });
+  } finally {
+    clearAuthToken();
+  }
+}
+
+export async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = refreshAccessTokenRequest().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
 function handleUnauthorizedResponse() {
   clearAuthToken();
 
   if (unauthorizedHandler) {
     unauthorizedHandler();
   }
+}
+
+async function refreshAccessTokenRequest(): Promise<boolean> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    });
+  } catch {
+    clearAuthToken();
+    return false;
+  }
+
+  if (!response.ok) {
+    clearAuthToken();
+    return false;
+  }
+
+  const authResponse = (await response.json()) as AuthResponse;
+  setAuthToken(authResponse.access_token);
+
+  return true;
 }
 
 async function getErrorMessage(response: Response) {
@@ -92,7 +147,62 @@ async function getErrorMessage(response: Response) {
   }
 }
 
-async function handleApiResponse<T>(response: Response): Promise<T> {
+async function parseApiResponse<T>(response: Response): Promise<T> {
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
+async function requestWithAuth(
+  path: string,
+  options: RequestInit,
+  config: ApiRequestConfig,
+): Promise<Response> {
+  const headers = new Headers(options.headers);
+  const token = getAuthToken();
+
+  if (token && !config.skipAuthHeader) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  if (options.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const requestUrl = `${API_URL}${path}`;
+
+  try {
+    return await fetch(requestUrl, {
+      ...options,
+      headers,
+      credentials: "include",
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError(
+      `Não foi possível conectar ao backend. Verifique se a API está online e se a URL está correta: ${requestUrl}`,
+      0,
+    );
+  }
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+  config: ApiRequestConfig = {},
+): Promise<T> {
+  let response = await requestWithAuth(path, options, config);
+
+  if (response.status === 401 && !config.skipAuthRefresh) {
+    const refreshed = await refreshAccessToken();
+
+    if (refreshed) {
+      response = await requestWithAuth(path, options, config);
+    }
+  }
+
   if (!response.ok) {
     const message = await getErrorMessage(response);
 
@@ -103,79 +213,64 @@ async function handleApiResponse<T>(response: Response): Promise<T> {
     throw new ApiError(message, response.status);
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
-}
-
-async function apiRequest<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const headers = new Headers(options.headers);
-  const token = getAuthToken();
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  if (options.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const requestUrl = `${API_URL}${path}`;
-  let response: Response;
-
-  try {
-    response = await fetch(requestUrl, {
-      ...options,
-      headers,
-      cache: "no-store",
-    });
-  } catch {
-    throw new ApiError(
-      `Não foi possível conectar ao backend. Verifique se a API está online e se a URL está correta: ${requestUrl}`,
-      0,
-    );
-  }
-
-  return handleApiResponse<T>(response);
+  return parseApiResponse<T>(response);
 }
 
 export async function registerWithEmail(
   userData: RegisterRequest,
 ): Promise<AuthResponse> {
-  return apiRequest<AuthResponse>("/auth/register", {
-    method: "POST",
-    body: JSON.stringify(userData),
-  });
+  return apiRequest<AuthResponse>(
+    "/auth/register",
+    {
+      method: "POST",
+      body: JSON.stringify(userData),
+    },
+    {
+      skipAuthHeader: true,
+      skipAuthRefresh: true,
+    },
+  );
 }
 
 export async function loginWithEmail(
   loginData: LoginRequest,
 ): Promise<AuthResponse> {
-  return apiRequest<AuthResponse>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(loginData),
-  });
+  return apiRequest<AuthResponse>(
+    "/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify(loginData),
+    },
+    {
+      skipAuthHeader: true,
+      skipAuthRefresh: true,
+    },
+  );
 }
 
 export async function loginWithGoogle(
   loginData: GoogleLoginRequest,
 ): Promise<AuthResponse> {
-  return apiRequest<AuthResponse>("/auth/google", {
-    method: "POST",
-    body: JSON.stringify(loginData),
-  });
+  return apiRequest<AuthResponse>(
+    "/auth/google",
+    {
+      method: "POST",
+      body: JSON.stringify(loginData),
+    },
+    {
+      skipAuthHeader: true,
+      skipAuthRefresh: true,
+    },
+  );
 }
 
 export async function getCurrentUser(): Promise<User> {
-  const token = getAuthToken();
+  if (!getAuthToken()) {
+    const refreshed = await refreshAccessToken();
 
-  if (!token) {
-    throw new ApiError("Usuário não autenticado.", 401);
+    if (!refreshed) {
+      throw new ApiError("Usuário não autenticado.", 401);
+    }
   }
 
   return apiRequest<User>("/auth/me");

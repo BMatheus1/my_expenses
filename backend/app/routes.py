@@ -1,7 +1,20 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
-from app.auth import get_current_user
-from app.auth_service import login_user, login_with_google, register_user
+from app.auth import (
+    clear_refresh_token_cookie,
+    create_refresh_token_session,
+    get_current_user,
+    get_optional_refresh_token_from_cookie,
+    get_refresh_token_from_cookie,
+    set_refresh_token_cookie,
+)
+from app.auth_service import (
+    login_user,
+    login_with_google,
+    logout_refresh_session,
+    refresh_user_session,
+    register_user,
+)
 from app.business_routes import router as business_router
 from app.schemas import (
     AuthLoginRequest,
@@ -41,6 +54,11 @@ router = APIRouter()
 router.include_router(business_router)
 
 
+def attach_refresh_cookie(response: Response, user_id: str) -> None:
+    refresh_token = create_refresh_token_session(user_id)
+    set_refresh_token_cookie(response, refresh_token)
+
+
 @router.get(
     "/health",
     response_model=HealthResponse,
@@ -57,8 +75,11 @@ def health_check():
     tags=["Auth"],
     dependencies=[Depends(auth_rate_limit)],
 )
-def register(user_data: AuthRegisterRequest):
-    return register_user(user_data)
+def register(user_data: AuthRegisterRequest, response: Response):
+    auth_response = register_user(user_data)
+    attach_refresh_cookie(response, auth_response.user.id)
+
+    return auth_response
 
 
 @router.post(
@@ -67,8 +88,11 @@ def register(user_data: AuthRegisterRequest):
     tags=["Auth"],
     dependencies=[Depends(auth_rate_limit)],
 )
-def login(login_data: AuthLoginRequest):
-    return login_user(login_data)
+def login(login_data: AuthLoginRequest, response: Response):
+    auth_response = login_user(login_data)
+    attach_refresh_cookie(response, auth_response.user.id)
+
+    return auth_response
 
 
 @router.post(
@@ -77,8 +101,38 @@ def login(login_data: AuthLoginRequest):
     tags=["Auth"],
     dependencies=[Depends(auth_rate_limit)],
 )
-def google_login(login_data: GoogleLoginRequest):
-    return login_with_google(login_data)
+def google_login(login_data: GoogleLoginRequest, response: Response):
+    auth_response = login_with_google(login_data)
+    attach_refresh_cookie(response, auth_response.user.id)
+
+    return auth_response
+
+
+@router.post(
+    "/auth/refresh",
+    response_model=AuthResponse,
+    tags=["Auth"],
+    dependencies=[Depends(auth_rate_limit)],
+)
+def refresh_session(request: Request, response: Response):
+    current_refresh_token = get_refresh_token_from_cookie(request)
+    auth_response = refresh_user_session(current_refresh_token)
+    attach_refresh_cookie(response, auth_response.user.id)
+
+    return auth_response
+
+
+@router.post(
+    "/auth/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Auth"],
+)
+def logout(request: Request, response: Response):
+    refresh_token = get_optional_refresh_token_from_cookie(request)
+    logout_refresh_session(refresh_token)
+    clear_refresh_token_cookie(response)
+
+    return None
 
 
 @router.get(

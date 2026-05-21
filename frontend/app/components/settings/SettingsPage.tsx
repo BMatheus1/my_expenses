@@ -328,11 +328,13 @@ function SecurityStatusCard({
   sessionInfo,
 }: SecurityStatusCardProps) {
   const storageLabel =
-    sessionInfo.storageType === "localStorage"
-      ? "Persistente neste navegador"
-      : sessionInfo.storageType === "sessionStorage"
-        ? "Somente nesta sessão"
-        : "Sem sessão ativa";
+    sessionInfo.storageType === "memory"
+      ? "Access token em memória"
+      : sessionInfo.storageType === "localStorage"
+        ? "Persistente neste navegador"
+        : sessionInfo.storageType === "sessionStorage"
+          ? "Somente nesta sessão"
+          : "Sem sessão ativa";
 
   return (
     <div className="app-card-soft rounded-3xl p-5">

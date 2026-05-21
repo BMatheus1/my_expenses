@@ -10,6 +10,7 @@ const LEGACY_AUTH_KEYS = [
   "access_token",
   "my_expenses_token",
   "my-expenses-token",
+  AUTH_TOKEN_KEY,
 ];
 
 const DEFAULT_REMEMBER_SESSION = true;
@@ -17,12 +18,9 @@ const DEFAULT_AUTO_LOGOUT_ENABLED = true;
 const DEFAULT_AUTO_LOGOUT_MINUTES = 15;
 const ALLOWED_AUTO_LOGOUT_MINUTES = [15, 30, 60] as const;
 
-type BrowserStorage = "localStorage" | "sessionStorage";
+let inMemoryAccessToken: string | null = null;
 
-type StoredToken = {
-  token: string;
-  storageType: BrowserStorage;
-};
+type TokenStorage = "memory" | "localStorage" | "sessionStorage";
 
 type JwtPayload = {
   exp?: number;
@@ -32,47 +30,32 @@ type JwtPayload = {
 
 export type SessionSecurityInfo = {
   hasToken: boolean;
-  storageType: BrowserStorage | null;
+  storageType: TokenStorage | null;
   issuedAt: Date | null;
   expiresAt: Date | null;
   isExpired: boolean;
 };
 
 export function getStoredAuthToken(): string | null {
-  return getStoredAuthTokenWithStorage()?.token ?? null;
+  return inMemoryAccessToken;
 }
 
 export function storeAuthToken(token: string): void {
-  if (!canUseBrowserStorage()) {
-    return;
-  }
-
-  clearStoredAuthToken();
-
-  const storage = getRememberSession() ? window.localStorage : window.sessionStorage;
-  storage.setItem(AUTH_TOKEN_KEY, token);
+  inMemoryAccessToken = token;
+  clearLegacyBrowserTokens();
+  dispatchSecuritySettingsChangedEvent();
 }
 
 export function clearStoredAuthToken(): void {
-  if (!canUseBrowserStorage()) {
-    return;
-  }
-
-  window.localStorage.removeItem(AUTH_TOKEN_KEY);
-  window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  inMemoryAccessToken = null;
+  clearLegacyBrowserTokens();
+  dispatchSecuritySettingsChangedEvent();
 }
 
 export function clearSensitiveBrowserData(): void {
-  if (!canUseBrowserStorage()) {
-    return;
-  }
-
-  clearStoredAuthToken();
-
-  for (const key of LEGACY_AUTH_KEYS) {
-    window.localStorage.removeItem(key);
-    window.sessionStorage.removeItem(key);
-  }
+  inMemoryAccessToken = null;
+  clearLegacyBrowserTokens();
+  dispatchSecuritySettingsChangedEvent();
 }
 
 export function getRememberSession(): boolean {
@@ -95,7 +78,6 @@ export function saveRememberSession(value: boolean): void {
   }
 
   window.localStorage.setItem(REMEMBER_SESSION_KEY, String(value));
-  migrateAuthTokenStorage(value);
   dispatchSecuritySettingsChangedEvent();
 }
 
@@ -148,9 +130,7 @@ export function getAutoLogoutMilliseconds(): number {
 }
 
 export function getSessionSecurityInfo(): SessionSecurityInfo {
-  const storedToken = getStoredAuthTokenWithStorage();
-
-  if (!storedToken) {
+  if (!inMemoryAccessToken) {
     return {
       hasToken: false,
       storageType: null,
@@ -160,59 +140,28 @@ export function getSessionSecurityInfo(): SessionSecurityInfo {
     };
   }
 
-  const payload = decodeJwtPayload(storedToken.token);
+  const payload = decodeJwtPayload(inMemoryAccessToken);
   const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : null;
   const issuedAt = payload?.iat ? new Date(payload.iat * 1000) : null;
 
   return {
     hasToken: true,
-    storageType: storedToken.storageType,
+    storageType: "memory",
     issuedAt,
     expiresAt,
     isExpired: expiresAt ? expiresAt.getTime() <= Date.now() : false,
   };
 }
 
-function getStoredAuthTokenWithStorage(): StoredToken | null {
+function clearLegacyBrowserTokens(): void {
   if (!canUseBrowserStorage()) {
-    return null;
-  }
-
-  const sessionToken = window.sessionStorage.getItem(AUTH_TOKEN_KEY);
-
-  if (sessionToken) {
-    return {
-      token: sessionToken,
-      storageType: "sessionStorage",
-    };
-  }
-
-  const localToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
-
-  if (localToken) {
-    return {
-      token: localToken,
-      storageType: "localStorage",
-    };
-  }
-
-  return null;
-}
-
-function migrateAuthTokenStorage(rememberSession: boolean): void {
-  const currentToken = getStoredAuthToken();
-
-  if (!currentToken || !canUseBrowserStorage()) {
     return;
   }
 
-  clearStoredAuthToken();
-
-  const targetStorage = rememberSession
-    ? window.localStorage
-    : window.sessionStorage;
-
-  targetStorage.setItem(AUTH_TOKEN_KEY, currentToken);
+  for (const key of LEGACY_AUTH_KEYS) {
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
+  }
 }
 
 function decodeJwtPayload(token: string): JwtPayload | null {

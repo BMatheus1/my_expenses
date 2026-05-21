@@ -1,4 +1,4 @@
-import { clearAuthToken, getAuthToken } from "@/app/lib/api";
+import { apiRequest } from "@/app/lib/api";
 import type {
   Business,
   BusinessCreatePayload,
@@ -16,102 +16,19 @@ import type {
   BusinessUpdatePayload,
 } from "@/app/types/business";
 
-const DEFAULT_API_URL = "http://127.0.0.1:8000/api";
-
-const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_URL
-).replace(/\/$/, "");
-
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
 };
 
-class ApiError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-  }
-}
-
-async function businessRequest<T>(
+function businessRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const token = getAuthToken();
-  const headers = new Headers();
-
-  headers.set("Content-Type", "application/json");
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  const requestUrl = `${API_URL}${path}`;
-  let response: Response;
-
-  try {
-    response = await fetch(requestUrl, {
-      method: options.method ?? "GET",
-      headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-      cache: "no-store",
-    });
-  } catch {
-    throw new ApiError(
-      `Não foi possível conectar ao backend. Verifique se a API está online e se a URL está correta: ${requestUrl}`,
-      0,
-    );
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    clearAuthToken();
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  const rawText = await response.text();
-  const data = parseJsonSafely(rawText);
-
-  if (!response.ok) {
-    throw new ApiError(getErrorMessage(data, rawText), response.status);
-  }
-
-  return data as T;
-}
-
-function parseJsonSafely(text: string): unknown {
-  if (!text) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-function getErrorMessage(data: unknown, fallbackText = ""): string {
-  if (
-    data &&
-    typeof data === "object" &&
-    "detail" in data &&
-    typeof data.detail === "string"
-  ) {
-    return data.detail;
-  }
-
-  if (fallbackText) {
-    return fallbackText;
-  }
-
-  return "Não foi possível concluir a operação.";
+  return apiRequest<T>(path, {
+    method: options.method ?? "GET",
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
 }
 
 export function listBusinesses() {

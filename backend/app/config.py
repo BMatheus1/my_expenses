@@ -21,7 +21,12 @@ class Settings(BaseSettings):
     legacy_import_email: str = ""
 
     secret_key: str
-    access_token_expire_minutes: int = 60 * 24
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 30
+    refresh_cookie_name: str = "my_expenses_refresh_token"
+    refresh_cookie_path: str = "/api/auth"
+    refresh_cookie_secure: bool = False
+    refresh_cookie_samesite: str = "lax"
 
     google_client_id: str = ""
 
@@ -94,13 +99,34 @@ class Settings(BaseSettings):
     @field_validator("access_token_expire_minutes")
     @classmethod
     def validate_token_expiration(cls, value: int) -> int:
-        if value < 15:
-            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES deve ser no mínimo 15.")
+        if value < 5:
+            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES deve ser no mínimo 5.")
 
-        if value > 60 * 24 * 7:
-            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES não deve passar de 7 dias.")
+        if value > 60:
+            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES não deve passar de 60 minutos.")
 
         return value
+
+    @field_validator("refresh_token_expire_days")
+    @classmethod
+    def validate_refresh_token_expiration(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("REFRESH_TOKEN_EXPIRE_DAYS deve ser no mínimo 1.")
+
+        if value > 60:
+            raise ValueError("REFRESH_TOKEN_EXPIRE_DAYS não deve passar de 60 dias.")
+
+        return value
+
+    @field_validator("refresh_cookie_samesite")
+    @classmethod
+    def validate_refresh_cookie_samesite(cls, value: str) -> str:
+        samesite = value.strip().lower()
+
+        if samesite not in {"lax", "strict", "none"}:
+            raise ValueError("REFRESH_COOKIE_SAMESITE deve ser lax, strict ou none.")
+
+        return samesite
 
     @field_validator("max_request_body_bytes")
     @classmethod

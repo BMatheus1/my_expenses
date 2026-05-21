@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from app.auth import (
     create_access_token,
     hash_password,
+    hash_refresh_token,
     verify_google_credential,
     verify_password,
 )
@@ -17,7 +18,12 @@ from app.schemas import (
     UserRecord,
     UserResponse,
 )
-from app.storage import create_user_record, get_user_record_by_email
+from app.session_repository import (
+    get_active_refresh_token_record,
+    revoke_refresh_token_by_hash,
+    revoke_refresh_token_record,
+)
+from app.storage import create_user_record, get_user_record_by_email, get_user_record_by_id
 
 
 def register_user(user_data: AuthRegisterRequest) -> AuthResponse:
@@ -81,6 +87,35 @@ def login_with_google(login_data: GoogleLoginRequest) -> AuthResponse:
     return build_auth_response(user)
 
 
+def refresh_user_session(refresh_token: str) -> AuthResponse:
+    now = datetime.now(timezone.utc)
+    token_hash = hash_refresh_token(refresh_token)
+    refresh_record = get_active_refresh_token_record(token_hash, now)
+
+    if refresh_record is None:
+        raise_invalid_session_error()
+
+    user = get_user_record_by_id(refresh_record.user_id)
+
+    if user is None:
+        revoke_refresh_token_record(refresh_record.id, now)
+        raise_invalid_session_error()
+
+    revoke_refresh_token_record(refresh_record.id, now)
+
+    return build_auth_response(user)
+
+
+def logout_refresh_session(refresh_token: str | None) -> None:
+    if not refresh_token:
+        return
+
+    revoke_refresh_token_by_hash(
+        token_hash=hash_refresh_token(refresh_token),
+        revoked_at=datetime.now(timezone.utc),
+    )
+
+
 def build_auth_response(user: UserRecord) -> AuthResponse:
     return AuthResponse(
         access_token=create_access_token(user.id),
@@ -96,4 +131,11 @@ def raise_invalid_credentials_error() -> None:
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="E-mail ou senha inválidos.",
+    )
+
+
+def raise_invalid_session_error() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Sessão inválida ou expirada. Faça login novamente.",
     )

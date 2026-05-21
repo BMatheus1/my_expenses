@@ -20,6 +20,13 @@ os.environ["LEGACY_IMPORT_EMAIL"] = ""
 os.environ["RATE_LIMIT_ENABLED"] = "false"
 os.environ["SECURITY_HEADERS_ENABLED"] = "false"
 
+os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "15"
+os.environ["REFRESH_TOKEN_EXPIRE_DAYS"] = "30"
+os.environ["REFRESH_COOKIE_NAME"] = "my_expenses_refresh_token"
+os.environ["REFRESH_COOKIE_PATH"] = "/api/auth"
+os.environ["REFRESH_COOKIE_SECURE"] = "false"
+os.environ["REFRESH_COOKIE_SAMESITE"] = "lax"
+
 from app.business_repository import initialize_business_database
 from app.main import app
 from app.storage import initialize_database

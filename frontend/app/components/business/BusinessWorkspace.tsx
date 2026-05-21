@@ -831,7 +831,6 @@ function abrirFichaDoServico(service: BusinessService) {
               vendas={vendas}
               estatisticasEstoque={estatisticasEstoque}
               onGoToStock={() => setAbaAtiva("estoque")}
-              onGoToServices={() => setAbaAtiva("servicos")}
               onGoToRecipes={() => setAbaAtiva("fichas")}
             />
           ) : null}

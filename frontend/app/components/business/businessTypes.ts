@@ -1,6 +1,6 @@
 import type { BusinessMaterial, BusinessService } from "@/app/types/business";
 
-export type BusinessTab = "resumo" | "estoque" | "servicos" | "vendas";
+export type BusinessTab = "resumo" | "estoque" | "servicos" | "fichas" | "vendas";
 
 export type BusinessFormState = {
   name: string;

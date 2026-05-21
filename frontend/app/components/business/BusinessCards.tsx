@@ -113,31 +113,32 @@ export function ServiceDetailsCard({
   service,
   onEditService,
   onDeleteService,
-  onEditRecipeItem,
-  onDeleteRecipeItem,
+  onManageRecipe,
 }: {
   service: BusinessService;
   onEditService: (service: BusinessService) => void;
   onDeleteService: (service: BusinessService) => void;
-  onEditRecipeItem: (
-    service: BusinessService,
-    item: BusinessRecipeItem,
-  ) => void;
-  onDeleteRecipeItem: (
-    service: BusinessService,
-    item: BusinessRecipeItem,
-  ) => void;
+  onManageRecipe: (service: BusinessService) => void;
 }) {
+  const hasRecipe = service.materials.length > 0;
+
   return (
-    <article className="min-w-0 rounded-3xl border border-stone-200 p-5">
+    <article className="min-w-0 rounded-3xl border border-stone-200 p-5 transition hover:border-emerald-200 hover:shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-xs font-black uppercase tracking-widest text-stone-400">
             {service.category}
           </p>
+
           <h3 className="mt-1 texto-quebra text-lg font-black text-stone-950">
             {service.name}
           </h3>
+
+          <p className="mt-1 texto-quebra text-sm text-stone-500">
+            {hasRecipe
+              ? "Ficha de custo vinculada"
+              : "Sem ficha de custo vinculada"}
+          </p>
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -155,6 +156,14 @@ export function ServiceDetailsCard({
 
           <button
             type="button"
+            onClick={() => onManageRecipe(service)}
+            className="rounded-full border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
+          >
+            {hasRecipe ? "Ver ficha" : "Montar ficha"}
+          </button>
+
+          <button
+            type="button"
             onClick={() => onDeleteService(service)}
             className="rounded-full border border-red-200 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50"
           >
@@ -164,36 +173,19 @@ export function ServiceDetailsCard({
       </div>
 
       <div className="mt-4 grid min-w-0 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-        <InfoLine label="Materiais" value={formatCurrency(service.material_cost)} />
-        <InfoLine label="Lucro bruto" value={formatCurrency(service.gross_profit)} />
-        <InfoLine label="Margem" value={`${formatNumber(service.gross_margin_percent)}%`} />
         <InfoLine
-          label="Capacidade"
-          value={
-            service.current_capacity === null ||
-            service.current_capacity === undefined
-              ? "-"
-              : `${service.current_capacity}x`
-          }
+          label="Ficha"
+          value={hasRecipe ? `${service.materials.length} item(ns)` : "Pendente"}
         />
-      </div>
-
-      <div className="mt-4 space-y-2">
-        {service.materials.length === 0 ? (
-          <p className="rounded-2xl bg-stone-50 p-3 text-sm text-stone-500">
-            Ficha de custo ainda não montada.
-          </p>
-        ) : null}
-
-        {service.materials.map((item) => (
-          <RecipeItemRow
-            key={item.id}
-            service={service}
-            item={item}
-            onEdit={onEditRecipeItem}
-            onDelete={onDeleteRecipeItem}
-          />
-        ))}
+        <InfoLine label="Custo" value={formatCurrency(service.material_cost)} />
+        <InfoLine
+          label="Lucro bruto"
+          value={formatCurrency(service.gross_profit)}
+        />
+        <InfoLine
+          label="Margem"
+          value={`${formatNumber(service.gross_margin_percent)}%`}
+        />
       </div>
     </article>
   );
@@ -216,6 +208,7 @@ export function RecipeItemRow({
         <p className="texto-quebra font-bold text-stone-800">
           {item.material_name}
         </p>
+
         <p className="texto-quebra text-stone-500">
           Usa {formatNumber(item.quantity_used)} {item.unit} x{" "}
           {formatCurrency(item.unit_cost)}
@@ -263,6 +256,7 @@ export function FichaResumo({
           <h3 className="texto-quebra font-black text-stone-950">
             Ficha atual: {service.name}
           </h3>
+
           <p className="mt-1 texto-quebra text-sm text-stone-500">
             Custo total: {formatCurrency(service.material_cost)} • Lucro bruto:{" "}
             {formatCurrency(service.gross_profit)}
@@ -306,6 +300,7 @@ export function SaleCard({ sale }: { sale: BusinessSale }) {
           <h3 className="texto-quebra font-black text-stone-950">
             {sale.service_name}
           </h3>
+
           <p className="texto-quebra text-sm text-stone-500">
             {formatDate(sale.sale_date)} • {sale.payment_method}
           </p>
@@ -318,9 +313,15 @@ export function SaleCard({ sale }: { sale: BusinessSale }) {
 
       <div className="mt-3 grid min-w-0 gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
         <InfoLine label="Qtd." value={`${sale.quantity}`} />
-        <InfoLine label="Materiais" value={formatCurrency(sale.total_material_cost)} />
+        <InfoLine
+          label="Materiais"
+          value={formatCurrency(sale.total_material_cost)}
+        />
         <InfoLine label="Lucro" value={formatCurrency(sale.gross_profit)} />
-        <InfoLine label="Margem" value={`${formatNumber(sale.gross_margin_percent)}%`} />
+        <InfoLine
+          label="Margem"
+          value={`${formatNumber(sale.gross_margin_percent)}%`}
+        />
       </div>
     </article>
   );
@@ -336,6 +337,7 @@ export function AlertRow({
   return (
     <div className="min-w-0 rounded-2xl border border-amber-200 bg-amber-50 p-4">
       <p className="texto-quebra font-black text-amber-950">{title}</p>
+
       <p className="mt-1 texto-quebra text-sm text-amber-800">
         {description}
       </p>

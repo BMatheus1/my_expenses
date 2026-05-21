@@ -18,7 +18,7 @@ const DEFAULT_API_URL = "http://127.0.0.1:8000/api";
 const AUTH_TOKEN_KEY = "my_expenses_auth_token";
 
 const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL
+  process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_URL
 ).replace(/\/$/, "");
 
 type ApiValidationError = {
@@ -133,13 +133,22 @@ async function apiRequest<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-    cache: "no-store",
-  });
+  const requestUrl = `${API_URL}${path}`;
 
-  return handleApiResponse<T>(response);
+  try {
+    const response = await fetch(requestUrl, {
+      ...options,
+      headers,
+      cache: "no-store",
+    });
+
+    return handleApiResponse<T>(response);
+  } catch {
+    throw new ApiError(
+      `Não foi possível conectar ao backend. Verifique se a API está online e se a URL está correta: ${requestUrl}`,
+      0,
+    );
+  }
 }
 
 export async function registerWithEmail(

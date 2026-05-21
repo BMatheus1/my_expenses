@@ -128,8 +128,13 @@ export function TabNavigation({
     },
     {
       id: "servicos",
-      label: "Serviços e fichas",
-      description: "Custo por venda",
+      label: "Serviços",
+      description: "O que você vende",
+    },
+    {
+      id: "fichas",
+      label: "Fichas de custo",
+      description: "Materiais por serviço",
     },
     {
       id: "vendas",
@@ -139,7 +144,7 @@ export function TabNavigation({
   ];
 
   return (
-    <nav className="grid gap-3 md:grid-cols-4">
+    <nav className="grid gap-3 md:grid-cols-5">
       {tabs.map((tab) => {
         const active = tab.id === activeTab;
 
@@ -157,6 +162,7 @@ export function TabNavigation({
             <span className="block truncate text-sm font-black">
               {tab.label}
             </span>
+
             <span
               className={`mt-1 block truncate text-xs ${
                 active ? "text-emerald-50" : "text-stone-400"
@@ -178,7 +184,7 @@ export function ResumoTab({
   vendas,
   estatisticasEstoque,
   onGoToStock,
-  onGoToServices,
+  onGoToRecipes,
 }: {
   dashboard: BusinessDashboard | null;
   materiais: BusinessMaterial[];
@@ -186,7 +192,7 @@ export function ResumoTab({
   vendas: BusinessSale[];
   estatisticasEstoque: StockStats;
   onGoToStock: () => void;
-  onGoToServices: () => void;
+  onGoToRecipes: () => void;
 }) {
   const summary = dashboard?.summary;
 
@@ -257,7 +263,7 @@ export function ResumoTab({
               value={`${servicos.filter((servico) => servico.materials.length > 0).length}/${servicos.length}`}
               description="Serviços com materiais definidos"
               actionLabel="Ver fichas"
-              onAction={onGoToServices}
+              onAction={onGoToRecipes}
             />
             <HealthCard
               title="Estoque crítico"
@@ -589,66 +595,69 @@ export function EstoqueTab({
 }
 
 export function ServicosTab({
-  materiais,
   servicos,
   servicoForm,
-  fichaForm,
   servicoEmEdicaoId,
-  itemFichaEmEdicaoId,
-  servicoSelecionadoParaFicha,
   saving,
   onServiceChange,
-  onRecipeChange,
   onServiceSubmit,
-  onRecipeSubmit,
   onCancelServiceEdit,
-  onCancelRecipeEdit,
   onEditService,
   onDeleteService,
-  onEditRecipeItem,
-  onDeleteRecipeItem,
+  onManageRecipe,
 }: {
-  materiais: BusinessMaterial[];
   servicos: BusinessService[];
   servicoForm: ServiceFormState;
-  fichaForm: RecipeFormState;
   servicoEmEdicaoId: string | null;
-  itemFichaEmEdicaoId: string | null;
-  servicoSelecionadoParaFicha: BusinessService | null;
   saving: boolean;
   onServiceChange: (form: ServiceFormState) => void;
-  onRecipeChange: (form: RecipeFormState) => void;
   onServiceSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onRecipeSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancelServiceEdit: () => void;
-  onCancelRecipeEdit: () => void;
   onEditService: (service: BusinessService) => void;
   onDeleteService: (service: BusinessService) => void;
-  onEditRecipeItem: (
-    service: BusinessService,
-    item: BusinessRecipeItem,
-  ) => void;
-  onDeleteRecipeItem: (
-    service: BusinessService,
-    item: BusinessRecipeItem,
-  ) => void;
+  onManageRecipe: (service: BusinessService) => void;
 }) {
+  const servicosComFicha = servicos.filter(
+    (servico) => servico.materials.length > 0,
+  ).length;
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
+        <MetricCard
+          label="Serviços cadastrados"
+          value={`${servicos.length}`}
+          hint="Produtos ou serviços vendidos"
+        />
+        <MetricCard
+          label="Com ficha de custo"
+          value={`${servicosComFicha}`}
+          hint="Serviços com materiais vinculados"
+        />
+        <MetricCard
+          label="Pendentes de ficha"
+          value={`${servicos.length - servicosComFicha}`}
+          hint="Precisam de composição"
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <SectionCard>
           <div className="mb-5 flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-sm font-bold text-emerald-700">
                 {servicoEmEdicaoId ? "Editar serviço" : "Novo serviço"}
               </p>
+
               <h2 className="texto-quebra text-xl font-black tracking-tight text-stone-950">
                 {servicoEmEdicaoId
                   ? "Corrigir serviço ou produto"
                   : "Criar serviço ou produto"}
               </h2>
+
               <p className="mt-1 texto-quebra text-sm text-stone-500">
-                Cadastre o que você vende. Depois monte a ficha com os materiais usados.
+                Cadastre somente o que você vende. A composição de materiais fica
+                na aba Fichas de custo.
               </p>
             </div>
 
@@ -728,16 +737,128 @@ export function ServicosTab({
         </SectionCard>
 
         <SectionCard>
+          <div className="mb-5">
+            <h2 className="text-xl font-black tracking-tight text-stone-950">
+              Serviços cadastrados
+            </h2>
+
+            <p className="mt-1 texto-quebra text-sm text-stone-500">
+              Esta lista mostra apenas os serviços/produtos. Para adicionar
+              materiais usados, clique em Montar ficha.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {servicos.length === 0 ? (
+              <EmptyList message="Nenhum serviço criado ainda." />
+            ) : null}
+
+            {servicos.map((service) => (
+              <ServiceDetailsCard
+                key={service.id}
+                service={service}
+                onEditService={onEditService}
+                onDeleteService={onDeleteService}
+                onManageRecipe={onManageRecipe}
+              />
+            ))}
+          </div>
+        </SectionCard>
+      </div>
+    </div>
+  );
+}
+
+export function FichasTab({
+  materiais,
+  servicos,
+  fichaForm,
+  itemFichaEmEdicaoId,
+  servicoSelecionadoParaFicha,
+  saving,
+  onRecipeChange,
+  onRecipeSubmit,
+  onCancelRecipeEdit,
+  onEditRecipeItem,
+  onDeleteRecipeItem,
+  onGoToServices,
+  onGoToStock,
+}: {
+  materiais: BusinessMaterial[];
+  servicos: BusinessService[];
+  fichaForm: RecipeFormState;
+  itemFichaEmEdicaoId: string | null;
+  servicoSelecionadoParaFicha: BusinessService | null;
+  saving: boolean;
+  onRecipeChange: (form: RecipeFormState) => void;
+  onRecipeSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancelRecipeEdit: () => void;
+  onEditRecipeItem: (
+    service: BusinessService,
+    item: BusinessRecipeItem,
+  ) => void;
+  onDeleteRecipeItem: (
+    service: BusinessService,
+    item: BusinessRecipeItem,
+  ) => void;
+  onGoToServices: () => void;
+  onGoToStock: () => void;
+}) {
+  const servicosComRecipe = servicos.filter(
+    (servico) => servico.materials.length > 0,
+  ).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
+        <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
+          Fichas de custo
+        </p>
+
+        <h2 className="mt-1 texto-quebra text-2xl font-black tracking-tight text-emerald-950">
+          Materiais usados em cada serviço
+        </h2>
+
+        <p className="mt-2 max-w-3xl texto-quebra text-sm leading-6 text-emerald-800">
+          Aqui você conecta o estoque aos serviços. O serviço continua aparecendo
+          na aba Serviços, e a ficha mostra apenas os materiais consumidos em uma
+          venda.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <MetricCard
+          label="Serviços com ficha"
+          value={`${servicosComRecipe}/${servicos.length}`}
+          hint="Serviços com materiais vinculados"
+        />
+        <MetricCard
+          label="Materiais disponíveis"
+          value={`${materiais.length}`}
+          hint="Itens cadastrados no estoque"
+        />
+        <MetricCard
+          label="Ficha selecionada"
+          value={servicoSelecionadoParaFicha ? servicoSelecionadoParaFicha.name : "Nenhuma"}
+          hint="Escolha um serviço para montar a composição"
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <SectionCard>
           <div className="mb-5 flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-sm font-bold text-emerald-700">
                 {itemFichaEmEdicaoId ? "Editar item da ficha" : "Ficha de custo"}
               </p>
+
               <h2 className="texto-quebra text-xl font-black tracking-tight text-stone-950">
-                Ficha de custo inteligente
+                Montar composição do serviço
               </h2>
+
               <p className="mt-1 texto-quebra text-sm text-stone-500">
-                Informe quanto de cada material é consumido em uma venda.
+                Escolha um serviço e informe quais materiais do estoque são
+                consumidos em uma venda.
               </p>
             </div>
 
@@ -752,54 +873,109 @@ export function ServicosTab({
             ) : null}
           </div>
 
-          <form onSubmit={onRecipeSubmit} className="space-y-4">
-            <SelectField
-              label="Serviço ou produto"
-              value={fichaForm.service_id}
-              onChange={(value) =>
-                onRecipeChange({ ...fichaForm, service_id: value })
-              }
-              options={servicos.map((servico) => ({
-                label: servico.name,
-                value: servico.id,
-              }))}
-              placeholder="Selecione um serviço"
-            />
+          {servicos.length === 0 ? (
+            <div className="space-y-4">
+              <EmptyList message="Crie um serviço antes de montar a ficha de custo." />
 
-            <SelectField
-              label="Material"
-              value={fichaForm.material_id}
-              onChange={(value) =>
-                onRecipeChange({ ...fichaForm, material_id: value })
-              }
-              options={materiais.map((material) => ({
-                label: `${material.name} (${formatNumber(
-                  material.stock_quantity,
-                )} ${material.unit})`,
-                value: material.id,
-              }))}
-              placeholder="Selecione um material"
-            />
+              <button
+                type="button"
+                onClick={onGoToServices}
+                className="w-full rounded-2xl border border-emerald-200 px-5 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-50"
+              >
+                Ir para Serviços
+              </button>
+            </div>
+          ) : materiais.length === 0 ? (
+            <div className="space-y-4">
+              <EmptyList message="Cadastre materiais no estoque antes de montar a ficha." />
 
-            <InputField
-              label="Quantidade usada por venda"
-              value={fichaForm.quantity_used}
-              onChange={(value) =>
-                onRecipeChange({ ...fichaForm, quantity_used: value })
-              }
-              placeholder="Ex: 80"
-              inputMode="decimal"
-              required
-            />
+              <button
+                type="button"
+                onClick={onGoToStock}
+                className="w-full rounded-2xl border border-emerald-200 px-5 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-50"
+              >
+                Ir para Estoque
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={onRecipeSubmit} className="space-y-4">
+              <SelectField
+                label="Serviço"
+                value={fichaForm.service_id}
+                onChange={(value) =>
+                  onRecipeChange({ ...fichaForm, service_id: value })
+                }
+                options={servicos.map((servico) => ({
+                  label: servico.name,
+                  value: servico.id,
+                }))}
+                placeholder="Selecione um serviço"
+              />
 
-            <PrimaryButton disabled={saving || !servicos.length || !materiais.length}>
-              {saving
-                ? "Salvando..."
-                : itemFichaEmEdicaoId
-                  ? "Salvar item da ficha"
-                  : "Adicionar à ficha"}
-            </PrimaryButton>
-          </form>
+              <SelectField
+                label="Material do estoque"
+                value={fichaForm.material_id}
+                onChange={(value) =>
+                  onRecipeChange({ ...fichaForm, material_id: value })
+                }
+                options={materiais.map((material) => ({
+                  label: `${material.name} (${formatNumber(
+                    material.stock_quantity,
+                  )} ${material.unit})`,
+                  value: material.id,
+                }))}
+                placeholder="Selecione um material"
+              />
+
+              <InputField
+                label="Quantidade usada por venda"
+                value={fichaForm.quantity_used}
+                onChange={(value) =>
+                  onRecipeChange({ ...fichaForm, quantity_used: value })
+                }
+                placeholder="Ex: 80"
+                inputMode="decimal"
+                required
+              />
+
+              <PrimaryButton
+                disabled={saving || !fichaForm.service_id || !fichaForm.material_id}
+              >
+                {saving
+                  ? "Salvando..."
+                  : itemFichaEmEdicaoId
+                    ? "Salvar item da ficha"
+                    : "Adicionar material à ficha"}
+              </PrimaryButton>
+            </form>
+          )}
+        </SectionCard>
+
+        <SectionCard>
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-xl font-black tracking-tight text-stone-950">
+                Ficha selecionada
+              </h2>
+
+              <p className="mt-1 texto-quebra text-sm text-stone-500">
+                Esta área mostra somente os materiais vinculados ao serviço
+                escolhido.
+              </p>
+            </div>
+
+            {servicoSelecionadoParaFicha ? (
+              <Badge
+                tone={
+                  servicoSelecionadoParaFicha.materials.length > 0
+                    ? "success"
+                    : "neutral"
+                }
+              >
+                {servicoSelecionadoParaFicha.materials.length} item(ns)
+              </Badge>
+            ) : null}
+          </div>
 
           {servicoSelecionadoParaFicha ? (
             <FichaResumo
@@ -807,32 +983,11 @@ export function ServicosTab({
               onEditItem={onEditRecipeItem}
               onDeleteItem={onDeleteRecipeItem}
             />
-          ) : null}
+          ) : (
+            <EmptyList message="Selecione um serviço para visualizar ou montar a ficha." />
+          )}
         </SectionCard>
       </div>
-
-      <SectionCard>
-        <h2 className="text-xl font-black tracking-tight text-stone-950">
-          Serviços cadastrados
-        </h2>
-
-        <div className="mt-4 grid gap-4 xl:grid-cols-2">
-          {servicos.length === 0 ? (
-            <EmptyList message="Nenhum serviço criado ainda." />
-          ) : null}
-
-          {servicos.map((service) => (
-            <ServiceDetailsCard
-              key={service.id}
-              service={service}
-              onEditService={onEditService}
-              onDeleteService={onDeleteService}
-              onEditRecipeItem={onEditRecipeItem}
-              onDeleteRecipeItem={onDeleteRecipeItem}
-            />
-          ))}
-        </div>
-      </SectionCard>
     </div>
   );
 }

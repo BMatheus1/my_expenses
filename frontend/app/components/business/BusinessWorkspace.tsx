@@ -48,6 +48,7 @@ import { DeleteBusinessModal, EditBusinessModal } from "./BusinessModals";
 import {
   CreateBusinessCard,
   EstoqueTab,
+  FichasTab,
   ResumoTab,
   ServicosTab,
   TabNavigation,
@@ -737,19 +738,30 @@ export default function BusinessWorkspace() {
   }
 
   function iniciarEdicaoItemFicha(
-    service: BusinessService,
-    item: BusinessRecipeItem,
-  ) {
-    setItemFichaEmEdicaoId(item.id);
-    setFichaForm({
-      service_id: service.id,
-      material_id: item.material_id,
-      quantity_used: String(item.quantity_used).replace(".", ","),
-    });
-    setAbaAtiva("servicos");
-    setErro(null);
-    setSucesso(null);
-  }
+  service: BusinessService,
+  item: BusinessRecipeItem,
+) {
+  setItemFichaEmEdicaoId(item.id);
+  setFichaForm({
+    service_id: service.id,
+    material_id: item.material_id,
+    quantity_used: String(item.quantity_used).replace(".", ","),
+  });
+  setAbaAtiva("fichas");
+  setErro(null);
+  setSucesso(null);
+}
+
+function abrirFichaDoServico(service: BusinessService) {
+  setFichaForm((formAtual) => ({
+    ...formAtual,
+    service_id: service.id,
+    material_id: formAtual.material_id || materiais[0]?.id || "",
+  }));
+  setAbaAtiva("fichas");
+  setErro(null);
+  setSucesso(null);
+}
 
   function limparFormularioMaterial() {
     setMaterialEmEdicaoId(null);
@@ -820,6 +832,7 @@ export default function BusinessWorkspace() {
               estatisticasEstoque={estatisticasEstoque}
               onGoToStock={() => setAbaAtiva("estoque")}
               onGoToServices={() => setAbaAtiva("servicos")}
+              onGoToRecipes={() => setAbaAtiva("fichas")}
             />
           ) : null}
 
@@ -846,24 +859,34 @@ export default function BusinessWorkspace() {
 
           {abaAtiva === "servicos" ? (
             <ServicosTab
-              materiais={materiais}
               servicos={servicos}
               servicoForm={servicoForm}
-              fichaForm={fichaForm}
               servicoEmEdicaoId={servicoEmEdicaoId}
+              saving={salvando}
+              onServiceChange={setServicoForm}
+              onServiceSubmit={handleSalvarServico}
+              onCancelServiceEdit={limparFormularioServico}
+              onEditService={iniciarEdicaoServico}
+              onDeleteService={handleExcluirServico}
+              onManageRecipe={abrirFichaDoServico}
+            />
+          ) : null}
+
+          {abaAtiva === "fichas" ? (
+            <FichasTab
+              materiais={materiais}
+              servicos={servicos}
+              fichaForm={fichaForm}
               itemFichaEmEdicaoId={itemFichaEmEdicaoId}
               servicoSelecionadoParaFicha={servicoSelecionadoParaFicha}
               saving={salvando}
-              onServiceChange={setServicoForm}
               onRecipeChange={setFichaForm}
-              onServiceSubmit={handleSalvarServico}
               onRecipeSubmit={handleSalvarItemFicha}
-              onCancelServiceEdit={limparFormularioServico}
               onCancelRecipeEdit={limparFormularioFicha}
-              onEditService={iniciarEdicaoServico}
-              onDeleteService={handleExcluirServico}
               onEditRecipeItem={iniciarEdicaoItemFicha}
               onDeleteRecipeItem={handleExcluirItemFicha}
+              onGoToServices={() => setAbaAtiva("servicos")}
+              onGoToStock={() => setAbaAtiva("estoque")}
             />
           ) : null}
 

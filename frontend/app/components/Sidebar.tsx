@@ -136,7 +136,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`sticky top-0 hidden h-screen shrink-0 border-r p-4 shadow-sm transition-all lg:block ${
+      className={`sticky top-0 hidden h-screen shrink-0 border-r p-4 shadow-sm transition-all lg:flex ${
         isCollapsed ? "w-24" : "w-72"
       }`}
       style={{
@@ -144,7 +144,7 @@ export function Sidebar({
         borderColor: "var(--app-border)",
       }}
     >
-      <div className="flex h-full flex-col">
+      <div className="flex min-h-0 w-full flex-col">
         <div className="flex items-center justify-between gap-3">
           {!isCollapsed ? (
             <div>
@@ -173,7 +173,7 @@ export function Sidebar({
           </button>
         </div>
 
-        <nav className="mt-8 space-y-3">
+        <nav className="mt-8 min-h-0 flex-1 space-y-3 overflow-y-auto pb-4 pr-1">
           <SidebarGroupButton
             title="Minha Carteira"
             description="Ganhos, gastos e relatórios"
@@ -265,7 +265,10 @@ export function Sidebar({
           ) : null}
         </nav>
 
-        <div className="mt-auto space-y-3">
+        <div
+          className="shrink-0 space-y-3 border-t pt-4"
+          style={{ borderColor: "var(--app-border)" }}
+        >
           <button
             type="button"
             onClick={openSettings}
@@ -309,9 +312,13 @@ export function Sidebar({
           <button
             type="button"
             onClick={onLogout}
-            className="app-button-secondary w-full px-4 py-3 text-sm"
+            className="app-btn app-btn-soft h-11 w-full rounded-2xl text-sm"
+            aria-label="Sair"
+            title="Sair"
           >
-            {isCollapsed ? "S" : "Sair"}
+            <span aria-hidden="true">⎋</span>
+
+            {!isCollapsed ? <span>Sair</span> : null}
           </button>
         </div>
       </div>

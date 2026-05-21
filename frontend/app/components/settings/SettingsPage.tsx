@@ -13,6 +13,17 @@ import {
   saveAndApplyAppMode,
   saveAndApplyAppTheme,
 } from "@/app/lib/theme";
+import {
+  clearSensitiveBrowserData,
+  getAutoLogoutEnabled,
+  getAutoLogoutMinutes,
+  getRememberSession,
+  getSessionSecurityInfo,
+  saveAutoLogoutEnabled,
+  saveAutoLogoutMinutes,
+  saveRememberSession,
+} from "@/app/lib/security";
+import type { User } from "@/app/types/auth";
 
 const DISPLAY_MODES: Array<{
   value: AppColorMode;
@@ -34,14 +45,38 @@ const DISPLAY_MODES: Array<{
   },
 ];
 
-export default function SettingsPage() {
+const AUTO_LOGOUT_OPTIONS = [
+  { value: 15, label: "15 minutos" },
+  { value: 30, label: "30 minutos" },
+  { value: 60, label: "1 hora" },
+];
+
+type SettingsPageProps = {
+  currentUser: User;
+  onLogout: () => void;
+};
+
+export default function SettingsPage({
+  currentUser,
+  onLogout,
+}: SettingsPageProps) {
   const [selectedTheme, setSelectedTheme] = useState<AppThemeName>("emerald");
   const [selectedMode, setSelectedMode] = useState<AppColorMode>("light");
+  const [rememberSession, setRememberSession] = useState(true);
+  const [autoLogoutEnabled, setAutoLogoutEnabled] = useState(true);
+  const [autoLogoutMinutes, setAutoLogoutMinutes] = useState(15);
+  const [, refreshSessionInfo] = useState(0);
+
+  const sessionInfo = getSessionSecurityInfo();
 
   useEffect(() => {
     initializeAppTheme();
     setSelectedTheme(getSavedAppTheme());
     setSelectedMode(getSavedAppMode());
+    setRememberSession(getRememberSession());
+    setAutoLogoutEnabled(getAutoLogoutEnabled());
+    setAutoLogoutMinutes(getAutoLogoutMinutes());
+    refreshSessionInfo((currentValue) => currentValue + 1);
   }, []);
 
   function handleThemeChange(theme: AppThemeName) {
@@ -54,9 +89,107 @@ export default function SettingsPage() {
     saveAndApplyAppMode(mode);
   }
 
+  function handleRememberSessionChange(value: boolean) {
+    setRememberSession(value);
+    saveRememberSession(value);
+    refreshSessionInfo((currentValue) => currentValue + 1);
+  }
+
+  function handleAutoLogoutEnabledChange(value: boolean) {
+    setAutoLogoutEnabled(value);
+    saveAutoLogoutEnabled(value);
+  }
+
+  function handleAutoLogoutMinutesChange(value: number) {
+    setAutoLogoutMinutes(value);
+    saveAutoLogoutMinutes(value);
+  }
+
+  function handleClearSessionAndLogout() {
+    clearSensitiveBrowserData();
+    onLogout();
+  }
+
   return (
     <section className="space-y-6">
       <SettingsHeader />
+
+      <section className="app-card rounded-3xl p-6">
+        <SectionHeader
+          title="Segurança da conta"
+          description="Controle como sua sessão é armazenada neste navegador e reduza riscos em computadores compartilhados."
+        />
+
+        <div className="grid gap-4 xl:grid-cols-3">
+          <SecurityStatusCard
+            currentUser={currentUser}
+            sessionInfo={sessionInfo}
+          />
+
+          <div className="space-y-4 xl:col-span-2">
+            <SecurityToggle
+              title="Lembrar sessão neste navegador"
+              description="Quando desativado, o token fica no sessionStorage e tende a sair ao fechar o navegador."
+              isEnabled={rememberSession}
+              onChange={handleRememberSessionChange}
+            />
+
+            <SecurityToggle
+              title="Sair automaticamente por inatividade"
+              description="Encerra a sessão local depois de um período sem cliques, teclado, rolagem ou toque."
+              isEnabled={autoLogoutEnabled}
+              onChange={handleAutoLogoutEnabledChange}
+            />
+
+            <div className="app-card-soft rounded-3xl p-5">
+              <label className="app-title block text-sm font-black">
+                Tempo até sair por inatividade
+              </label>
+
+              <p className="app-muted mt-1 text-sm leading-6">
+                Use tempos menores em computadores compartilhados ou públicos.
+              </p>
+
+              <select
+                value={autoLogoutMinutes}
+                onChange={(event) =>
+                  handleAutoLogoutMinutesChange(Number(event.target.value))
+                }
+                disabled={!autoLogoutEnabled}
+                className="mt-4 w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none transition disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  backgroundColor: "var(--app-surface)",
+                  borderColor: "var(--app-border)",
+                  color: "var(--app-text)",
+                }}
+              >
+                {AUTO_LOGOUT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="rounded-3xl border border-red-100 bg-red-50 p-5 text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-100">
+              <h3 className="text-sm font-black">Sessão e dados locais</h3>
+
+              <p className="mt-1 text-sm leading-6 opacity-80">
+                Remove tokens antigos do navegador e encerra o acesso neste dispositivo.
+                Seus lançamentos salvos no banco não são apagados.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleClearSessionAndLogout}
+                className="mt-4 rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-red-700"
+              >
+                Limpar sessão e sair
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="app-card rounded-3xl p-6">
         <SectionHeader
@@ -105,13 +238,12 @@ function SettingsHeader() {
       <p className="app-kicker">Configurações</p>
 
       <h1 className="app-title mt-2 text-3xl font-black tracking-tight">
-        Aparência
+        Aparência e segurança
       </h1>
 
       <p className="app-muted mt-2 max-w-3xl text-sm leading-6">
-        Personalize o app com temas modernos, harmônicos e consistentes. Esta
-        tela salva sua escolha no navegador e aplica a identidade visual em toda
-        a aplicação.
+        Personalize o app e configure proteções importantes para a sua sessão.
+        Segurança boa começa com padrões seguros e opções simples para o usuário.
       </p>
     </header>
   );
@@ -129,6 +261,102 @@ function SectionHeader({
       <h2 className="app-title text-xl font-black tracking-tight">{title}</h2>
       <p className="app-muted mt-1 text-sm leading-6">{description}</p>
     </div>
+  );
+}
+
+type SecurityStatusCardProps = {
+  currentUser: User;
+  sessionInfo: ReturnType<typeof getSessionSecurityInfo>;
+};
+
+function SecurityStatusCard({
+  currentUser,
+  sessionInfo,
+}: SecurityStatusCardProps) {
+  const storageLabel =
+    sessionInfo.storageType === "localStorage"
+      ? "Persistente neste navegador"
+      : sessionInfo.storageType === "sessionStorage"
+        ? "Somente nesta sessão"
+        : "Sem sessão ativa";
+
+  return (
+    <div className="app-card-soft rounded-3xl p-5">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl app-brand-soft text-lg font-black">
+        🔐
+      </div>
+
+      <h3 className="app-title mt-4 text-lg font-black">Acesso atual</h3>
+
+      <div className="mt-4 space-y-3 text-sm">
+        <InfoRow label="Usuário" value={currentUser.name} />
+        <InfoRow label="E-mail" value={currentUser.email} />
+        <InfoRow label="Armazenamento" value={storageLabel} />
+        <InfoRow
+          label="Expira em"
+          value={formatDateTime(sessionInfo.expiresAt) ?? "Não informado"}
+        />
+        <InfoRow
+          label="Status"
+          value={sessionInfo.isExpired ? "Expirada" : "Ativa"}
+        />
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="app-muted text-xs font-bold uppercase tracking-wide">
+        {label}
+      </p>
+      <p className="app-title mt-1 max-w-full overflow-hidden text-wrap font-black">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+type SecurityToggleProps = {
+  title: string;
+  description: string;
+  isEnabled: boolean;
+  onChange: (value: boolean) => void;
+};
+
+function SecurityToggle({
+  title,
+  description,
+  isEnabled,
+  onChange,
+}: SecurityToggleProps) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!isEnabled)}
+      className={`app-card-hover flex w-full items-center justify-between gap-4 rounded-3xl border p-5 text-left ${
+        isEnabled ? "app-brand-border app-brand-ring" : ""
+      }`}
+    >
+      <span>
+        <span className="app-title block text-sm font-black">{title}</span>
+        <span className="app-muted mt-1 block text-sm leading-6">
+          {description}
+        </span>
+      </span>
+
+      <span
+        className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
+          isEnabled ? "justify-end app-brand-soft" : "justify-start bg-stone-200"
+        }`}
+      >
+        <span
+          className="h-5 w-5 rounded-full bg-white shadow-sm"
+          aria-hidden="true"
+        />
+      </span>
+    </button>
   );
 }
 
@@ -276,4 +504,15 @@ function ThemePreview() {
       </div>
     </section>
   );
+}
+
+function formatDateTime(date: Date | null): string | null {
+  if (!date) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
 }

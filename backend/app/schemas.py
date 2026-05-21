@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class UserResponse(BaseModel):
@@ -26,14 +26,25 @@ class AuthRegisterRequest(BaseModel):
 
     name: str = Field(min_length=2, max_length=80)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=72)
+    password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        has_letter = any(character.isalpha() for character in value)
+        has_number = any(character.isdigit() for character in value)
+
+        if not has_letter or not has_number:
+            raise ValueError("A senha precisa ter letras e números.")
+
+        return value
 
 
 class AuthLoginRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     email: EmailStr
-    password: str = Field(min_length=6, max_length=72)
+    password: str = Field(min_length=1, max_length=72)
 
 
 class GoogleLoginRequest(BaseModel):

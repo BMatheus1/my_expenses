@@ -641,7 +641,7 @@ export function ExpensesDashboard({
       onLogout={onLogout}
     >
       {activeView === "settings" ? (
-        <SettingsPage />
+        <SettingsPage currentUser={currentUser} onLogout={onLogout} />
       ) : activeView === "businesses" ? (
         <BusinessWorkspace />
       ) : activeView === "reports" ? (

@@ -7,13 +7,27 @@ import {
   getCurrentUser,
   setUnauthorizedHandler,
 } from "../lib/api";
+import {
+  getAutoLogoutEnabled,
+  getAutoLogoutMilliseconds,
+  SECURITY_SETTINGS_CHANGED_EVENT,
+} from "../lib/security";
 import type { User } from "../types/auth";
 import { AuthPage } from "./AuthPage";
 import { ExpensesDashboard } from "./ExpensesDashboard";
 
+const USER_ACTIVITY_EVENTS = [
+  "click",
+  "keydown",
+  "mousemove",
+  "scroll",
+  "touchstart",
+] as const;
+
 export function AuthGate() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [securitySettingsVersion, setSecuritySettingsVersion] = useState(0);
 
   const handleLogout = useCallback(() => {
     clearAuthToken();
@@ -42,6 +56,60 @@ export function AuthGate() {
 
     void checkSession();
   }, [handleLogout]);
+
+  useEffect(() => {
+    function handleSecuritySettingsChange() {
+      setSecuritySettingsVersion((currentValue) => currentValue + 1);
+    }
+
+    window.addEventListener(
+      SECURITY_SETTINGS_CHANGED_EVENT,
+      handleSecuritySettingsChange,
+    );
+
+    return () => {
+      window.removeEventListener(
+        SECURITY_SETTINGS_CHANGED_EVENT,
+        handleSecuritySettingsChange,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser || !getAutoLogoutEnabled()) {
+      return;
+    }
+
+    let timeoutId: number | undefined;
+
+    function resetInactivityTimer() {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+
+      timeoutId = window.setTimeout(() => {
+        handleLogout();
+      }, getAutoLogoutMilliseconds());
+    }
+
+    resetInactivityTimer();
+
+    for (const eventName of USER_ACTIVITY_EVENTS) {
+      window.addEventListener(eventName, resetInactivityTimer, {
+        passive: true,
+      });
+    }
+
+    return () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+
+      for (const eventName of USER_ACTIVITY_EVENTS) {
+        window.removeEventListener(eventName, resetInactivityTimer);
+      }
+    };
+  }, [currentUser, handleLogout, securitySettingsVersion]);
 
   if (isCheckingSession) {
     return (

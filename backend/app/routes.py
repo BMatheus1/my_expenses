@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Response, status
+
 from app.auth import get_current_user
 from app.auth_service import login_user, login_with_google, register_user
 from app.business_routes import router as business_router
-
 from app.schemas import (
     AuthLoginRequest,
     AuthRegisterRequest,
@@ -20,6 +20,7 @@ from app.schemas import (
     IncomeUpdate,
     UserResponse,
 )
+from app.security import auth_rate_limit, write_rate_limit
 from app.services import (
     create_expense,
     create_expense_category,
@@ -39,6 +40,7 @@ from app.services import (
 router = APIRouter()
 router.include_router(business_router)
 
+
 @router.get(
     "/health",
     response_model=HealthResponse,
@@ -53,6 +55,7 @@ def health_check():
     response_model=AuthResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["Auth"],
+    dependencies=[Depends(auth_rate_limit)],
 )
 def register(user_data: AuthRegisterRequest):
     return register_user(user_data)
@@ -62,6 +65,7 @@ def register(user_data: AuthRegisterRequest):
     "/auth/login",
     response_model=AuthResponse,
     tags=["Auth"],
+    dependencies=[Depends(auth_rate_limit)],
 )
 def login(login_data: AuthLoginRequest):
     return login_user(login_data)
@@ -71,6 +75,7 @@ def login(login_data: AuthLoginRequest):
     "/auth/google",
     response_model=AuthResponse,
     tags=["Auth"],
+    dependencies=[Depends(auth_rate_limit)],
 )
 def google_login(login_data: GoogleLoginRequest):
     return login_with_google(login_data)
@@ -101,6 +106,7 @@ def get_expense_categories(
     response_model=ExpenseCategoryResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["Expense Categories"],
+    dependencies=[Depends(write_rate_limit)],
 )
 def add_expense_category(
     category_data: ExpenseCategoryCreate,
@@ -113,6 +119,7 @@ def add_expense_category(
     "/expense-categories/{category_id}",
     response_model=ExpenseCategoryResponse,
     tags=["Expense Categories"],
+    dependencies=[Depends(write_rate_limit)],
 )
 def edit_expense_category(
     category_id: str,
@@ -130,6 +137,7 @@ def edit_expense_category(
     "/expense-categories/{category_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["Expense Categories"],
+    dependencies=[Depends(write_rate_limit)],
 )
 def remove_expense_category(
     category_id: str,
@@ -154,6 +162,7 @@ def get_expenses(current_user: UserResponse = Depends(get_current_user)):
     response_model=ExpenseResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["Expenses"],
+    dependencies=[Depends(write_rate_limit)],
 )
 def add_expense(
     expense_data: ExpenseCreate,
@@ -166,6 +175,7 @@ def add_expense(
     "/expenses/{expense_id}",
     response_model=ExpenseResponse,
     tags=["Expenses"],
+    dependencies=[Depends(write_rate_limit)],
 )
 def edit_expense(
     expense_id: str,
@@ -179,6 +189,7 @@ def edit_expense(
     "/expenses/{expense_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["Expenses"],
+    dependencies=[Depends(write_rate_limit)],
 )
 def remove_expense(
     expense_id: str,
@@ -203,6 +214,7 @@ def get_incomes(current_user: UserResponse = Depends(get_current_user)):
     response_model=IncomeResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["Incomes"],
+    dependencies=[Depends(write_rate_limit)],
 )
 def add_income(
     income_data: IncomeCreate,
@@ -215,6 +227,7 @@ def add_income(
     "/incomes/{income_id}",
     response_model=IncomeResponse,
     tags=["Incomes"],
+    dependencies=[Depends(write_rate_limit)],
 )
 def edit_income(
     income_id: str,
@@ -228,6 +241,7 @@ def edit_income(
     "/incomes/{income_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["Incomes"],
+    dependencies=[Depends(write_rate_limit)],
 )
 def remove_income(
     income_id: str,

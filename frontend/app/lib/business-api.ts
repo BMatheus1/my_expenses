@@ -1,3 +1,4 @@
+import { clearAuthToken, getAuthToken } from "@/app/lib/api";
 import type {
   Business,
   BusinessCreatePayload,
@@ -15,7 +16,11 @@ import type {
   BusinessUpdatePayload,
 } from "@/app/types/business";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const DEFAULT_API_URL = "http://127.0.0.1:8000/api";
+
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_URL
+).replace(/\/$/, "");
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
@@ -27,6 +32,7 @@ class ApiError extends Error {
 
   constructor(message: string, status: number) {
     super(message);
+    this.name = "ApiError";
     this.status = status;
   }
 }
@@ -35,28 +41,34 @@ async function businessRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL não está configurada.");
+  const token = getAuthToken();
+  const headers = new Headers();
+
+  headers.set("Content-Type", "application/json");
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const token = getTokenFromStorage();
-
+  const requestUrl = `${API_URL}${path}`;
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(requestUrl, {
       method: options.method ?? "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
+      cache: "no-store",
     });
   } catch {
     throw new ApiError(
-      "Não foi possível conectar ao backend. Verifique se a API está rodando e se a URL em NEXT_PUBLIC_API_URL está correta.",
+      `Não foi possível conectar ao backend. Verifique se a API está online e se a URL está correta: ${requestUrl}`,
       0,
     );
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    clearAuthToken();
   }
 
   if (response.status === 204) {
@@ -100,120 +112,6 @@ function getErrorMessage(data: unknown, fallbackText = ""): string {
   }
 
   return "Não foi possível concluir a operação.";
-}
-
-function getTokenFromStorage(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const knownKeys = [
-    "auth_token",
-    "access_token",
-    "my_expenses_token",
-    "my_expenses_auth_token",
-    "my-expenses-token",
-  ];
-
-  for (const key of knownKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (isJwt(value)) {
-      return value;
-    }
-
-    const tokenFromJson = findTokenInJson(value);
-
-    if (tokenFromJson) {
-      return tokenFromJson;
-    }
-  }
-
-  return findTokenScanningStorage();
-}
-
-function findTokenScanningStorage(): string | null {
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index);
-
-    if (!key) {
-      continue;
-    }
-
-    const value = window.localStorage.getItem(key);
-
-    if (isJwt(value)) {
-      return value;
-    }
-
-    const tokenFromJson = findTokenInJson(value);
-
-    if (tokenFromJson) {
-      return tokenFromJson;
-    }
-  }
-
-  return null;
-}
-
-function findTokenInJson(value: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsedValue = JSON.parse(value);
-
-    return findTokenInObject(parsedValue);
-  } catch {
-    return null;
-  }
-}
-
-function findTokenInObject(value: unknown): string | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const token = findTokenInObject(item);
-
-      if (token) {
-        return token;
-      }
-    }
-
-    return null;
-  }
-
-  const objectValue = value as Record<string, unknown>;
-
-  for (const key of ["access_token", "token", "authToken"]) {
-    const possibleToken = objectValue[key];
-
-    if (typeof possibleToken === "string" && isJwt(possibleToken)) {
-      return possibleToken;
-    }
-  }
-
-  for (const nestedValue of Object.values(objectValue)) {
-    const token = findTokenInObject(nestedValue);
-
-    if (token) {
-      return token;
-    }
-  }
-
-  return null;
-}
-
-function isJwt(value: string | null): value is string {
-  if (!value) {
-    return false;
-  }
-
-  return /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(value);
 }
 
 export function listBusinesses() {

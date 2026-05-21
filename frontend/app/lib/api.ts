@@ -13,9 +13,13 @@ import type {
 } from "../types/auth";
 import type { CreateExpenseRequest, Expense } from "../types/expense";
 import type { CreateIncomeRequest, Income } from "../types/income";
+import {
+  clearStoredAuthToken,
+  getStoredAuthToken,
+  storeAuthToken,
+} from "./security";
 
 const DEFAULT_API_URL = "http://127.0.0.1:8000/api";
-const AUTH_TOKEN_KEY = "my_expenses_auth_token";
 
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_URL
@@ -44,27 +48,15 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
 }
 
 export function getAuthToken() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+  return getStoredAuthToken();
 }
 
 export function setAuthToken(token: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+  storeAuthToken(token);
 }
 
 export function clearAuthToken() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  clearStoredAuthToken();
 }
 
 function handleUnauthorizedResponse() {
@@ -120,7 +112,7 @@ async function handleApiResponse<T>(response: Response): Promise<T> {
 
 async function apiRequest<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const headers = new Headers(options.headers);
   const token = getAuthToken();
@@ -134,25 +126,26 @@ async function apiRequest<T>(
   }
 
   const requestUrl = `${API_URL}${path}`;
+  let response: Response;
 
   try {
-    const response = await fetch(requestUrl, {
+    response = await fetch(requestUrl, {
       ...options,
       headers,
       cache: "no-store",
     });
-
-    return handleApiResponse<T>(response);
   } catch {
     throw new ApiError(
       `Não foi possível conectar ao backend. Verifique se a API está online e se a URL está correta: ${requestUrl}`,
       0,
     );
   }
+
+  return handleApiResponse<T>(response);
 }
 
 export async function registerWithEmail(
-  userData: RegisterRequest
+  userData: RegisterRequest,
 ): Promise<AuthResponse> {
   return apiRequest<AuthResponse>("/auth/register", {
     method: "POST",
@@ -161,7 +154,7 @@ export async function registerWithEmail(
 }
 
 export async function loginWithEmail(
-  loginData: LoginRequest
+  loginData: LoginRequest,
 ): Promise<AuthResponse> {
   return apiRequest<AuthResponse>("/auth/login", {
     method: "POST",
@@ -170,7 +163,7 @@ export async function loginWithEmail(
 }
 
 export async function loginWithGoogle(
-  loginData: GoogleLoginRequest
+  loginData: GoogleLoginRequest,
 ): Promise<AuthResponse> {
   return apiRequest<AuthResponse>("/auth/google", {
     method: "POST",
@@ -187,12 +180,13 @@ export async function getCurrentUser(): Promise<User> {
 
   return apiRequest<User>("/auth/me");
 }
+
 export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
   return apiRequest<ExpenseCategory[]>("/expense-categories");
 }
 
 export async function createExpenseCategory(
-  category: CreateExpenseCategoryRequest
+  category: CreateExpenseCategoryRequest,
 ): Promise<ExpenseCategory> {
   return apiRequest<ExpenseCategory>("/expense-categories", {
     method: "POST",
@@ -202,7 +196,7 @@ export async function createExpenseCategory(
 
 export async function updateExpenseCategory(
   categoryId: string,
-  category: UpdateExpenseCategoryRequest
+  category: UpdateExpenseCategoryRequest,
 ): Promise<ExpenseCategory> {
   return apiRequest<ExpenseCategory>(`/expense-categories/${categoryId}`, {
     method: "PUT",
@@ -215,12 +209,13 @@ export async function deleteExpenseCategory(categoryId: string): Promise<void> {
     method: "DELETE",
   });
 }
+
 export async function getExpenses(): Promise<Expense[]> {
   return apiRequest<Expense[]>("/expenses");
 }
 
 export async function createExpense(
-  expense: CreateExpenseRequest
+  expense: CreateExpenseRequest,
 ): Promise<Expense> {
   return apiRequest<Expense>("/expenses", {
     method: "POST",
@@ -230,7 +225,7 @@ export async function createExpense(
 
 export async function updateExpense(
   expenseId: string,
-  expense: CreateExpenseRequest
+  expense: CreateExpenseRequest,
 ): Promise<Expense> {
   return apiRequest<Expense>(`/expenses/${expenseId}`, {
     method: "PUT",
@@ -249,7 +244,7 @@ export async function getIncomes(): Promise<Income[]> {
 }
 
 export async function createIncome(
-  income: CreateIncomeRequest
+  income: CreateIncomeRequest,
 ): Promise<Income> {
   return apiRequest<Income>("/incomes", {
     method: "POST",
@@ -259,7 +254,7 @@ export async function createIncome(
 
 export async function updateIncome(
   incomeId: string,
-  income: CreateIncomeRequest
+  income: CreateIncomeRequest,
 ): Promise<Income> {
   return apiRequest<Income>(`/incomes/${incomeId}`, {
     method: "PUT",

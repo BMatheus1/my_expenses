@@ -3,9 +3,9 @@ from collections.abc import Iterator
 from urllib.parse import urlparse
 
 import psycopg
-from pytest import fixture
 from fastapi.testclient import TestClient
 from psycopg import sql
+from pytest import fixture
 
 TEST_DATABASE_URL = os.getenv(
     "DATABASE_URL_TEST",
@@ -27,9 +27,11 @@ os.environ["REFRESH_COOKIE_SECURE"] = "false"
 os.environ["REFRESH_COOKIE_SAMESITE"] = "lax"
 os.environ["FRONTEND_URL"] = "http://127.0.0.1:3000"
 os.environ["PASSWORD_RESET_TOKEN_EXPIRE_MINUTES"] = "30"
+os.environ["EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES"] = "1440"
 os.environ["SMTP_ENABLED"] = "false"
 
 from app.business_repository import initialize_business_database
+from app.email_verification_repository import initialize_email_verification_database
 from app.main import app
 from app.password_reset_repository import initialize_password_reset_database
 from app.session_repository import initialize_refresh_token_database
@@ -37,6 +39,7 @@ from app.storage import initialize_database
 
 
 TABLES_TO_TRUNCATE = [
+    "email_verification_tokens",
     "password_reset_tokens",
     "refresh_tokens",
     "business_sale_materials",
@@ -59,6 +62,7 @@ def client() -> Iterator[TestClient]:
     initialize_business_database()
     initialize_refresh_token_database()
     initialize_password_reset_database()
+    initialize_email_verification_database()
     clear_database()
 
     with TestClient(app) as test_client:

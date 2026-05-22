@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     refresh_cookie_samesite: str = "lax"
 
     password_reset_token_expire_minutes: int = 30
+    email_verification_token_expire_minutes: int = 1440
 
     smtp_enabled: bool = False
     smtp_host: str = ""
@@ -125,7 +126,9 @@ class Settings(BaseSettings):
             raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES deve ser no mínimo 5.")
 
         if value > 60:
-            raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES não deve passar de 60 minutos.")
+            raise ValueError(
+                "ACCESS_TOKEN_EXPIRE_MINUTES não deve passar de 60 minutos."
+            )
 
         return value
 
@@ -157,7 +160,24 @@ class Settings(BaseSettings):
             raise ValueError("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES deve ser no mínimo 5.")
 
         if value > 120:
-            raise ValueError("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES não deve passar de 120.")
+            raise ValueError(
+                "PASSWORD_RESET_TOKEN_EXPIRE_MINUTES não deve passar de 120."
+            )
+
+        return value
+
+    @field_validator("email_verification_token_expire_minutes")
+    @classmethod
+    def validate_email_verification_token_expiration(cls, value: int) -> int:
+        if value < 15:
+            raise ValueError(
+                "EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES deve ser no mínimo 15."
+            )
+
+        if value > 60 * 24 * 7:
+            raise ValueError(
+                "EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES não deve passar de 7 dias."
+            )
 
         return value
 

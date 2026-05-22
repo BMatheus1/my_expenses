@@ -1,4 +1,6 @@
 from fastapi.testclient import TestClient
+from app.email_verification_repository import mark_user_email_as_verified
+from app.storage import get_user_record_by_email
 
 API_PREFIX = "/api"
 
@@ -221,11 +223,22 @@ def register_user(client: TestClient, user_data: dict[str, str]) -> str:
 
     assert response.status_code == 201, response.text
 
-    data = response.json()
+    user = get_user_record_by_email(user_data["email"])
+    assert user is not None
 
-    assert "access_token" in data
+    mark_user_email_as_verified(user.id)
 
-    return data["access_token"]
+    login_response = client.post(
+        f"{API_PREFIX}/auth/login",
+        json={
+            "email": user_data["email"],
+            "password": user_data["password"],
+        },
+    )
+
+    assert login_response.status_code == 200, login_response.text
+
+    return login_response.json()["access_token"]
 
 
 def auth_headers(token: str) -> dict[str, str]:

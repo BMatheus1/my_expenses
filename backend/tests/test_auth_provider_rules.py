@@ -1,4 +1,6 @@
 from fastapi.testclient import TestClient
+from app.email_verification_repository import mark_user_email_as_verified
+from app.storage import get_user_record_by_email
 
 API_PREFIX = "/api"
 
@@ -141,7 +143,22 @@ def register_credentials_user(
 
     assert response.status_code == 201, response.text
 
-    return response.json()["access_token"]
+    user = get_user_record_by_email(email)
+    assert user is not None
+
+    mark_user_email_as_verified(user.id)
+
+    login_response = client.post(
+        f"{API_PREFIX}/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert login_response.status_code == 200, login_response.text
+
+    return login_response.json()["access_token"]
 
 
 def mock_google_credential(monkeypatch, email: str, name: str) -> None:

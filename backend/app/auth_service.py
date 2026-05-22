@@ -13,7 +13,15 @@ from app.auth import (
     verify_password,
 )
 from app.config import settings
-from app.email_service import send_password_reset_email
+from app.email_service import send_email_verification_email, send_password_reset_email
+from app.email_verification_repository import (
+    create_email_verification_token_record,
+    get_active_email_verification_token_record,
+    get_user_email_verified,
+    mark_email_verification_token_as_used,
+    mark_user_email_as_verified,
+    revoke_user_email_verification_tokens,
+)
 from app.password_reset_repository import (
     create_password_reset_token_record,
     get_active_password_reset_token_record,
@@ -25,12 +33,15 @@ from app.schemas import (
     AuthLoginRequest,
     AuthRegisterRequest,
     AuthResponse,
+    EmailVerificationTokenRecord,
     ForgotPasswordRequest,
     GoogleLoginRequest,
     PasswordResetTokenRecord,
+    ResendVerificationEmailRequest,
     ResetPasswordRequest,
     UserRecord,
     UserResponse,
+    VerifyEmailRequest,
 )
 from app.session_repository import (
     get_active_refresh_token_record,
@@ -41,6 +52,7 @@ from app.session_repository import (
 from app.storage import create_user_record, get_user_record_by_email, get_user_record_by_id
 
 PASSWORD_RESET_TOKEN_BYTES = 48
+EMAIL_VERIFICATION_TOKEN_BYTES = 48
 
 PROVIDER_CREDENTIALS = "credentials"
 PROVIDER_GOOGLE = "google"
@@ -49,8 +61,12 @@ PASSWORD_RESET_GENERIC_MESSAGE = (
     "Se existir uma conta com este e-mail, enviaremos as instruções de recuperação."
 )
 
+EMAIL_VERIFICATION_GENERIC_MESSAGE = (
+    "Se existir uma conta pendente com este e-mail, enviaremos um novo link de verificação."
+)
 
-def register_user(user_data: AuthRegisterRequest) -> AuthResponse:
+
+def register_user(user_data: AuthRegisterRequest) -> str:
     email = normalize_email(user_data.email)
     existing_user = get_user_record_by_email(email)
 
@@ -64,11 +80,16 @@ def register_user(user_data: AuthRegisterRequest) -> AuthResponse:
         password_hash=hash_password(user_data.password),
         provider=PROVIDER_CREDENTIALS,
         created_at=datetime.now(timezone.utc),
+        email_verified=False,
     )
 
     created_user = create_user_record(user)
+    request_email_verification_for_user(created_user)
 
-    return build_auth_response(created_user)
+    return (
+        "Conta criada com sucesso. Enviamos um link para confirmar seu e-mail "
+        "antes do primeiro acesso."
+    )
 
 
 def login_user(login_data: AuthLoginRequest) -> AuthResponse:
@@ -86,6 +107,12 @@ def login_user(login_data: AuthLoginRequest) -> AuthResponse:
 
     if user.provider != PROVIDER_CREDENTIALS or user.password_hash is None:
         raise_invalid_credentials_error()
+
+    if not get_user_email_verified(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Confirme seu e-mail antes de entrar. Enviamos um link de confirmação para sua caixa de entrada.",
+        )
 
     if not verify_password(login_data.password, user.password_hash):
         raise_invalid_credentials_error()
@@ -116,10 +143,62 @@ def login_with_google(login_data: GoogleLoginRequest) -> AuthResponse:
                 password_hash=None,
                 provider=PROVIDER_GOOGLE,
                 created_at=datetime.now(timezone.utc),
+                email_verified=True,
             )
         )
 
+    mark_user_email_as_verified(user.id)
+
     return build_auth_response(user)
+
+
+def verify_user_email(verification_data: VerifyEmailRequest) -> AuthResponse:
+    now = datetime.now(timezone.utc)
+    token_hash = hash_email_verification_token(verification_data.token)
+    verification_record = get_active_email_verification_token_record(token_hash, now)
+
+    if verification_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Link de verificação inválido ou expirado.",
+        )
+
+    user = get_user_record_by_id(verification_record.user_id)
+
+    if user is None or user.provider != PROVIDER_CREDENTIALS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Link de verificação inválido ou expirado.",
+        )
+
+    mark_user_email_as_verified(user.id)
+    mark_email_verification_token_as_used(verification_record.id, now)
+    revoke_user_email_verification_tokens(user.id, now)
+
+    verified_user = get_user_record_by_id(user.id)
+
+    if verified_user is None:
+        raise_invalid_session_error()
+
+    return build_auth_response(verified_user)
+
+
+def resend_verification_email(data: ResendVerificationEmailRequest) -> str:
+    email = normalize_email(data.email)
+    user = get_user_record_by_email(email)
+
+    if user is None:
+        return EMAIL_VERIFICATION_GENERIC_MESSAGE
+
+    if user.provider != PROVIDER_CREDENTIALS:
+        return EMAIL_VERIFICATION_GENERIC_MESSAGE
+
+    if get_user_email_verified(user.id):
+        return EMAIL_VERIFICATION_GENERIC_MESSAGE
+
+    request_email_verification_for_user(user)
+
+    return EMAIL_VERIFICATION_GENERIC_MESSAGE
 
 
 def request_password_reset(reset_data: ForgotPasswordRequest) -> str:
@@ -130,6 +209,9 @@ def request_password_reset(reset_data: ForgotPasswordRequest) -> str:
         return PASSWORD_RESET_GENERIC_MESSAGE
 
     if user.provider != PROVIDER_CREDENTIALS or user.password_hash is None:
+        return PASSWORD_RESET_GENERIC_MESSAGE
+
+    if not get_user_email_verified(user.id):
         return PASSWORD_RESET_GENERIC_MESSAGE
 
     now = datetime.now(timezone.utc)
@@ -176,6 +258,12 @@ def reset_user_password(reset_data: ResetPasswordRequest) -> None:
             detail="Link de recuperação inválido ou expirado.",
         )
 
+    if not get_user_email_verified(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirme seu e-mail antes de redefinir a senha.",
+        )
+
     update_user_password_hash(
         user_id=reset_record.user_id,
         password_hash=hash_password(reset_data.password),
@@ -215,6 +303,30 @@ def logout_refresh_session(refresh_token: str | None) -> None:
     )
 
 
+def request_email_verification_for_user(user: UserRecord) -> None:
+    now = datetime.now(timezone.utc)
+    raw_token = create_email_verification_token()
+    token_hash = hash_email_verification_token(raw_token)
+
+    revoke_user_email_verification_tokens(user.id, now)
+
+    create_email_verification_token_record(
+        EmailVerificationTokenRecord(
+            id=str(uuid4()),
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=now + timedelta(
+                minutes=settings.email_verification_token_expire_minutes
+            ),
+            created_at=now,
+            used_at=None,
+        )
+    )
+
+    verification_url = build_email_verification_url(raw_token)
+    send_email_verification_email(user.email, verification_url)
+
+
 def build_auth_response(user: UserRecord) -> AuthResponse:
     return AuthResponse(
         access_token=create_access_token(user.id),
@@ -232,6 +344,18 @@ def hash_password_reset_token(token: str) -> str:
 
 def build_password_reset_url(token: str) -> str:
     return f"{settings.frontend_url}/?reset_token={token}"
+
+
+def create_email_verification_token() -> str:
+    return token_urlsafe(EMAIL_VERIFICATION_TOKEN_BYTES)
+
+
+def hash_email_verification_token(token: str) -> str:
+    return sha256(token.encode("utf-8")).hexdigest()
+
+
+def build_email_verification_url(token: str) -> str:
+    return f"{settings.frontend_url}/?verify_email_token={token}"
 
 
 def normalize_email(email: str) -> str:

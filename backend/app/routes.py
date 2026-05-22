@@ -15,7 +15,9 @@ from app.auth_service import (
     refresh_user_session,
     register_user,
     request_password_reset,
+    resend_verification_email,
     reset_user_password,
+    verify_user_email,
 )
 from app.business_routes import router as business_router
 from app.schemas import (
@@ -35,8 +37,10 @@ from app.schemas import (
     IncomeResponse,
     IncomeUpdate,
     MessageResponse,
+    ResendVerificationEmailRequest,
     ResetPasswordRequest,
     UserResponse,
+    VerifyEmailRequest,
 )
 from app.security import auth_rate_limit, write_rate_limit
 from app.services import (
@@ -75,16 +79,15 @@ def health_check():
 
 @router.post(
     "/auth/register",
-    response_model=AuthResponse,
+    response_model=MessageResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["Auth"],
     dependencies=[Depends(auth_rate_limit)],
 )
-def register(user_data: AuthRegisterRequest, response: Response):
-    auth_response = register_user(user_data)
-    attach_refresh_cookie(response, auth_response.user.id)
+def register(user_data: AuthRegisterRequest):
+    message = register_user(user_data)
 
-    return auth_response
+    return MessageResponse(message=message)
 
 
 @router.post(
@@ -111,6 +114,31 @@ def google_login(login_data: GoogleLoginRequest, response: Response):
     attach_refresh_cookie(response, auth_response.user.id)
 
     return auth_response
+
+
+@router.post(
+    "/auth/verify-email",
+    response_model=AuthResponse,
+    tags=["Auth"],
+    dependencies=[Depends(auth_rate_limit)],
+)
+def verify_email(verification_data: VerifyEmailRequest, response: Response):
+    auth_response = verify_user_email(verification_data)
+    attach_refresh_cookie(response, auth_response.user.id)
+
+    return auth_response
+
+
+@router.post(
+    "/auth/resend-verification-email",
+    response_model=MessageResponse,
+    tags=["Auth"],
+    dependencies=[Depends(auth_rate_limit)],
+)
+def resend_email_verification(data: ResendVerificationEmailRequest):
+    message = resend_verification_email(data)
+
+    return MessageResponse(message=message)
 
 
 @router.post(

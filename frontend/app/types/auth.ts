@@ -3,6 +3,7 @@ export type User = {
   name: string;
   email: string;
   created_at: string;
+  email_verified: boolean;
 };
 
 export type AuthResponse = {
@@ -39,4 +40,12 @@ export type ForgotPasswordRequest = {
 export type ResetPasswordRequest = {
   token: string;
   password: string;
+};
+
+export type VerifyEmailRequest = {
+  token: string;
+};
+
+export type ResendVerificationEmailRequest = {
+  email: string;
 };

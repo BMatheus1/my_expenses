@@ -23,11 +23,29 @@ Se você não solicitou a redefinição de senha, ignore este e-mail.
 Equipe My Expenses
 """.strip()
 
-    send_email(
-        to_email=to_email,
-        subject=subject,
-        body=body,
-    )
+    send_email(to_email=to_email, subject=subject, body=body)
+
+
+def send_email_verification_email(to_email: str, verification_url: str) -> None:
+    subject = "Confirme seu e-mail - My Expenses"
+
+    body = f"""
+Olá!
+
+Obrigado por criar sua conta no My Expenses.
+
+Para ativar sua conta, confirme seu e-mail acessando o link abaixo:
+
+{verification_url}
+
+Este link expira em {settings.email_verification_token_expire_minutes} minutos.
+
+Se você não criou uma conta no My Expenses, ignore este e-mail.
+
+Equipe My Expenses
+""".strip()
+
+    send_email(to_email=to_email, subject=subject, body=body)
 
 
 def send_email(to_email: str, subject: str, body: str) -> None:

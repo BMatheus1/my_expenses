@@ -15,6 +15,7 @@ class UserResponse(BaseModel):
     name: str
     email: EmailStr
     created_at: datetime
+    email_verified: bool = False
 
 
 class UserRecord(BaseModel):
@@ -26,6 +27,7 @@ class UserRecord(BaseModel):
     password_hash: str | None = None
     provider: str = "credentials"
     created_at: datetime
+    email_verified: bool = False
 
 
 class RefreshTokenRecord(BaseModel):
@@ -40,6 +42,17 @@ class RefreshTokenRecord(BaseModel):
 
 
 class PasswordResetTokenRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    token_hash: str
+    expires_at: datetime
+    created_at: datetime
+    used_at: datetime | None = None
+
+
+class EmailVerificationTokenRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -125,6 +138,16 @@ class ResetPasswordRequest(BaseModel):
             raise ValueError("A senha precisa ter letras e números.")
 
         return value
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=300)
+
+
+class ResendVerificationEmailRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    email: EmailStr
 
 
 class AuthResponse(BaseModel):

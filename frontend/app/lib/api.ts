@@ -11,8 +11,10 @@ import type {
   LoginRequest,
   MessageResponse,
   RegisterRequest,
+  ResendVerificationEmailRequest,
   ResetPasswordRequest,
   User,
+  VerifyEmailRequest,
 } from "../types/auth";
 import type { CreateExpenseRequest, Expense } from "../types/expense";
 import type { CreateIncomeRequest, Income } from "../types/income";
@@ -221,8 +223,8 @@ export async function apiRequest<T>(
 
 export async function registerWithEmail(
   userData: RegisterRequest,
-): Promise<AuthResponse> {
-  return apiRequest<AuthResponse>(
+): Promise<MessageResponse> {
+  return apiRequest<MessageResponse>(
     "/auth/register",
     {
       method: "POST",
@@ -259,6 +261,38 @@ export async function loginWithGoogle(
     {
       method: "POST",
       body: JSON.stringify(loginData),
+    },
+    {
+      skipAuthHeader: true,
+      skipAuthRefresh: true,
+    },
+  );
+}
+
+export async function verifyEmail(
+  verificationData: VerifyEmailRequest,
+): Promise<AuthResponse> {
+  return apiRequest<AuthResponse>(
+    "/auth/verify-email",
+    {
+      method: "POST",
+      body: JSON.stringify(verificationData),
+    },
+    {
+      skipAuthHeader: true,
+      skipAuthRefresh: true,
+    },
+  );
+}
+
+export async function resendVerificationEmail(
+  data: ResendVerificationEmailRequest,
+): Promise<MessageResponse> {
+  return apiRequest<MessageResponse>(
+    "/auth/resend-verification-email",
+    {
+      method: "POST",
+      body: JSON.stringify(data),
     },
     {
       skipAuthHeader: true,

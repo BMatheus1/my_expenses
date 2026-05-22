@@ -7,13 +7,21 @@ import {
   loginWithEmail,
   registerWithEmail,
   requestPasswordReset,
+  resendVerificationEmail,
   resetPassword,
   setAuthToken,
+  verifyEmail,
 } from "../lib/api";
 import type { User } from "../types/auth";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 
-type AuthMode = "login" | "register" | "forgot-password" | "reset-password";
+type AuthMode =
+  | "login"
+  | "register"
+  | "forgot-password"
+  | "reset-password"
+  | "verify-email";
+
 type LegalModalType = "terms" | "privacy" | null;
 
 type AuthPageProps = {
@@ -46,8 +54,9 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState("");
 
+  const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -60,25 +69,70 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const isRegisterMode = mode === "register";
   const isForgotPasswordMode = mode === "forgot-password";
   const isResetPasswordMode = mode === "reset-password";
+  const isVerifyEmailMode = mode === "verify-email";
 
   const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
 
   useEffect(() => {
-    const tokenFromUrl = new URLSearchParams(window.location.search).get(
-      "reset_token",
-    );
+    const searchParams = new URLSearchParams(window.location.search);
+    const resetTokenFromUrl = searchParams.get("reset_token");
+    const verifyEmailTokenFromUrl = searchParams.get("verify_email_token");
 
-    if (!tokenFromUrl) {
+    if (verifyEmailTokenFromUrl) {
+      const tokenToVerify = verifyEmailTokenFromUrl;
+      let isMounted = true;
+
+      async function confirmEmail() {
+        setMode("verify-email");
+        setErrorMessage("");
+        setSuccessMessage("Confirmando seu e-mail...");
+        setIsSubmitting(true);
+
+        try {
+          const authResponse = await verifyEmail({
+            token: tokenToVerify,
+          });
+
+          if (!isMounted) {
+            return;
+          }
+
+          setAuthToken(authResponse.access_token);
+          setSuccessMessage("E-mail confirmado com sucesso.");
+          clearUrlTokens();
+          onAuthenticated(authResponse.user);
+        } catch (error) {
+          if (!isMounted) {
+            return;
+          }
+
+          setErrorMessage(getAuthErrorMessage(error));
+          setSuccessMessage("");
+        } finally {
+          if (isMounted) {
+            setIsSubmitting(false);
+          }
+        }
+      }
+
+      void confirmEmail();
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (!resetTokenFromUrl) {
       return;
     }
 
-    setResetToken(tokenFromUrl);
+    setResetToken(resetTokenFromUrl);
     setMode("reset-password");
     setPassword("");
     setConfirmPassword("");
     setErrorMessage("");
     setSuccessMessage("");
-  }, []);
+  }, [onAuthenticated]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -95,6 +149,16 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
     try {
       setIsSubmitting(true);
+
+      if (isVerifyEmailMode) {
+        const response = await resendVerificationEmail({
+          email: getEmailForVerification(),
+        });
+
+        setSuccessMessage(response.message);
+        setErrorMessage("");
+        return;
+      }
 
       if (isForgotPasswordMode) {
         const response = await requestPasswordReset({
@@ -115,25 +179,38 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         setPassword("");
         setConfirmPassword("");
         setMode("login");
-        clearResetTokenFromUrl();
+        clearUrlTokens();
         return;
       }
 
-      const authResponse = isLoginMode
-        ? await loginWithEmail({
-            email: email.trim(),
-            password,
-          })
-        : await registerWithEmail({
-            name: normalizeName(name),
-            email: email.trim(),
-            password,
-            confirm_password: confirmPassword,
-            terms_accepted: termsAccepted,
-          });
+      if (isLoginMode) {
+        const authResponse = await loginWithEmail({
+          email: email.trim(),
+          password,
+        });
 
-      setAuthToken(authResponse.access_token);
-      onAuthenticated(authResponse.user);
+        setAuthToken(authResponse.access_token);
+        onAuthenticated(authResponse.user);
+        return;
+      }
+
+      const response = await registerWithEmail({
+        name: normalizeName(name),
+        email: email.trim(),
+        password,
+        confirm_password: confirmPassword,
+        terms_accepted: termsAccepted,
+      });
+
+      const registeredEmail = email.trim();
+
+      setVerificationEmail(registeredEmail);
+      setEmail(registeredEmail);
+      setSuccessMessage(response.message);
+      setMode("verify-email");
+      setPassword("");
+      setConfirmPassword("");
+      setTermsAccepted(false);
     } catch (error) {
       setErrorMessage(getAuthErrorMessage(error));
     } finally {
@@ -144,6 +221,20 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   function validateAuthForm() {
     const trimmedName = normalizeName(name);
     const trimmedEmail = email.trim();
+
+    if (isVerifyEmailMode) {
+      const emailForVerification = getEmailForVerification();
+
+      if (!emailForVerification) {
+        return "Informe seu e-mail para reenviar o link de confirmação.";
+      }
+
+      if (!isValidEmail(emailForVerification)) {
+        return "Formato de e-mail inválido. Verifique e tente novamente.";
+      }
+
+      return "";
+    }
 
     if (isRegisterMode && trimmedName.length < 3) {
       return "Informe seu nome completo.";
@@ -188,6 +279,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     return "";
   }
 
+  function getEmailForVerification() {
+    return (verificationEmail || email).trim();
+  }
+
   function switchMode(nextMode: AuthMode) {
     setMode(nextMode);
     setName("");
@@ -197,9 +292,13 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     setErrorMessage("");
     setSuccessMessage("");
 
+    if (nextMode !== "verify-email") {
+      setVerificationEmail("");
+    }
+
     if (nextMode !== "reset-password") {
       setResetToken("");
-      clearResetTokenFromUrl();
+      clearUrlTokens();
     }
   }
 
@@ -242,6 +341,13 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             </p>
           </div>
 
+          {isVerifyEmailMode ? (
+            <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
+              Enviamos um link de confirmação para seu e-mail. Abra o link para
+              ativar sua conta.
+            </div>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {isRegisterMode ? (
               <AuthField
@@ -262,12 +368,22 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             {!isResetPasswordMode ? (
               <AuthField
                 label="E-mail"
-                hint="Usaremos para login e recuperação de senha."
+                hint={
+                  isVerifyEmailMode
+                    ? "Informe o e-mail cadastrado para reenviar o link."
+                    : "Usaremos para login e recuperação de senha."
+                }
               >
                 <input
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+
+                    if (isVerifyEmailMode) {
+                      setVerificationEmail(event.target.value);
+                    }
+                  }}
                   placeholder="voce@email.com"
                   className="app-input"
                   autoComplete="email"
@@ -275,7 +391,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
               </AuthField>
             ) : null}
 
-            {!isForgotPasswordMode ? (
+            {!isForgotPasswordMode && !isVerifyEmailMode ? (
               <>
                 <AuthField
                   label={isResetPasswordMode ? "Nova senha" : "Senha"}
@@ -366,7 +482,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             </button>
           </form>
 
-          {!isForgotPasswordMode && !isResetPasswordMode ? (
+          {!isForgotPasswordMode && !isResetPasswordMode && !isVerifyEmailMode ? (
             <>
               <button
                 type="button"
@@ -597,6 +713,7 @@ function getAuthTitle(mode: AuthMode) {
     register: "Criar conta",
     "forgot-password": "Recuperar senha",
     "reset-password": "Criar nova senha",
+    "verify-email": "Confirme seu e-mail",
   };
 
   return titles[mode];
@@ -610,6 +727,8 @@ function getAuthDescription(mode: AuthMode) {
     "forgot-password":
       "Informe seu e-mail. Se existir uma conta, enviaremos o link de recuperação.",
     "reset-password": "Informe e confirme sua nova senha para recuperar o acesso.",
+    "verify-email":
+      "Enviamos um link para confirmar sua conta. Verifique sua caixa de entrada.",
   };
 
   return descriptions[mode];
@@ -621,6 +740,7 @@ function getSubmitLabel(mode: AuthMode) {
     register: "Criar conta segura",
     "forgot-password": "Enviar link de recuperação",
     "reset-password": "Salvar nova senha",
+    "verify-email": "Reenviar link de confirmação",
   };
 
   return labels[mode];
@@ -634,7 +754,7 @@ function getSecondaryActionLabel(mode: AuthMode) {
   return "Voltar para login";
 }
 
-function clearResetTokenFromUrl() {
+function clearUrlTokens() {
   window.history.replaceState({}, document.title, window.location.pathname);
 }
 
@@ -656,6 +776,18 @@ function getAuthErrorMessage(error: unknown) {
   }
 
   const message = error.message.toLowerCase();
+
+  if (message.includes("confirme seu e-mail")) {
+    return "Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.";
+  }
+
+  if (
+    message.includes("verificação inválido") ||
+    message.includes("verificacao invalido") ||
+    message.includes("link de verificação")
+  ) {
+    return "Link de verificação inválido ou expirado. Solicite um novo link.";
+  }
 
   if (
     message.includes("conta foi criada com google") ||

@@ -210,7 +210,13 @@ def test_user_cannot_access_or_update_another_user_business(
 def register_user(client: TestClient, user_data: dict[str, str]) -> str:
     response = client.post(
         f"{API_PREFIX}/auth/register",
-        json=user_data,
+        json={
+            "name": user_data["name"],
+            "email": user_data["email"],
+            "password": user_data["password"],
+            "confirm_password": user_data["password"],
+            "terms_accepted": True,
+        },
     )
 
     assert response.status_code == 201, response.text

@@ -72,9 +72,11 @@ def print_email_preview(to_email: str, subject: str, body: str) -> None:
     if settings.is_production:
         raise RuntimeError("SMTP_ENABLED precisa estar ativo em produção.")
 
-    print("\n========== EMAIL SIMULADO ==========")
+    print("\n" + "=" * 80)
+    print("EMAIL SIMULADO - NÃO FOI ENVIADO DE VERDADE")
+    print("=" * 80)
     print(f"Para: {to_email}")
     print(f"Assunto: {subject}")
-    print("")
+    print("-" * 80)
     print(body)
-    print("====================================\n")
+    print("=" * 80 + "\n")

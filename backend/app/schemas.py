@@ -1,6 +1,13 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 class UserResponse(BaseModel):
@@ -46,9 +53,24 @@ class PasswordResetTokenRecord(BaseModel):
 class AuthRegisterRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    name: str = Field(min_length=2, max_length=80)
+    name: str = Field(min_length=3, max_length=80)
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
+    confirm_password: str = Field(min_length=8, max_length=72)
+    terms_accepted: bool = Field(default=False)
+
+    @field_validator("name")
+    @classmethod
+    def validate_full_name(cls, value: str) -> str:
+        normalized_name = " ".join(value.split())
+
+        if len(normalized_name) < 3:
+            raise ValueError("Informe seu nome completo.")
+
+        if not any(character.isalpha() for character in normalized_name):
+            raise ValueError("O nome precisa conter letras.")
+
+        return normalized_name
 
     @field_validator("password")
     @classmethod
@@ -60,6 +82,16 @@ class AuthRegisterRequest(BaseModel):
             raise ValueError("A senha precisa ter letras e números.")
 
         return value
+
+    @model_validator(mode="after")
+    def validate_registration(self):
+        if self.password != self.confirm_password:
+            raise ValueError("A confirmação de senha não confere.")
+
+        if not self.terms_accepted:
+            raise ValueError("Você precisa aceitar os termos para criar a conta.")
+
+        return self
 
 
 class AuthLoginRequest(BaseModel):

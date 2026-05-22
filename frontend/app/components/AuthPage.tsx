@@ -98,7 +98,6 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           }
 
           setAuthToken(authResponse.access_token);
-          setSuccessMessage("E-mail confirmado com sucesso.");
           clearUrlTokens();
           onAuthenticated(authResponse.user);
         } catch (error) {
@@ -123,6 +122,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     }
 
     if (!resetTokenFromUrl) {
+      setIsSubmitting(false);
       return;
     }
 
@@ -132,6 +132,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     setConfirmPassword("");
     setErrorMessage("");
     setSuccessMessage("");
+    setIsSubmitting(false);
   }, [onAuthenticated]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -343,8 +344,9 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
           {isVerifyEmailMode ? (
             <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
-              Enviamos um link de confirmação para seu e-mail. Abra o link para
-              ativar sua conta.
+              {isSubmitting
+                ? "Confirmando seu e-mail..."
+                : "Enviamos um link de confirmação para seu e-mail. Abra o link para ativar sua conta."}
             </div>
           ) : null}
 

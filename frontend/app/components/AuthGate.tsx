@@ -43,18 +43,44 @@ export function AuthGate() {
   }, [handleLogout]);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function checkSession() {
+      const searchParams = new URLSearchParams(window.location.search);
+      const hasAuthActionToken =
+        searchParams.has("verify_email_token") || searchParams.has("reset_token");
+
+      if (hasAuthActionToken) {
+        if (isMounted) {
+          setCurrentUser(null);
+          setIsCheckingSession(false);
+        }
+
+        return;
+      }
+
       try {
         const user = await getCurrentUser();
-        setCurrentUser(user);
+
+        if (isMounted) {
+          setCurrentUser(user);
+        }
       } catch {
-        setCurrentUser(null);
+        if (isMounted) {
+          setCurrentUser(null);
+        }
       } finally {
-        setIsCheckingSession(false);
+        if (isMounted) {
+          setIsCheckingSession(false);
+        }
       }
     }
 
     void checkSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {

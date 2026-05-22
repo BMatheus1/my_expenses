@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import EmailStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     app_debug: bool = False
 
     api_prefix: str = "/api"
+    frontend_url: str = "http://127.0.0.1:3000"
 
     database_url: str
 
@@ -27,6 +28,17 @@ class Settings(BaseSettings):
     refresh_cookie_path: str = "/api/auth"
     refresh_cookie_secure: bool = False
     refresh_cookie_samesite: str = "lax"
+
+    password_reset_token_expire_minutes: int = 30
+
+    smtp_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: EmailStr | str = "no-reply@myexpenses.local"
+    smtp_from_name: str = "My Expenses"
+    smtp_use_tls: bool = True
 
     google_client_id: str = ""
 
@@ -63,6 +75,16 @@ class Settings(BaseSettings):
             )
 
         return app_env
+
+    @field_validator("frontend_url")
+    @classmethod
+    def validate_frontend_url(cls, value: str) -> str:
+        frontend_url = value.strip().rstrip("/")
+
+        if not frontend_url.startswith(("http://", "https://")):
+            raise ValueError("FRONTEND_URL deve começar com http:// ou https://.")
+
+        return frontend_url
 
     @field_validator("database_url")
     @classmethod
@@ -127,6 +149,17 @@ class Settings(BaseSettings):
             raise ValueError("REFRESH_COOKIE_SAMESITE deve ser lax, strict ou none.")
 
         return samesite
+
+    @field_validator("password_reset_token_expire_minutes")
+    @classmethod
+    def validate_password_reset_token_expiration(cls, value: int) -> int:
+        if value < 5:
+            raise ValueError("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES deve ser no mínimo 5.")
+
+        if value > 120:
+            raise ValueError("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES não deve passar de 120.")
+
+        return value
 
     @field_validator("max_request_body_bytes")
     @classmethod

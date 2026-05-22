@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.business_repository import initialize_business_database
 from app.config import settings
+from app.password_reset_repository import initialize_password_reset_database
 from app.routes import router
 from app.security import security_middleware
 from app.session_repository import initialize_refresh_token_database
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     initialize_database()
     initialize_business_database()
     initialize_refresh_token_database()
+    initialize_password_reset_database()
     yield
 
 

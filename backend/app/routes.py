@@ -14,6 +14,8 @@ from app.auth_service import (
     logout_refresh_session,
     refresh_user_session,
     register_user,
+    request_password_reset,
+    reset_user_password,
 )
 from app.business_routes import router as business_router
 from app.schemas import (
@@ -26,11 +28,14 @@ from app.schemas import (
     ExpenseCreate,
     ExpenseResponse,
     ExpenseUpdate,
+    ForgotPasswordRequest,
     GoogleLoginRequest,
     HealthResponse,
     IncomeCreate,
     IncomeResponse,
     IncomeUpdate,
+    MessageResponse,
+    ResetPasswordRequest,
     UserResponse,
 )
 from app.security import auth_rate_limit, write_rate_limit
@@ -133,6 +138,30 @@ def logout(request: Request, response: Response):
     clear_refresh_token_cookie(response)
 
     return None
+
+
+@router.post(
+    "/auth/forgot-password",
+    response_model=MessageResponse,
+    tags=["Auth"],
+    dependencies=[Depends(auth_rate_limit)],
+)
+def forgot_password(reset_data: ForgotPasswordRequest):
+    message = request_password_reset(reset_data)
+
+    return MessageResponse(message=message)
+
+
+@router.post(
+    "/auth/reset-password",
+    response_model=MessageResponse,
+    tags=["Auth"],
+    dependencies=[Depends(auth_rate_limit)],
+)
+def reset_password(reset_data: ResetPasswordRequest):
+    reset_user_password(reset_data)
+
+    return MessageResponse(message="Senha alterada com sucesso. Faça login novamente.")
 
 
 @router.get(

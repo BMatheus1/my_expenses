@@ -1,13 +1,19 @@
 "use client";
 
 import type { FormEvent, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { loginWithEmail, registerWithEmail, setAuthToken } from "../lib/api";
+import {
+  loginWithEmail,
+  registerWithEmail,
+  requestPasswordReset,
+  resetPassword,
+  setAuthToken,
+} from "../lib/api";
 import type { User } from "../types/auth";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 
-type AuthMode = "login" | "register";
+type AuthMode = "login" | "register" | "forgot-password" | "reset-password";
 
 type AuthPageProps = {
   onAuthenticated: (user: User) => void;
@@ -20,15 +26,37 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [resetToken, setResetToken] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isLoginMode = mode === "login";
+  const isRegisterMode = mode === "register";
+  const isForgotPasswordMode = mode === "forgot-password";
+  const isResetPasswordMode = mode === "reset-password";
+
+  useEffect(() => {
+    const tokenFromUrl = new URLSearchParams(window.location.search).get(
+      "reset_token",
+    );
+
+    if (!tokenFromUrl) {
+      return;
+    }
+
+    setResetToken(tokenFromUrl);
+    setMode("reset-password");
+    setPassword("");
+    setErrorMessage("");
+    setSuccessMessage("");
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setErrorMessage("");
+    setSuccessMessage("");
 
     const validationMessage = validateAuthForm();
 
@@ -39,6 +67,28 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
     try {
       setIsSubmitting(true);
+
+      if (isForgotPasswordMode) {
+        const response = await requestPasswordReset({
+          email: email.trim(),
+        });
+
+        setSuccessMessage(response.message);
+        return;
+      }
+
+      if (isResetPasswordMode) {
+        const response = await resetPassword({
+          token: resetToken,
+          password,
+        });
+
+        setSuccessMessage(response.message);
+        setPassword("");
+        setMode("login");
+        clearResetTokenFromUrl();
+        return;
+      }
 
       const authResponse = isLoginMode
         ? await loginWithEmail({
@@ -64,38 +114,52 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
 
-    if (!isLoginMode && trimmedName.length < 2) {
+    if (isRegisterMode && trimmedName.length < 2) {
       return "Informe seu nome.";
     }
 
-    if (!trimmedEmail) {
+    if (!isResetPasswordMode && !trimmedEmail) {
       return "Informe seu e-mail.";
     }
 
-    if (!isValidEmail(trimmedEmail)) {
+    if (!isResetPasswordMode && !isValidEmail(trimmedEmail)) {
       return "Formato de e-mail inválido. Verifique e tente novamente.";
+    }
+
+    if (isForgotPasswordMode) {
+      return "";
     }
 
     if (!password.trim()) {
       return "Informe sua senha.";
     }
 
-    if (password.length < 6) {
-      return "A senha deve ter pelo menos 6 caracteres.";
+    if (password.length < 8) {
+      return "A senha deve ter pelo menos 8 caracteres.";
+    }
+
+    if (!hasLetterAndNumber(password)) {
+      return "A senha precisa ter letras e números.";
+    }
+
+    if (isResetPasswordMode && !resetToken) {
+      return "Link de recuperação inválido. Solicite um novo link.";
     }
 
     return "";
   }
 
-  function toggleMode() {
-    setMode((currentMode) =>
-      currentMode === "login" ? "register" : "login"
-    );
-
+  function switchMode(nextMode: AuthMode) {
+    setMode(nextMode);
     setName("");
-    setEmail("");
     setPassword("");
     setErrorMessage("");
+    setSuccessMessage("");
+
+    if (nextMode !== "reset-password") {
+      setResetToken("");
+      clearResetTokenFromUrl();
+    }
   }
 
   return (
@@ -125,18 +189,16 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
           <div>
             <h2 className="text-2xl font-bold text-stone-950">
-              {isLoginMode ? "Entrar na conta" : "Criar conta"}
+              {getAuthTitle(mode)}
             </h2>
 
             <p className="mt-2 text-sm text-stone-500">
-              {isLoginMode
-                ? "Use seu e-mail e senha para acessar."
-                : "Preencha os dados para começar."}
+              {getAuthDescription(mode)}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            {!isLoginMode && (
+            {isRegisterMode ? (
               <AuthField label="Nome">
                 <input
                   type="text"
@@ -146,68 +208,86 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
                   className="app-input"
                 />
               </AuthField>
-            )}
+            ) : null}
 
-            <AuthField label="E-mail">
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="voce@email.com"
-                className="app-input"
-              />
-            </AuthField>
+            {!isResetPasswordMode ? (
+              <AuthField label="E-mail">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="voce@email.com"
+                  className="app-input"
+                />
+              </AuthField>
+            ) : null}
 
-            <AuthField label="Senha">
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Mínimo 6 caracteres"
-                className="app-input"
-              />
-            </AuthField>
+            {!isForgotPasswordMode ? (
+              <AuthField label={isResetPasswordMode ? "Nova senha" : "Senha"}>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Mínimo 8 caracteres, letras e números"
+                  className="app-input"
+                />
+              </AuthField>
+            ) : null}
 
-            {errorMessage && (
+            {successMessage ? (
+              <p className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                {successMessage}
+              </p>
+            ) : null}
+
+            {errorMessage ? (
               <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
                 {errorMessage}
               </p>
-            )}
+            ) : null}
 
             <button
               type="submit"
               disabled={isSubmitting}
               className="app-button-primary w-full"
             >
-              {isSubmitting
-                ? "Aguarde..."
-                : isLoginMode
-                  ? "Entrar"
-                  : "Criar conta"}
+              {isSubmitting ? "Aguarde..." : getSubmitLabel(mode)}
             </button>
           </form>
 
-          <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-stone-200" />
+          {!isForgotPasswordMode && !isResetPasswordMode ? (
+            <>
+              <button
+                type="button"
+                onClick={() => switchMode("forgot-password")}
+                className="mt-4 w-full text-sm font-bold text-emerald-700 transition hover:text-emerald-800"
+              >
+                Esqueci minha senha
+              </button>
 
-            <span className="text-xs font-bold uppercase tracking-widest text-stone-400">
-              ou
-            </span>
+              <div className="my-6 flex items-center gap-3">
+                <div className="h-px flex-1 bg-stone-200" />
 
-            <div className="h-px flex-1 bg-stone-200" />
-          </div>
+                <span className="text-xs font-bold uppercase tracking-widest text-stone-400">
+                  ou
+                </span>
 
-          <GoogleSignInButton
-            onAuthenticated={onAuthenticated}
-            onError={setErrorMessage}
-          />
+                <div className="h-px flex-1 bg-stone-200" />
+              </div>
+
+              <GoogleSignInButton
+                onAuthenticated={onAuthenticated}
+                onError={setErrorMessage}
+              />
+            </>
+          ) : null}
 
           <button
             type="button"
-            onClick={toggleMode}
+            onClick={() => switchMode(isLoginMode ? "register" : "login")}
             className="mt-6 w-full rounded-full border border-stone-200 px-4 py-3 text-sm font-bold text-stone-700 transition hover:bg-stone-50"
           >
-            {isLoginMode ? "Ainda não tenho conta" : "Já tenho conta"}
+            {getSecondaryActionLabel(mode)}
           </button>
         </section>
       </div>
@@ -243,8 +323,57 @@ function AuthField({ label, children }: AuthFieldProps) {
   );
 }
 
+function getAuthTitle(mode: AuthMode) {
+  const titles: Record<AuthMode, string> = {
+    login: "Entrar na conta",
+    register: "Criar conta",
+    "forgot-password": "Recuperar senha",
+    "reset-password": "Criar nova senha",
+  };
+
+  return titles[mode];
+}
+
+function getAuthDescription(mode: AuthMode) {
+  const descriptions: Record<AuthMode, string> = {
+    login: "Use seu e-mail e senha para acessar.",
+    register: "Preencha os dados para começar.",
+    "forgot-password": "Informe seu e-mail para receber o link de recuperação.",
+    "reset-password": "Informe uma nova senha segura para sua conta.",
+  };
+
+  return descriptions[mode];
+}
+
+function getSubmitLabel(mode: AuthMode) {
+  const labels: Record<AuthMode, string> = {
+    login: "Entrar",
+    register: "Criar conta",
+    "forgot-password": "Enviar link de recuperação",
+    "reset-password": "Salvar nova senha",
+  };
+
+  return labels[mode];
+}
+
+function getSecondaryActionLabel(mode: AuthMode) {
+  if (mode === "login") {
+    return "Ainda não tenho conta";
+  }
+
+  return "Voltar para login";
+}
+
+function clearResetTokenFromUrl() {
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function hasLetterAndNumber(value: string) {
+  return /[A-Za-zÀ-ÿ]/.test(value) && /\d/.test(value);
 }
 
 function getAuthErrorMessage(error: unknown) {
@@ -274,6 +403,10 @@ function getAuthErrorMessage(error: unknown) {
 
   if (message.includes("já existe") || message.includes("already")) {
     return "Já existe uma conta com este e-mail.";
+  }
+
+  if (message.includes("inválido ou expirado") || message.includes("expirado")) {
+    return "Link de recuperação inválido ou expirado. Solicite um novo link.";
   }
 
   return error.message || "Não foi possível entrar na conta.";

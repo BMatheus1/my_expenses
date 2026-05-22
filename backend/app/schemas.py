@@ -32,6 +32,17 @@ class RefreshTokenRecord(BaseModel):
     revoked_at: datetime | None = None
 
 
+class PasswordResetTokenRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    token_hash: str
+    expires_at: datetime
+    created_at: datetime
+    used_at: datetime | None = None
+
+
 class AuthRegisterRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -62,10 +73,36 @@ class GoogleLoginRequest(BaseModel):
     credential: str = Field(min_length=10)
 
 
+class ForgotPasswordRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=300)
+    password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        has_letter = any(character.isalpha() for character in value)
+        has_number = any(character.isdigit() for character in value)
+
+        if not has_letter or not has_number:
+            raise ValueError("A senha precisa ter letras e números.")
+
+        return value
+
+
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class MessageResponse(BaseModel):
+    message: str
 
 
 class ExpenseCategoryCreate(BaseModel):

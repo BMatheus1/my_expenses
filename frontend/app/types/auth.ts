@@ -11,6 +11,10 @@ export type AuthResponse = {
   user: User;
 };
 
+export type MessageResponse = {
+  message: string;
+};
+
 export type LoginRequest = {
   email: string;
   password: string;
@@ -24,4 +28,13 @@ export type RegisterRequest = {
 
 export type GoogleLoginRequest = {
   credential: string;
+};
+
+export type ForgotPasswordRequest = {
+  email: string;
+};
+
+export type ResetPasswordRequest = {
+  token: string;
+  password: string;
 };

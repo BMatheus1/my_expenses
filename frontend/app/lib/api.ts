@@ -6,9 +6,12 @@ import type {
 
 import type {
   AuthResponse,
+  ForgotPasswordRequest,
   GoogleLoginRequest,
   LoginRequest,
+  MessageResponse,
   RegisterRequest,
+  ResetPasswordRequest,
   User,
 } from "../types/auth";
 import type { CreateExpenseRequest, Expense } from "../types/expense";
@@ -256,6 +259,38 @@ export async function loginWithGoogle(
     {
       method: "POST",
       body: JSON.stringify(loginData),
+    },
+    {
+      skipAuthHeader: true,
+      skipAuthRefresh: true,
+    },
+  );
+}
+
+export async function requestPasswordReset(
+  resetData: ForgotPasswordRequest,
+): Promise<MessageResponse> {
+  return apiRequest<MessageResponse>(
+    "/auth/forgot-password",
+    {
+      method: "POST",
+      body: JSON.stringify(resetData),
+    },
+    {
+      skipAuthHeader: true,
+      skipAuthRefresh: true,
+    },
+  );
+}
+
+export async function resetPassword(
+  resetData: ResetPasswordRequest,
+): Promise<MessageResponse> {
+  return apiRequest<MessageResponse>(
+    "/auth/reset-password",
+    {
+      method: "POST",
+      body: JSON.stringify(resetData),
     },
     {
       skipAuthHeader: true,

@@ -42,6 +42,9 @@ from app.storage import create_user_record, get_user_record_by_email, get_user_r
 
 PASSWORD_RESET_TOKEN_BYTES = 48
 
+PROVIDER_CREDENTIALS = "credentials"
+PROVIDER_GOOGLE = "google"
+
 PASSWORD_RESET_GENERIC_MESSAGE = (
     "Se existir uma conta com este e-mail, enviaremos as instruções de recuperação."
 )
@@ -49,21 +52,17 @@ PASSWORD_RESET_GENERIC_MESSAGE = (
 
 def register_user(user_data: AuthRegisterRequest) -> AuthResponse:
     email = normalize_email(user_data.email)
-
     existing_user = get_user_record_by_email(email)
 
     if existing_user is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Já existe uma conta com este e-mail.",
-        )
+        raise_existing_account_error(existing_user.provider)
 
     user = UserRecord(
         id=str(uuid4()),
         name=user_data.name,
         email=email,
         password_hash=hash_password(user_data.password),
-        provider="credentials",
+        provider=PROVIDER_CREDENTIALS,
         created_at=datetime.now(timezone.utc),
     )
 
@@ -76,7 +75,16 @@ def login_user(login_data: AuthLoginRequest) -> AuthResponse:
     email = normalize_email(login_data.email)
     user = get_user_record_by_email(email)
 
-    if user is None or user.password_hash is None:
+    if user is None:
+        raise_invalid_credentials_error()
+
+    if user.provider == PROVIDER_GOOGLE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta conta foi criada com Google. Use Entrar com Google.",
+        )
+
+    if user.provider != PROVIDER_CREDENTIALS or user.password_hash is None:
         raise_invalid_credentials_error()
 
     if not verify_password(login_data.password, user.password_hash):
@@ -93,6 +101,12 @@ def login_with_google(login_data: GoogleLoginRequest) -> AuthResponse:
 
     user = get_user_record_by_email(email)
 
+    if user is not None and user.provider == PROVIDER_CREDENTIALS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta conta foi criada com e-mail e senha. Use o login normal.",
+        )
+
     if user is None:
         user = create_user_record(
             UserRecord(
@@ -100,7 +114,7 @@ def login_with_google(login_data: GoogleLoginRequest) -> AuthResponse:
                 name=name,
                 email=email,
                 password_hash=None,
-                provider="google",
+                provider=PROVIDER_GOOGLE,
                 created_at=datetime.now(timezone.utc),
             )
         )
@@ -113,6 +127,9 @@ def request_password_reset(reset_data: ForgotPasswordRequest) -> str:
     user = get_user_record_by_email(email)
 
     if user is None:
+        return PASSWORD_RESET_GENERIC_MESSAGE
+
+    if user.provider != PROVIDER_CREDENTIALS or user.password_hash is None:
         return PASSWORD_RESET_GENERIC_MESSAGE
 
     now = datetime.now(timezone.utc)
@@ -146,6 +163,14 @@ def reset_user_password(reset_data: ResetPasswordRequest) -> None:
     reset_record = get_active_password_reset_token_record(token_hash, now)
 
     if reset_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Link de recuperação inválido ou expirado.",
+        )
+
+    user = get_user_record_by_id(reset_record.user_id)
+
+    if user is None or user.provider != PROVIDER_CREDENTIALS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Link de recuperação inválido ou expirado.",
@@ -211,6 +236,19 @@ def build_password_reset_url(token: str) -> str:
 
 def normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+def raise_existing_account_error(provider: str) -> None:
+    if provider == PROVIDER_GOOGLE:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este e-mail já possui uma conta criada com Google. Use Entrar com Google.",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Já existe uma conta com este e-mail. Faça login ou recupere sua senha.",
+    )
 
 
 def raise_invalid_credentials_error() -> None:

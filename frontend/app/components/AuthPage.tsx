@@ -658,6 +658,27 @@ function getAuthErrorMessage(error: unknown) {
   const message = error.message.toLowerCase();
 
   if (
+    message.includes("conta foi criada com google") ||
+    message.includes("criada com google")
+  ) {
+    return "Esta conta foi criada com Google. Use o botão Entrar com Google.";
+  }
+
+  if (
+    message.includes("conta foi criada com e-mail e senha") ||
+    message.includes("use o login normal")
+  ) {
+    return "Esta conta foi criada com e-mail e senha. Use o login normal.";
+  }
+
+  if (
+    message.includes("e-mail já possui uma conta criada com google") ||
+    message.includes("possui uma conta criada com google")
+  ) {
+    return "Este e-mail já possui uma conta criada com Google. Use Entrar com Google.";
+  }
+
+  if (
     message.includes("e-mail ou senha") ||
     message.includes("email ou senha") ||
     message.includes("senha inválidos") ||
@@ -676,7 +697,7 @@ function getAuthErrorMessage(error: unknown) {
   }
 
   if (message.includes("já existe") || message.includes("already")) {
-    return "Já existe uma conta com este e-mail.";
+    return "Já existe uma conta com este e-mail. Faça login ou recupere sua senha.";
   }
 
   if (message.includes("confirmação de senha")) {

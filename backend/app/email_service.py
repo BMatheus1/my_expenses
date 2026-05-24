@@ -1,9 +1,14 @@
+import json
 import smtplib
+import urllib.error
+import urllib.request
 from email.message import EmailMessage
 from email.utils import formataddr
 from html import escape
 
 from app.config import settings
+
+RESEND_EMAIL_API_URL = "https://api.resend.com/emails"
 
 
 def send_password_reset_email(to_email: str, reset_url: str) -> None:
@@ -88,10 +93,77 @@ def send_email(
     text_body: str,
     html_body: str | None = None,
 ) -> None:
+    if settings.resend_api_key:
+        send_email_with_resend_api(
+            to_email=to_email,
+            subject=subject,
+            text_body=text_body,
+            html_body=html_body,
+        )
+        return
+
     if not settings.smtp_enabled:
         print_email_preview(to_email, subject, text_body)
         return
 
+    send_email_with_smtp(
+        to_email=to_email,
+        subject=subject,
+        text_body=text_body,
+        html_body=html_body,
+    )
+
+
+def send_email_with_resend_api(
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: str | None = None,
+) -> None:
+    payload = {
+        "from": formataddr((settings.smtp_from_name, str(settings.smtp_from_email))),
+        "to": [to_email],
+        "subject": subject,
+        "text": text_body,
+    }
+
+    if html_body:
+        payload["html"] = html_body
+
+    request = urllib.request.Request(
+        RESEND_EMAIL_API_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {settings.resend_api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            response.read()
+    except urllib.error.HTTPError as error:
+        error_body = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Falha ao enviar e-mail pela Resend API. "
+            f"status={error.code}, from={settings.smtp_from_email}, "
+            f"to={to_email}, response={error_body}"
+        ) from error
+    except Exception as error:
+        raise RuntimeError(
+            f"Falha ao conectar na Resend API. "
+            f"from={settings.smtp_from_email}, to={to_email}. "
+            f"Erro original: {error}"
+        ) from error
+
+
+def send_email_with_smtp(
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: str | None = None,
+) -> None:
     validate_smtp_settings()
 
     message = EmailMessage()
@@ -104,14 +176,22 @@ def send_email(
     if html_body:
         message.add_alternative(html_body, subtype="html")
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as server:
-        if settings.smtp_use_tls:
-            server.starttls()
+    try:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as server:
+            if settings.smtp_use_tls:
+                server.starttls()
 
-        if settings.smtp_username and settings.smtp_password:
-            server.login(settings.smtp_username, settings.smtp_password)
+            if settings.smtp_username and settings.smtp_password:
+                server.login(settings.smtp_username, settings.smtp_password)
 
-        server.send_message(message)
+            server.send_message(message)
+    except Exception as error:
+        raise RuntimeError(
+            f"Falha ao enviar e-mail SMTP. "
+            f"host={settings.smtp_host}, port={settings.smtp_port}, "
+            f"from={settings.smtp_from_email}, to={to_email}. "
+            f"Erro original: {error}"
+        ) from error
 
 
 def validate_smtp_settings() -> None:
@@ -221,7 +301,9 @@ def build_action_email_html(
 
 def print_email_preview(to_email: str, subject: str, body: str) -> None:
     if settings.is_production:
-        raise RuntimeError("SMTP_ENABLED precisa estar ativo em produção.")
+        raise RuntimeError(
+            "Envio simulado bloqueado em produção. Configure RESEND_API_KEY."
+        )
 
     print("\n" + "=" * 80)
     print("EMAIL SIMULADO - NÃO FOI ENVIADO DE VERDADE")

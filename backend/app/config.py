@@ -32,12 +32,14 @@ class Settings(BaseSettings):
     password_reset_token_expire_minutes: int = 30
     email_verification_token_expire_minutes: int = 1440
 
+    resend_api_key: str = ""
+
     smtp_enabled: bool = False
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""
     smtp_password: str = ""
-    smtp_from_email: EmailStr | str = "no-reply@myexpenses.local"
+    smtp_from_email: EmailStr | str = "no-reply@myexpensesfinance.com"
     smtp_from_name: str = "My Expenses"
     smtp_use_tls: bool = True
 

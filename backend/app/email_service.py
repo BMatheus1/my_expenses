@@ -133,9 +133,10 @@ def send_email_with_resend_api(
     request = urllib.request.Request(
         RESEND_EMAIL_API_URL,
         data=json.dumps(payload).encode("utf-8"),
-        headers={
+       headers={
             "Authorization": f"Bearer {settings.resend_api_key}",
             "Content-Type": "application/json",
+            "User-Agent": "my-expenses/1.0",
         },
         method="POST",
     )

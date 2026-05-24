@@ -774,10 +774,21 @@ function hasLetterAndNumber(value: string) {
 
 function getAuthErrorMessage(error: unknown) {
   if (!(error instanceof Error)) {
-    return "Não foi possível entrar na conta.";
+    return "Não foi possível concluir a ação.";
   }
 
   const message = error.message.toLowerCase();
+
+  if (
+    message.includes("value is not a valid email address") ||
+    message.includes("valid email") ||
+    message.includes("email inválido") ||
+    message.includes("e-mail inválido") ||
+    message.includes("formato de e-mail") ||
+    message.includes("formato de email")
+  ) {
+    return "Formato de e-mail inválido. Verifique e tente novamente.";
+  }
 
   if (message.includes("confirme seu e-mail")) {
     return "Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.";
@@ -822,14 +833,6 @@ function getAuthErrorMessage(error: unknown) {
     return "Usuário ou senha incorretos.";
   }
 
-  if (
-    message.includes("value is not a valid email address") ||
-    message.includes("email") ||
-    message.includes("e-mail")
-  ) {
-    return "Formato de e-mail inválido. Verifique e tente novamente.";
-  }
-
   if (message.includes("já existe") || message.includes("already")) {
     return "Já existe uma conta com este e-mail. Faça login ou recupere sua senha.";
   }
@@ -846,5 +849,13 @@ function getAuthErrorMessage(error: unknown) {
     return "Link de recuperação inválido ou expirado. Solicite um novo link.";
   }
 
-  return error.message || "Não foi possível entrar na conta.";
+  if (
+    message.includes("failed to fetch") ||
+    message.includes("não foi possível conectar") ||
+    message.includes("network")
+  ) {
+    return "Não foi possível conectar ao servidor. Verifique se a API está online.";
+  }
+
+  return error.message || "Não foi possível concluir a ação.";
 }

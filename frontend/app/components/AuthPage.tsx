@@ -442,21 +442,23 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
                   <span className="leading-6">
                     Confirmo que li e aceito os{" "}
-                    <button
-                      type="button"
-                      onClick={() => setLegalModal("terms")}
+                    <a
+                      href="/termos-de-uso"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="font-bold text-emerald-700 underline-offset-4 hover:underline"
                     >
                       Termos de Uso
-                    </button>{" "}
+                    </a>{" "}
                     e a{" "}
-                    <button
-                      type="button"
-                      onClick={() => setLegalModal("privacy")}
+                    <a
+                      href="/politica-de-privacidade"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="font-bold text-emerald-700 underline-offset-4 hover:underline"
                     >
                       Política de Privacidade
-                    </button>
+                    </a>
                     .
                   </span>
                 </label>

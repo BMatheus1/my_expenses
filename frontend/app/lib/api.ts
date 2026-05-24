@@ -15,6 +15,7 @@ import type {
   ResetPasswordRequest,
   User,
   VerifyEmailRequest,
+  DeleteAccountRequest,
 } from "../types/auth";
 import type { CreateExpenseRequest, Expense } from "../types/expense";
 import type { CreateIncomeRequest, Income } from "../types/income";
@@ -429,5 +430,14 @@ export async function updateIncome(
 export async function deleteIncome(incomeId: string): Promise<void> {
   await apiRequest<void>(`/incomes/${incomeId}`, {
     method: "DELETE",
+  });
+}
+
+export async function deleteAccount(
+  data: DeleteAccountRequest,
+): Promise<MessageResponse> {
+  return apiRequest<MessageResponse>("/auth/account", {
+    method: "DELETE",
+    body: JSON.stringify(data),
   });
 }

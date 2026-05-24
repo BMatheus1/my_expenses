@@ -149,6 +149,11 @@ class ResendVerificationEmailRequest(BaseModel):
 
     email: EmailStr
 
+class DeleteAccountRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    confirmation: str = Field(min_length=7, max_length=20)
+    password: str | None = Field(default=None, max_length=72)
 
 class AuthResponse(BaseModel):
     access_token: str

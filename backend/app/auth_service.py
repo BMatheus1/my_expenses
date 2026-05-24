@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from secrets import token_urlsafe
 from uuid import uuid4
+from app.account_repository import delete_user_account_data
 
 from fastapi import HTTPException, status
 
@@ -42,6 +43,7 @@ from app.schemas import (
     UserRecord,
     UserResponse,
     VerifyEmailRequest,
+    DeleteAccountRequest,
 )
 from app.session_repository import (
     get_active_refresh_token_record,
@@ -387,3 +389,38 @@ def raise_invalid_session_error() -> None:
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Sessão inválida ou expirada. Faça login novamente.",
     )
+
+def delete_current_user_account(
+    user_id: str,
+    delete_data: DeleteAccountRequest,
+) -> str:
+    user = get_user_record_by_id(user_id)
+
+    if user is None:
+        raise_invalid_session_error()
+
+    if delete_data.confirmation.strip().upper() != "EXCLUIR":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Digite EXCLUIR para confirmar a exclusão da conta.",
+        )
+
+    if user.provider == PROVIDER_CREDENTIALS:
+        if not delete_data.password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Informe sua senha para excluir a conta.",
+            )
+
+        if user.password_hash is None or not verify_password(
+            delete_data.password,
+            user.password_hash,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Senha incorreta.",
+            )
+
+    delete_user_account_data(user.id)
+
+    return "Conta excluída com sucesso."

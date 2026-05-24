@@ -18,6 +18,7 @@ from app.auth_service import (
     resend_verification_email,
     reset_user_password,
     verify_user_email,
+    delete_current_user_account,
 )
 from app.business_routes import router as business_router
 from app.schemas import (
@@ -41,6 +42,7 @@ from app.schemas import (
     ResetPasswordRequest,
     UserResponse,
     VerifyEmailRequest,
+    DeleteAccountRequest,
 )
 from app.security import auth_rate_limit, write_rate_limit
 from app.services import (
@@ -211,6 +213,26 @@ def get_expense_categories(
 ):
     return list_expense_categories(current_user.id)
 
+@router.delete(
+    "/auth/account",
+    response_model=MessageResponse,
+    tags=["Auth"],
+    dependencies=[Depends(write_rate_limit)],
+)
+def delete_account(
+    delete_data: DeleteAccountRequest,
+    request: Request,
+    response: Response,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    refresh_token = get_optional_refresh_token_from_cookie(request)
+    logout_refresh_session(refresh_token)
+
+    message = delete_current_user_account(current_user.id, delete_data)
+
+    clear_refresh_token_cookie(response)
+
+    return MessageResponse(message=message)
 
 @router.post(
     "/expense-categories",

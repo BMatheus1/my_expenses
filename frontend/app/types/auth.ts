@@ -49,3 +49,8 @@ export type VerifyEmailRequest = {
 export type ResendVerificationEmailRequest = {
   email: string;
 };
+
+export type DeleteAccountRequest = {
+  confirmation: string;
+  password?: string;
+};

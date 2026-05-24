@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { AccountDeletionSection } from "./AccountDeletionSection";
 import {
   APP_THEMES,
   type AppColorMode,
@@ -225,6 +225,21 @@ export default function SettingsPage({
               description="Evite compartilhar prints com valores, e-mail ou informações pessoais."
             />
           </div>
+        </section>
+        <section className="space-y-5">
+          <div>
+            <h2 className="text-xl font-black text-stone-950">
+              Segurança
+            </h2>
+
+            <p className="mt-1 text-sm text-stone-500">
+              Gerencie as opções de segurança da sua conta.
+            </p>
+          </div>
+
+          {/* outras opções de segurança aqui */}
+
+          <AccountDeletionSection />
         </section>
       </section>
     );

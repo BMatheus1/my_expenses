@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AccountDeletionSection } from "./AccountDeletionSection";
+import { AccountDeletionSection } from "../AccountDeletionSection";
 import {
   APP_THEMES,
   type AppColorMode,

@@ -4,6 +4,7 @@ export type User = {
   email: string;
   created_at: string;
   email_verified: boolean;
+  provider: "credentials" | "google";
 };
 
 export type AuthResponse = {
@@ -53,4 +54,5 @@ export type ResendVerificationEmailRequest = {
 export type DeleteAccountRequest = {
   confirmation: string;
   password?: string;
+  google_credential?: string;
 };

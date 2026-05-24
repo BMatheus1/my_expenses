@@ -406,21 +406,50 @@ def delete_current_user_account(
         )
 
     if user.provider == PROVIDER_CREDENTIALS:
-        if not delete_data.password:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Informe sua senha para excluir a conta.",
-            )
+        validate_credentials_account_deletion(user, delete_data)
 
-        if user.password_hash is None or not verify_password(
-            delete_data.password,
-            user.password_hash,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Senha incorreta.",
-            )
+    if user.provider == PROVIDER_GOOGLE:
+        validate_google_account_deletion(user, delete_data)
 
     delete_user_account_data(user.id)
 
     return "Conta excluída com sucesso."
+
+def validate_credentials_account_deletion(
+    user: UserRecord,
+    delete_data: DeleteAccountRequest,
+) -> None:
+    if not delete_data.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe sua senha para excluir a conta.",
+        )
+
+    if user.password_hash is None or not verify_password(
+        delete_data.password,
+        user.password_hash,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Senha incorreta.",
+        )
+
+
+def validate_google_account_deletion(
+    user: UserRecord,
+    delete_data: DeleteAccountRequest,
+) -> None:
+    if not delete_data.google_credential:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirme sua identidade com Google para excluir a conta.",
+        )
+
+    google_user = verify_google_credential(delete_data.google_credential)
+    google_email = normalize_email(google_user["email"])
+
+    if google_email != normalize_email(user.email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A conta Google confirmada não corresponde à conta atual.",
+        )

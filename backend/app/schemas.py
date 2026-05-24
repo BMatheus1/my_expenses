@@ -16,6 +16,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     created_at: datetime
     email_verified: bool = False
+    provider: str = "credentials"
 
 
 class UserRecord(BaseModel):
@@ -154,6 +155,7 @@ class DeleteAccountRequest(BaseModel):
 
     confirmation: str = Field(min_length=7, max_length=20)
     password: str | None = Field(default=None, max_length=72)
+    google_credential: str | None = Field(default=None, min_length=10)
 
 class AuthResponse(BaseModel):
     access_token: str

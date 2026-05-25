@@ -247,10 +247,16 @@ def test_credentials_account_delete_rejects_wrong_password(
         },
     )
 
-    assert response.status_code == 401
+    assert response.status_code == 400
     assert "Senha incorreta" in response.json()["detail"]
 
+    me_response = client.get(
+        f"{API_PREFIX}/auth/me",
+        headers=auth_headers(token),
+    )
 
+    assert me_response.status_code == 200
+    
 def test_credentials_account_delete_removes_user(
     client: TestClient,
 ) -> None:

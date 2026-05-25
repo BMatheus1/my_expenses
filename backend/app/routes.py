@@ -225,15 +225,13 @@ def delete_account(
     response: Response,
     current_user: UserResponse = Depends(get_current_user),
 ):
-    refresh_token = get_optional_refresh_token_from_cookie(request)
-    logout_refresh_session(refresh_token)
-
     message = delete_current_user_account(current_user.id, delete_data)
 
+    refresh_token = get_optional_refresh_token_from_cookie(request)
+    logout_refresh_session(refresh_token)
     clear_refresh_token_cookie(response)
 
     return MessageResponse(message=message)
-
 @router.post(
     "/expense-categories",
     response_model=ExpenseCategoryResponse,

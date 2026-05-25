@@ -212,7 +212,7 @@ export async function apiRequest<T>(
   if (!response.ok) {
     const message = await getErrorMessage(response);
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       handleUnauthorizedResponse();
     }
 

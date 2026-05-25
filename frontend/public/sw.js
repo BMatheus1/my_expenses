@@ -1,4 +1,4 @@
-const APP_VERSION = "my-expenses-v2";
+const APP_VERSION = "my-expenses-v3";
 const STATIC_CACHE = `${APP_VERSION}-static`;
 
 const STATIC_ASSETS = [

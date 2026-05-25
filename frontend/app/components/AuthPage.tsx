@@ -2,7 +2,6 @@
 
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { smartScrollToRef } from "../utils/smartScroll";
 
 import {
   loginWithEmail,
@@ -14,6 +13,7 @@ import {
   verifyEmail,
 } from "../lib/api";
 import type { User } from "../types/auth";
+import { smartScrollToRef } from "../utils/smartScroll";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 
 type AuthMode =
@@ -51,7 +51,7 @@ const PRIVACY_ITEMS = [
 
 export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const authCardRef = useRef<HTMLElement | null>(null);
-  
+
   const [mode, setMode] = useState<AuthMode>("login");
   const [legalModal, setLegalModal] = useState<LegalModalType>(null);
 
@@ -74,7 +74,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const isResetPasswordMode = mode === "reset-password";
   const isVerifyEmailMode = mode === "verify-email";
 
-  const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
+  const passwordStrength = useMemo(
+    () => getPasswordStrength(password),
+    [password]
+  );
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -138,7 +141,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     setIsSubmitting(false);
   }, [onAuthenticated]);
 
-    useEffect(() => {
+  useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const authModeFromUrl = searchParams.get("auth");
     const focusTarget = searchParams.get("focus");
@@ -216,6 +219,12 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         setConfirmPassword("");
         setMode("login");
         clearUrlTokens();
+
+        smartScrollToRef(authCardRef, {
+          delayMs: 80,
+          focusFirstField: true,
+        });
+
         return;
       }
 
@@ -247,6 +256,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
       setPassword("");
       setConfirmPassword("");
       setTermsAccepted(false);
+
+      smartScrollToRef(authCardRef, {
+        delayMs: 100,
+      });
     } catch (error) {
       if (isLoginMode && isEmailVerificationRequiredError(error)) {
         const pendingEmail = email.trim();
@@ -256,9 +269,14 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         setPassword("");
         setMode("verify-email");
         setSuccessMessage(
-          "Sua conta está pendente de confirmação. Enviamos um novo link para seu e-mail.",
+          "Sua conta está pendente de confirmação. Enviamos um novo link para seu e-mail."
         );
         setErrorMessage("");
+
+        smartScrollToRef(authCardRef, {
+          delayMs: 100,
+        });
+
         return;
       }
 
@@ -272,9 +290,14 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         setTermsAccepted(false);
         setMode("verify-email");
         setSuccessMessage(
-          "Já existe uma conta pendente com este e-mail. Enviamos um novo link de confirmação.",
+          "Já existe uma conta pendente com este e-mail. Enviamos um novo link de confirmação."
         );
         setErrorMessage("");
+
+        smartScrollToRef(authCardRef, {
+          delayMs: 100,
+        });
+
         return;
       }
 
@@ -330,7 +353,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
       return "A senha precisa ter letras e números.";
     }
 
-    if ((isRegisterMode || isResetPasswordMode) && password !== confirmPassword) {
+    if (
+      (isRegisterMode || isResetPasswordMode) &&
+      password !== confirmPassword
+    ) {
       return "A confirmação de senha não confere.";
     }
 
@@ -349,7 +375,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     return (verificationEmail || email).trim();
   }
 
-    function switchMode(nextMode: AuthMode) {
+  function switchMode(nextMode: AuthMode) {
     setMode(nextMode);
     setName("");
     setPassword("");
@@ -374,14 +400,14 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-stone-50 px-4 py-8 text-stone-900">
-      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="rounded-3xl border border-stone-200 bg-white p-8 shadow-sm">
+    <main className="min-h-screen w-full overflow-x-clip bg-stone-50 px-4 py-6 text-stone-900 sm:py-8">
+      <div className="mx-auto grid min-h-[calc(100vh-3rem)] w-full min-w-0 max-w-6xl items-center gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
+        <section className="w-full min-w-0 overflow-hidden rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700">
             My Expenses
           </p>
 
-          <h1 className="mt-4 text-4xl font-bold tracking-tight text-stone-950 lg:text-5xl">
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-stone-950 sm:text-4xl lg:text-5xl">
             Controle seus gastos com clareza e segurança.
           </h1>
 
@@ -390,7 +416,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             lugar, com autenticação segura e proteção por usuário.
           </p>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+          <div className="mt-8 grid min-w-0 gap-3 sm:grid-cols-3">
             <FeatureCard title="Carteira" description="Ganhos e gastos" />
             <FeatureCard title="Relatórios" description="Resumo mensal" />
             <FeatureCard title="Segurança" description="Sessão protegida" />
@@ -399,9 +425,9 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
         <section
           ref={authCardRef}
-          className="scroll-mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8"
+          className="scroll-mt-6 w-full min-w-0 overflow-hidden rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8"
         >
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">
               Acesso seguro
             </p>
@@ -423,7 +449,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             </div>
           ) : null}
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <form onSubmit={handleSubmit} className="mt-6 min-w-0 space-y-4">
             {isRegisterMode ? (
               <AuthField
                 label="Nome completo"
@@ -504,16 +530,16 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             ) : null}
 
             {isRegisterMode ? (
-              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                <label className="flex items-start gap-3 text-sm text-stone-600">
+              <div className="w-full min-w-0 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <label className="flex min-w-0 items-start gap-3 text-sm text-stone-600">
                   <input
                     type="checkbox"
                     checked={termsAccepted}
                     onChange={(event) => setTermsAccepted(event.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-stone-300 text-emerald-600"
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-stone-300 text-emerald-600"
                   />
 
-                  <span className="leading-6">
+                  <span className="min-w-0 leading-6">
                     Confirmo que li e aceito os{" "}
                     <a
                       href="/termos-de-uso"
@@ -559,7 +585,9 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             </button>
           </form>
 
-          {!isForgotPasswordMode && !isResetPasswordMode && !isVerifyEmailMode ? (
+          {!isForgotPasswordMode &&
+          !isResetPasswordMode &&
+          !isVerifyEmailMode ? (
             <>
               <button
                 type="button"
@@ -569,14 +597,14 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
                 Esqueci minha senha
               </button>
 
-              <div className="my-6 flex items-center gap-3">
-                <div className="h-px flex-1 bg-stone-200" />
+              <div className="my-6 flex min-w-0 items-center gap-3">
+                <div className="h-px min-w-0 flex-1 bg-stone-200" />
 
-                <span className="text-xs font-bold uppercase tracking-widest text-stone-400">
+                <span className="shrink-0 text-xs font-bold uppercase tracking-widest text-stone-400">
                   ou
                 </span>
 
-                <div className="h-px flex-1 bg-stone-200" />
+                <div className="h-px min-w-0 flex-1 bg-stone-200" />
               </div>
 
               <GoogleSignInButton
@@ -608,8 +636,8 @@ type FeatureCardProps = {
 
 function FeatureCard({ title, description }: FeatureCardProps) {
   return (
-    <article className="rounded-3xl border border-stone-100 bg-stone-50 p-4">
-      <h3 className="font-bold text-stone-950">{title}</h3>
+    <article className="min-w-0 rounded-3xl border border-stone-100 bg-stone-50 p-4">
+      <h3 className="truncate font-bold text-stone-950">{title}</h3>
       <p className="mt-1 text-sm text-stone-500">{description}</p>
     </article>
   );
@@ -623,7 +651,7 @@ type AuthFieldProps = {
 
 function AuthField({ label, hint, children }: AuthFieldProps) {
   return (
-    <label className="space-y-2 text-sm font-bold text-stone-700">
+    <label className="block min-w-0 space-y-2 text-sm font-bold text-stone-700">
       <span>{label}</span>
       {children}
       {hint ? (
@@ -641,13 +669,13 @@ function PasswordStrengthIndicator({
   strength: PasswordStrength;
 }) {
   return (
-    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className="w-full min-w-0 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+      <div className="flex min-w-0 items-center justify-between gap-3">
         <p className="text-xs font-bold uppercase tracking-widest text-stone-500">
           Segurança da senha
         </p>
 
-        <p className={`text-xs font-black ${strength.textColor}`}>
+        <p className={`shrink-0 text-xs font-black ${strength.textColor}`}>
           {strength.label}
         </p>
       </div>
@@ -681,11 +709,11 @@ function LegalModal({
   const items = isTerms ? TERMS_ITEMS : PRIVACY_ITEMS;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-clip bg-black/40 px-4 py-6">
       <div className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-xl">
         <div className="border-b border-stone-200 p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex min-w-0 items-start justify-between gap-4">
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">
                 My Expenses
               </p>
@@ -702,7 +730,7 @@ function LegalModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl border border-stone-200 px-3 py-2 text-sm font-black text-stone-600 transition hover:bg-stone-50"
+              className="shrink-0 rounded-2xl border border-stone-200 px-3 py-2 text-sm font-black text-stone-600 transition hover:bg-stone-50"
               aria-label="Fechar"
             >
               ✕

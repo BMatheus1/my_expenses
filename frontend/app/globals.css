@@ -34,6 +34,31 @@
   --background: var(--app-bg);
   --foreground: var(--app-text);
 }
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+}
+
+input,
+select,
+textarea,
+button {
+  max-width: 100%;
+}
 
 html[data-app-theme="ocean"] {
   --brand-primary: #0369a1;

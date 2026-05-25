@@ -109,11 +109,11 @@ export function ConnectionErrorState({
 
   return (
     <ErrorState
-      title={isOffline ? "Você está sem internet" : "API fora do ar"}
+      title={isOffline ? "Você está sem internet" : "Servidor indisponível"}
       description={
         isOffline
           ? "Verifique sua conexão e tente novamente."
-          : "Não foi possível conectar ao servidor agora. A API pode estar iniciando ou temporariamente indisponível."
+          : "Não foi possível conectar ao servidor agora. O servidor pode estar iniciando ou temporariamente indisponível."
       }
       action={{
         label: "Tentar novamente",

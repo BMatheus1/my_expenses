@@ -31,6 +31,24 @@ const API_URL = (
   process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_URL
 ).replace(/\/$/, "");
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+
+function isBrowserOffline() {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
+function getNetworkErrorMessage(error?: unknown) {
+  if (isBrowserOffline()) {
+    return "Você está sem internet. Conecte-se para sincronizar suas informações.";
+  }
+
+  if (error instanceof Error && error.name === "AbortError") {
+    return "A conexão demorou mais que o esperado. Verifique sua internet e tente novamente.";
+  }
+
+  return "Não foi possível conectar ao servidor agora. Tente novamente em alguns segundos.";
+}
+
 type ApiValidationError = {
   msg?: string;
 };
@@ -40,6 +58,7 @@ type UnauthorizedHandler = () => void;
 type ApiRequestConfig = {
   skipAuthHeader?: boolean;
   skipAuthRefresh?: boolean;
+  timeoutMs?: number;
 };
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
@@ -104,17 +123,28 @@ function handleUnauthorizedResponse() {
 }
 
 async function refreshAccessTokenRequest(): Promise<boolean> {
+  if (isBrowserOffline()) {
+    throw new ApiError(getNetworkErrorMessage(), 0);
+  }
+
   let response: Response;
+  const requestUrl = `${API_URL}/auth/refresh`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, DEFAULT_REQUEST_TIMEOUT_MS);
 
   try {
-    response = await fetch(`${API_URL}/auth/refresh`, {
+    response = await fetch(requestUrl, {
       method: "POST",
       credentials: "include",
       cache: "no-store",
+      signal: controller.signal,
     });
-  } catch {
-    clearAuthToken();
-    return false;
+  } catch (error) {
+    throw new ApiError(getNetworkErrorMessage(error), 0);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!response.ok) {
@@ -166,6 +196,10 @@ async function requestWithAuth(
   options: RequestInit,
   config: ApiRequestConfig,
 ): Promise<Response> {
+  if (isBrowserOffline()) {
+    throw new ApiError(getNetworkErrorMessage(), 0);
+  }
+
   const headers = new Headers(options.headers);
   const token = getAuthToken();
 
@@ -178,6 +212,10 @@ async function requestWithAuth(
   }
 
   const requestUrl = `${API_URL}${path}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, config.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
 
   try {
     return await fetch(requestUrl, {
@@ -185,12 +223,12 @@ async function requestWithAuth(
       headers,
       credentials: "include",
       cache: "no-store",
+      signal: controller.signal,
     });
-  } catch {
-    throw new ApiError(
-      `Não foi possível conectar ao backend. Verifique se a API está online e se a URL está correta: ${requestUrl}`,
-      0,
-    );
+  } catch (error) {
+    throw new ApiError(getNetworkErrorMessage(error), 0);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

@@ -41,8 +41,31 @@ export function formatDate(value: string): string {
 }
 
 export function getErrorMessage(error: unknown): string {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "Você está sem internet. Conecte-se para carregar ou salvar os dados do negócio.";
+  }
+
   if (error instanceof Error) {
-    return error.message;
+    const message = error.message.trim();
+    const normalizedMessage = message.toLowerCase();
+
+    if (normalizedMessage.includes("sem internet")) {
+      return "Você está sem internet. Conecte-se para carregar ou salvar os dados do negócio.";
+    }
+
+    if (normalizedMessage.includes("conexão demorou")) {
+      return "A conexão demorou mais que o esperado. Verifique sua internet e tente novamente.";
+    }
+
+    if (
+      normalizedMessage.includes("não foi possível conectar") ||
+      normalizedMessage.includes("failed to fetch") ||
+      normalizedMessage.includes("network")
+    ) {
+      return "Não foi possível conectar ao servidor agora. Tente novamente em alguns segundos.";
+    }
+
+    return message || "Não foi possível concluir a operação.";
   }
 
   return "Não foi possível concluir a operação.";

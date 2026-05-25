@@ -11,17 +11,21 @@ from app.password_reset_repository import initialize_password_reset_database
 from app.routes import router
 from app.security import security_middleware
 from app.session_repository import initialize_refresh_token_database
-from app.storage import initialize_database
-
+from app.storage import close_database_pool, initialize_database, open_database_pool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    initialize_database()
-    initialize_business_database()
-    initialize_refresh_token_database()
-    initialize_password_reset_database()
-    initialize_email_verification_database()
-    yield
+    open_database_pool()
+
+    try:
+        initialize_database()
+        initialize_business_database()
+        initialize_refresh_token_database()
+        initialize_password_reset_database()
+        initialize_email_verification_database()
+        yield
+    finally:
+        close_database_pool()
 
 
 app = FastAPI(

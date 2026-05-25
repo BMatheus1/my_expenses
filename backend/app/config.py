@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     frontend_url: str = "http://127.0.0.1:3000"
 
     database_url: str
+    database_pool_min_size: int = 1
+    database_pool_max_size: int = 5
 
     legacy_json_file: str = "data/expenses.json"
     legacy_import_email: str = ""

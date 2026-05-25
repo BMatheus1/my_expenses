@@ -8,6 +8,6 @@ bcrypt
 google-auth
 requests
 email-validator
-psycopg[binary]
+psycopg[binary,pool]
 pytest
 httpx

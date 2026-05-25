@@ -975,11 +975,17 @@ function getAuthErrorMessage(error: unknown) {
   }
 
   if (
+    message.includes("sem internet") ||
     message.includes("failed to fetch") ||
     message.includes("não foi possível conectar") ||
-    message.includes("network")
+    message.includes("network") ||
+    message.includes("conexão demorou")
   ) {
-    return "Não foi possível conectar ao servidor. Verifique se a API está online.";
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return "Você está sem internet. Conecte-se e tente novamente.";
+    }
+
+    return "Não foi possível conectar ao servidor agora. Tente novamente em alguns segundos.";
   }
 
   return error.message || "Não foi possível concluir a ação.";

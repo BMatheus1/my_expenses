@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   ApiError,
-  getAuthToken,
   getCurrentUser,
   logoutCurrentSession,
   setUnauthorizedHandler,
@@ -16,7 +15,7 @@ import {
 } from "../lib/security";
 import type { User } from "../types/auth";
 import { AuthPage } from "./AuthPage";
-import { PageLoading, ConnectionErrorState } from "./AppFeedback";
+import { ConnectionErrorState, PageLoading } from "./AppFeedback";
 import { ExpensesDashboard } from "./ExpensesDashboard";
 
 const USER_ACTIVITY_EVENTS = [
@@ -26,6 +25,18 @@ const USER_ACTIVITY_EVENTS = [
   "scroll",
   "touchstart",
 ] as const;
+
+function hasAuthActionToken() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+
+  return (
+    searchParams.has("verify_email_token") || searchParams.has("reset_token")
+  );
+}
 
 export function AuthGate() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -39,22 +50,10 @@ export function AuthGate() {
   }, []);
 
   const checkSession = useCallback(async () => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const hasAuthActionToken =
-      searchParams.has("verify_email_token") || searchParams.has("reset_token");
-
     setIsCheckingSession(true);
     setSessionError(false);
 
-    if (hasAuthActionToken) {
-      setCurrentUser(null);
-      setIsCheckingSession(false);
-      return;
-    }
-
-    const token = getAuthToken();
-
-    if (!token) {
+    if (hasAuthActionToken()) {
       setCurrentUser(null);
       setIsCheckingSession(false);
       return;

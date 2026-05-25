@@ -168,7 +168,9 @@ export function ExpensesDashboard({
       setExpenses(data);
     } catch (error) {
       console.error(error);
-      setErrorMessage("Não foi possível carregar os gastos.");
+      setErrorMessage(
+        getDashboardErrorMessage(error, "Não foi possível carregar os gastos.")
+      );
     } finally {
       setIsLoadingExpenses(false);
     }
@@ -183,7 +185,9 @@ export function ExpensesDashboard({
       setIncomes(data);
     } catch (error) {
       console.error(error);
-      setErrorMessage("Não foi possível carregar os ganhos.");
+      setErrorMessage(
+        getDashboardErrorMessage(error, "Não foi possível carregar os ganhos.")
+      );
     } finally {
       setIsLoadingIncomes(false);
     }
@@ -342,13 +346,14 @@ export function ExpensesDashboard({
       return true;
     } catch (error) {
       console.error(error);
-      setCategoryManagerError("Não foi possível adicionar a categoria.");
+      setCategoryManagerError(
+        getDashboardErrorMessage(error, "Não foi possível adicionar a categoria.")
+      );
       return false;
     } finally {
       setIsSavingCategory(false);
     }
   }
-
   async function handleUpdateCategory(
     categoryToUpdate: ExpenseCategory,
     categoryName: string
@@ -420,7 +425,9 @@ export function ExpensesDashboard({
       return true;
     } catch (error) {
       console.error(error);
-      setCategoryManagerError("Não foi possível editar a categoria.");
+      setCategoryManagerError(
+        getDashboardErrorMessage(error, "Não foi possível editar a categoria.")
+      );
       return false;
     } finally {
       setIsSavingCategory(false);
@@ -470,7 +477,10 @@ export function ExpensesDashboard({
     } catch (error) {
       console.error(error);
       setCategoryManagerError(
-        "Não foi possível excluir a categoria. Verifique se ela possui gastos."
+        getDashboardErrorMessage(
+          error,
+          "Não foi possível excluir a categoria. Verifique se ela possui gastos."
+        )
       );
     } finally {
       setDeletingCategoryId(null);
@@ -532,11 +542,13 @@ export function ExpensesDashboard({
         resetForm();
       }
 
-      await loadCategories();
+      void loadCategories();
       showSuccessToast("Gasto removido.");
     } catch (error) {
       console.error(error);
-      setErrorMessage("Não foi possível remover o gasto.");
+      setErrorMessage(
+        getDashboardErrorMessage(error, "Não foi possível remover o gasto.")
+      );
     } finally {
       setDeletingExpenseId(null);
     }
@@ -544,6 +556,10 @@ export function ExpensesDashboard({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
 
     setErrorMessage("");
 
@@ -596,15 +612,18 @@ export function ExpensesDashboard({
         setExpenses((currentExpenses) => [createdExpense, ...currentExpenses]);
       }
 
-      await loadCategories();
+      void loadCategories();
       resetForm();
       showSuccessToast(successMessage);
     } catch (error) {
       console.error(error);
       setErrorMessage(
-        isEditing
-          ? "Não foi possível editar o gasto."
-          : "Não foi possível cadastrar o gasto."
+        getDashboardErrorMessage(
+          error,
+          isEditing
+            ? "Não foi possível editar o gasto."
+            : "Não foi possível cadastrar o gasto."
+        )
       );
     } finally {
       setIsSubmitting(false);
@@ -1083,6 +1102,25 @@ function hasCategoryName(
 
     return normalizeCategoryKey(category.name) === categoryKey;
   });
+}
+
+function getDashboardErrorMessage(
+  error: unknown,
+  fallbackMessage: string,
+): string {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "Você está sem internet. Conecte-se e tente novamente.";
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.trim();
+
+    if (message) {
+      return message;
+    }
+  }
+
+  return fallbackMessage;
 }
 
 function normalizeCategoryKey(value: string) {

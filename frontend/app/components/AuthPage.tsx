@@ -1,7 +1,8 @@
 "use client";
 
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { smartScrollToRef } from "../utils/smartScroll";
 
 import {
   loginWithEmail,
@@ -49,6 +50,8 @@ const PRIVACY_ITEMS = [
 ];
 
 export function AuthPage({ onAuthenticated }: AuthPageProps) {
+  const authCardRef = useRef<HTMLElement | null>(null);
+  
   const [mode, setMode] = useState<AuthMode>("login");
   const [legalModal, setLegalModal] = useState<LegalModalType>(null);
 
@@ -134,6 +137,38 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     setSuccessMessage("");
     setIsSubmitting(false);
   }, [onAuthenticated]);
+
+    useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const authModeFromUrl = searchParams.get("auth");
+    const focusTarget = searchParams.get("focus");
+
+    const hasAuthActionToken =
+      searchParams.has("verify_email_token") || searchParams.has("reset_token");
+
+    if (hasAuthActionToken) {
+      return;
+    }
+
+    if (authModeFromUrl === "register") {
+      setMode("register");
+    }
+
+    if (authModeFromUrl === "login") {
+      setMode("login");
+    }
+
+    if (
+      focusTarget === "auth" ||
+      authModeFromUrl === "login" ||
+      authModeFromUrl === "register"
+    ) {
+      smartScrollToRef(authCardRef, {
+        delayMs: 180,
+        focusFirstField: true,
+      });
+    }
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -314,7 +349,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     return (verificationEmail || email).trim();
   }
 
-  function switchMode(nextMode: AuthMode) {
+    function switchMode(nextMode: AuthMode) {
     setMode(nextMode);
     setName("");
     setPassword("");
@@ -331,6 +366,11 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
       setResetToken("");
       clearUrlTokens();
     }
+
+    smartScrollToRef(authCardRef, {
+      delayMs: 80,
+      focusFirstField: true,
+    });
   }
 
   return (
@@ -357,7 +397,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+        <section
+          ref={authCardRef}
+          className="scroll-mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8"
+        >
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">
               Acesso seguro

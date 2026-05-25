@@ -1,7 +1,7 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent, RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EXPENSE_CATEGORIES } from "../constants/categories";
 import {
@@ -30,6 +30,7 @@ import {
   parseMoneyToNumber,
   sanitizeMoneyInput,
 } from "../utils/formatters";
+import { smartScrollToRef } from "../utils/smartScroll";
 import { AppShell } from "./AppShell";
 import BusinessWorkspace from "./BusinessWorkspace";
 import { CategoryManagerModal } from "./CategoryManagerModal";
@@ -68,6 +69,9 @@ export function ExpensesDashboard({
   currentUser,
   onLogout,
 }: ExpensesDashboardProps) {
+  const expenseFormSectionRef = useRef<HTMLDivElement | null>(null);
+  const expenseFiltersSectionRef = useRef<HTMLDivElement | null>(null);
+
   const [activeView, setActiveView] = useState<AppView>("expenses");
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -293,6 +297,11 @@ export function ExpensesDashboard({
     resetForm();
     setIsFormOpen(true);
     setActiveView("expenses");
+
+    smartScrollToRef(expenseFormSectionRef, {
+      delayMs: 120,
+      focusFirstField: true,
+    });
   }
 
   async function handleCreateCategory(categoryName: string) {
@@ -487,6 +496,11 @@ export function ExpensesDashboard({
     setErrorMessage("");
     setIsFormOpen(true);
     setActiveView("expenses");
+
+    smartScrollToRef(expenseFormSectionRef, {
+      delayMs: 140,
+      focusFirstField: true,
+    });
   }
 
   function requestDeleteExpense(expenseId: string) {
@@ -633,6 +647,35 @@ export function ExpensesDashboard({
     });
   }
 
+  function handleFormToggle() {
+    setIsFormOpen((currentValue) => {
+      const nextValue = !currentValue;
+
+      if (nextValue) {
+        smartScrollToRef(expenseFormSectionRef, {
+          delayMs: 100,
+          focusFirstField: true,
+        });
+      }
+
+      return nextValue;
+    });
+  }
+
+  function handleFiltersToggle() {
+    setIsFiltersOpen((currentValue) => {
+      const nextValue = !currentValue;
+
+      if (nextValue) {
+        smartScrollToRef(expenseFiltersSectionRef, {
+          delayMs: 100,
+        });
+      }
+
+      return nextValue;
+    });
+  }
+
   return (
     <AppShell
       activeView={activeView}
@@ -671,6 +714,8 @@ export function ExpensesDashboard({
         />
       ) : (
         <ExpensesView
+          formSectionRef={expenseFormSectionRef}
+          filtersSectionRef={expenseFiltersSectionRef}
           monthlyExpenseTotal={monthlyExpenseTotal}
           monthlyIncomeTotal={monthlyIncomeTotal}
           monthlyBalance={monthlyBalance}
@@ -692,10 +737,8 @@ export function ExpensesDashboard({
           selectedMonth={selectedMonth}
           selectedCategory={selectedCategory}
           searchTerm={searchTerm}
-          onFormToggle={() => setIsFormOpen((currentValue) => !currentValue)}
-          onFiltersToggle={() =>
-            setIsFiltersOpen((currentValue) => !currentValue)
-          }
+          onFormToggle={handleFormToggle}
+          onFiltersToggle={handleFiltersToggle}
           onNewExpenseClick={handleNewExpenseClick}
           onDescriptionChange={setDescription}
           onAmountChange={handleAmountChange}
@@ -751,6 +794,8 @@ export function ExpensesDashboard({
 }
 
 type ExpensesViewProps = {
+  formSectionRef: RefObject<HTMLDivElement | null>;
+  filtersSectionRef: RefObject<HTMLDivElement | null>;
   monthlyExpenseTotal: number;
   monthlyIncomeTotal: number;
   monthlyBalance: number;
@@ -791,6 +836,8 @@ type ExpensesViewProps = {
 };
 
 function ExpensesView({
+  formSectionRef,
+  filtersSectionRef,
   monthlyExpenseTotal,
   monthlyIncomeTotal,
   monthlyBalance,
@@ -846,7 +893,7 @@ function ExpensesView({
       />
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <div>
+        <div ref={formSectionRef} className="scroll-mt-5">
           <CollapsibleSection
             title={isEditing ? "Editar gasto" : "Novo gasto"}
             description={
@@ -879,18 +926,20 @@ function ExpensesView({
         </div>
 
         <div className="space-y-4">
-          <ExpenseFilters
-            selectedMonth={selectedMonth}
-            selectedCategory={selectedCategory}
-            searchTerm={searchTerm}
-            categories={categories}
-            isOpen={isFiltersOpen}
-            onToggle={onFiltersToggle}
-            onSelectedMonthChange={onSelectedMonthChange}
-            onSelectedCategoryChange={onSelectedCategoryChange}
-            onSearchTermChange={onSearchTermChange}
-            onClearFilters={onClearFilters}
-          />
+          <div ref={filtersSectionRef} className="scroll-mt-5">
+            <ExpenseFilters
+              selectedMonth={selectedMonth}
+              selectedCategory={selectedCategory}
+              searchTerm={searchTerm}
+              categories={categories}
+              isOpen={isFiltersOpen}
+              onToggle={onFiltersToggle}
+              onSelectedMonthChange={onSelectedMonthChange}
+              onSelectedCategoryChange={onSelectedCategoryChange}
+              onSearchTermChange={onSearchTermChange}
+              onClearFilters={onClearFilters}
+            />
+          </div>
 
           <ExpenseList
             expenses={filteredExpenses}

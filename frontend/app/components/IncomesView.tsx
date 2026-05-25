@@ -1,5 +1,7 @@
+"use client";
+
 import type { FormEvent, ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { INCOME_SOURCES } from "../constants/incomeSources";
 import type { Income } from "../types/income";
@@ -11,6 +13,7 @@ import {
   parseMoneyToNumber,
   sanitizeMoneyInput,
 } from "../utils/formatters";
+import { smartScrollToRef } from "../utils/smartScroll";
 import { ConfirmModal } from "./ConfirmModal";
 
 type IncomesViewProps = {
@@ -49,6 +52,9 @@ export function IncomesView({
   onUpdateIncome,
   onDeleteIncome,
 }: IncomesViewProps) {
+  const incomeFormSectionRef = useRef<HTMLElement | null>(null);
+  const incomeFiltersSectionRef = useRef<HTMLDivElement | null>(null);
+
   const [selectedMonth, setSelectedMonth] = useState(() => getCurrentMonth());
   const [selectedSource, setSelectedSource] = useState("Todas");
   const [searchTerm, setSearchTerm] = useState("");
@@ -89,6 +95,16 @@ export function IncomesView({
   const monthlyTotal = useMemo(() => {
     return filteredIncomes.reduce((total, income) => total + income.amount, 0);
   }, [filteredIncomes]);
+
+  function handleNewIncomeClick() {
+    resetForm();
+    setIsFormOpen(true);
+
+    smartScrollToRef(incomeFormSectionRef, {
+      delayMs: 120,
+      focusFirstField: true,
+    });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -154,6 +170,11 @@ export function IncomesView({
     setDate(income.date);
     setIsFormOpen(true);
     setErrorMessage("");
+
+    smartScrollToRef(incomeFormSectionRef, {
+      delayMs: 140,
+      focusFirstField: true,
+    });
   }
 
   function requestDeleteIncome(income: Income) {
@@ -190,14 +211,40 @@ export function IncomesView({
     setConfirmation(null);
   }
 
+  function handleFormToggle() {
+    setIsFormOpen((currentValue) => {
+      const nextValue = !currentValue;
+
+      if (nextValue) {
+        smartScrollToRef(incomeFormSectionRef, {
+          delayMs: 100,
+          focusFirstField: true,
+        });
+      }
+
+      return nextValue;
+    });
+  }
+
+  function handleFiltersToggle() {
+    setIsFiltersOpen((currentValue) => {
+      const nextValue = !currentValue;
+
+      if (nextValue) {
+        smartScrollToRef(incomeFiltersSectionRef, {
+          delayMs: 100,
+        });
+      }
+
+      return nextValue;
+    });
+  }
+
   return (
     <div className="space-y-5">
       <IncomeHeader
         monthlyTotal={monthlyTotal}
-        onNewIncomeClick={() => {
-          resetForm();
-          setIsFormOpen(true);
-        }}
+        onNewIncomeClick={handleNewIncomeClick}
       />
 
       <section className="grid gap-3 md:grid-cols-3">
@@ -223,10 +270,13 @@ export function IncomesView({
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <section className="rounded-3xl border border-stone-200 bg-white shadow-sm">
+        <section
+          ref={incomeFormSectionRef}
+          className="scroll-mt-5 rounded-3xl border border-stone-200 bg-white shadow-sm"
+        >
           <button
             type="button"
-            onClick={() => setIsFormOpen((currentValue) => !currentValue)}
+            onClick={handleFormToggle}
             className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-stone-50"
             aria-expanded={isFormOpen}
           >
@@ -269,17 +319,19 @@ export function IncomesView({
         </section>
 
         <div className="space-y-4">
-          <IncomeFilters
-            selectedMonth={selectedMonth}
-            selectedSource={selectedSource}
-            searchTerm={searchTerm}
-            isOpen={isFiltersOpen}
-            onToggle={() => setIsFiltersOpen((currentValue) => !currentValue)}
-            onSelectedMonthChange={setSelectedMonth}
-            onSelectedSourceChange={setSelectedSource}
-            onSearchTermChange={setSearchTerm}
-            onClearFilters={clearFilters}
-          />
+          <div ref={incomeFiltersSectionRef} className="scroll-mt-5">
+            <IncomeFilters
+              selectedMonth={selectedMonth}
+              selectedSource={selectedSource}
+              searchTerm={searchTerm}
+              isOpen={isFiltersOpen}
+              onToggle={handleFiltersToggle}
+              onSelectedMonthChange={setSelectedMonth}
+              onSelectedSourceChange={setSelectedSource}
+              onSearchTermChange={setSearchTerm}
+              onClearFilters={clearFilters}
+            />
+          </div>
 
           <IncomeList
             incomes={filteredIncomes}

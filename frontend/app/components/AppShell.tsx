@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import type { User } from "../types/auth";
+import { scrollToPageTop } from "../utils/smartScroll";
 import { MobileBottomNav } from "./MobileBottomNav";
 import type { AppView } from "./Sidebar";
 import { Sidebar } from "./Sidebar";
@@ -22,13 +23,18 @@ export function AppShell({
   onLogout,
   children,
 }: AppShellProps) {
+  function handleActiveViewChange(view: AppView) {
+    onActiveViewChange(view);
+    scrollToPageTop(80);
+  }
+
   return (
     <main className="app-shell min-h-screen">
       <div className="flex min-h-screen">
         <Sidebar
           activeView={activeView}
           currentUser={currentUser}
-          onActiveViewChange={onActiveViewChange}
+          onActiveViewChange={handleActiveViewChange}
           onLogout={onLogout}
         />
 
@@ -40,7 +46,7 @@ export function AppShell({
       <MobileBottomNav
         activeView={activeView}
         currentUser={currentUser}
-        onActiveViewChange={onActiveViewChange}
+        onActiveViewChange={handleActiveViewChange}
         onLogout={onLogout}
       />
     </main>

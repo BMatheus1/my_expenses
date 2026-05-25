@@ -62,7 +62,7 @@ export default function LandingPage() {
           </nav>
 
           <Link
-            href="/app"
+            href="/app?auth=login&focus=auth"
             className="rounded-full bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
           >
             Entrar
@@ -88,7 +88,7 @@ export default function LandingPage() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/app"
+              href="/app?auth=register&focus=auth"
               className="rounded-full bg-emerald-600 px-6 py-4 text-center text-sm font-black text-white transition hover:bg-emerald-700"
             >
               Começar agora
@@ -221,7 +221,7 @@ export default function LandingPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/app"
+              href="/app?auth=register&focus=auth"
               className="rounded-full bg-emerald-500 px-6 py-4 text-center text-sm font-black text-white transition hover:bg-emerald-600"
             >
               Criar conta

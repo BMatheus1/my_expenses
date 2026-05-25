@@ -60,11 +60,20 @@ export function MobileBottomNav({
   onActiveViewChange,
   onLogout,
 }: MobileBottomNavProps) {
+  const shouldShowMobileNav = useMobileBottomNavVisibility();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
   const isAccountView = useMemo(() => {
     return ACCOUNT_VIEWS.includes(activeView);
   }, [activeView]);
+
+  useEffect(() => {
+    if (shouldShowMobileNav) {
+      return;
+    }
+
+    setIsAccountMenuOpen(false);
+  }, [shouldShowMobileNav]);
 
   useEffect(() => {
     if (!isAccountMenuOpen) {
@@ -94,10 +103,17 @@ export function MobileBottomNav({
     onLogout();
   }
 
+  if (!shouldShowMobileNav) {
+    return null;
+  }
+
   return (
     <>
       {isAccountMenuOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/35 backdrop-blur-[3px] lg:hidden">
+        <div
+          className="fixed inset-0 bg-black/35 backdrop-blur-[3px]"
+          style={{ zIndex: 70 }}
+        >
           <button
             type="button"
             className="absolute inset-0 h-full w-full cursor-default"
@@ -106,7 +122,8 @@ export function MobileBottomNav({
           />
 
           <section
-            className="absolute inset-x-3 bottom-24 rounded-3xl border p-4 shadow-2xl"            style={{
+            className="absolute inset-x-3 bottom-24 rounded-3xl border p-4 shadow-2xl"
+            style={{
               backgroundColor: "var(--app-surface)",
               borderColor: "var(--app-border)",
               color: "var(--app-text)",
@@ -153,8 +170,9 @@ export function MobileBottomNav({
       ) : null}
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t px-3 pt-2 shadow-2xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 border-t px-3 pt-2 shadow-2xl"
         style={{
+          zIndex: 80,
           backgroundColor:
             "color-mix(in srgb, var(--app-surface) 96%, transparent)",
           borderColor: "var(--app-border)",
@@ -300,4 +318,35 @@ function AccountMenuButton({
       </span>
     </button>
   );
+}
+
+function useMobileBottomNavVisibility() {
+  const [shouldShowMobileNav, setShouldShowMobileNav] = useState(false);
+
+  useEffect(() => {
+    function updateVisibility() {
+      const viewportWidth = Math.min(
+        window.innerWidth,
+        document.documentElement.clientWidth,
+      );
+
+      const isSmallScreen = viewportWidth < 1024;
+      const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+      const isTabletLikeTouchDevice = isTouchDevice && viewportWidth < 1280;
+
+      setShouldShowMobileNav(isSmallScreen || isTabletLikeTouchDevice);
+    }
+
+    updateVisibility();
+
+    window.addEventListener("resize", updateVisibility);
+    window.addEventListener("orientationchange", updateVisibility);
+
+    return () => {
+      window.removeEventListener("resize", updateVisibility);
+      window.removeEventListener("orientationchange", updateVisibility);
+    };
+  }, []);
+
+  return shouldShowMobileNav;
 }

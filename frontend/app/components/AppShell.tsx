@@ -23,7 +23,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <main className="app-shell">
+    <main className="app-shell min-h-screen">
       <div className="flex min-h-screen">
         <Sidebar
           activeView={activeView}

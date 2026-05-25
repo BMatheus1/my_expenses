@@ -35,14 +35,14 @@ export function AppShell({
         <section className="min-w-0 flex-1 px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-5">
           <div className="mx-auto max-w-6xl">{children}</div>
         </section>
-
-        <MobileBottomNav
-          activeView={activeView}
-          currentUser={currentUser}
-          onActiveViewChange={onActiveViewChange}
-          onLogout={onLogout}
-        />
       </div>
+
+      <MobileBottomNav
+        activeView={activeView}
+        currentUser={currentUser}
+        onActiveViewChange={onActiveViewChange}
+        onLogout={onLogout}
+      />
     </main>
   );
 }

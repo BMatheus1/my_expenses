@@ -2,6 +2,7 @@
 
 import type { FormEvent, ReactNode } from "react";
 import { useMemo, useRef, useState } from "react";
+import { EmptyState, LoadingButton, LoadingCard } from "./AppFeedback";
 
 import { INCOME_SOURCES } from "../constants/incomeSources";
 import type { Income } from "../types/income";
@@ -508,17 +509,14 @@ function IncomeForm({
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <button
+        <LoadingButton
           type="submit"
-          disabled={isSubmitting}
+          isLoading={isSubmitting}
+          loadingLabel="Salvando..."
           className="app-button-primary sm:w-auto"
         >
-          {isSubmitting
-            ? "Salvando..."
-            : isEditing
-              ? "Salvar alterações"
-              : "Adicionar ganho"}
-        </button>
+          {isEditing ? "Salvar alterações" : "Adicionar ganho"}
+        </LoadingButton>
 
         {isEditing && (
           <button
@@ -673,9 +671,19 @@ function IncomeList({ incomes, isLoading, onEdit, onDelete }: IncomeListProps) {
 
       <div className="divide-y divide-stone-100">
         {isLoading ? (
-          <ListStatus message="Carregando ganhos..." />
+          <div className="p-5">
+            <LoadingCard
+              title="Carregando ganhos"
+              description="Buscando suas entradas cadastradas."
+            />
+          </div>
         ) : incomes.length === 0 ? (
-          <ListStatus message="Nenhum ganho encontrado para os filtros atuais." />
+          <div className="p-5">
+            <EmptyState
+              title="Nenhum ganho encontrado"
+              description="Cadastre seu primeiro ganho ou ajuste os filtros para encontrar entradas já registradas."
+            />
+          </div>
         ) : (
           incomes.map((income) => (
             <article
@@ -718,18 +726,6 @@ function IncomeList({ incomes, isLoading, onEdit, onDelete }: IncomeListProps) {
         )}
       </div>
     </section>
-  );
-}
-
-type ListStatusProps = {
-  message: string;
-};
-
-function ListStatus({ message }: ListStatusProps) {
-  return (
-    <div className="p-8 text-center">
-      <p className="text-sm text-stone-500">{message}</p>
-    </div>
   );
 }
 

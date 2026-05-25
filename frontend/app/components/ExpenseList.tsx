@@ -1,5 +1,6 @@
 import type { Expense } from "../types/expense";
 import { formatCurrency, formatDate } from "../utils/formatters";
+import { EmptyState, LoadingCard } from "./AppFeedback";
 
 type ExpenseListProps = {
   expenses: Expense[];
@@ -36,9 +37,19 @@ export function ExpenseList({
 
       <div className="divide-y divide-stone-100">
         {isLoading ? (
-          <ExpenseListStatus message="Carregando gastos..." />
+          <div className="p-5">
+            <LoadingCard
+              title="Carregando gastos"
+              description="Buscando suas despesas cadastradas."
+            />
+          </div>
         ) : expenses.length === 0 ? (
-          <ExpenseListStatus message="Nenhum gasto encontrado para os filtros atuais." />
+          <div className="p-5">
+            <EmptyState
+              title="Nenhum gasto encontrado"
+              description="Cadastre seu primeiro gasto ou ajuste os filtros para encontrar despesas já registradas."
+            />
+          </div>
         ) : (
           expenses.map((expense) => (
             <ExpenseItem
@@ -52,18 +63,6 @@ export function ExpenseList({
         )}
       </div>
     </section>
-  );
-}
-
-type ExpenseListStatusProps = {
-  message: string;
-};
-
-function ExpenseListStatus({ message }: ExpenseListStatusProps) {
-  return (
-    <div className="p-8 text-center">
-      <p className="text-sm text-stone-500">{message}</p>
-    </div>
   );
 }
 

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
+  ApiError,
+  getAuthToken,
   getCurrentUser,
   logoutCurrentSession,
   setUnauthorizedHandler,
@@ -14,6 +16,7 @@ import {
 } from "../lib/security";
 import type { User } from "../types/auth";
 import { AuthPage } from "./AuthPage";
+import { PageLoading, ConnectionErrorState } from "./AppFeedback";
 import { ExpensesDashboard } from "./ExpensesDashboard";
 
 const USER_ACTIVITY_EVENTS = [
@@ -27,11 +30,52 @@ const USER_ACTIVITY_EVENTS = [
 export function AuthGate() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [sessionError, setSessionError] = useState(false);
   const [securitySettingsVersion, setSecuritySettingsVersion] = useState(0);
 
   const handleLogout = useCallback(() => {
     void logoutCurrentSession();
     setCurrentUser(null);
+  }, []);
+
+  const checkSession = useCallback(async () => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasAuthActionToken =
+      searchParams.has("verify_email_token") || searchParams.has("reset_token");
+
+    setIsCheckingSession(true);
+    setSessionError(false);
+
+    if (hasAuthActionToken) {
+      setCurrentUser(null);
+      setIsCheckingSession(false);
+      return;
+    }
+
+    const token = getAuthToken();
+
+    if (!token) {
+      setCurrentUser(null);
+      setIsCheckingSession(false);
+      return;
+    }
+
+    try {
+      const user = await getCurrentUser();
+
+      setCurrentUser(user);
+      setSessionError(false);
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 0) {
+        setSessionError(true);
+        return;
+      }
+
+      setCurrentUser(null);
+      setSessionError(false);
+    } finally {
+      setIsCheckingSession(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -43,45 +87,8 @@ export function AuthGate() {
   }, [handleLogout]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function checkSession() {
-      const searchParams = new URLSearchParams(window.location.search);
-      const hasAuthActionToken =
-        searchParams.has("verify_email_token") || searchParams.has("reset_token");
-
-      if (hasAuthActionToken) {
-        if (isMounted) {
-          setCurrentUser(null);
-          setIsCheckingSession(false);
-        }
-
-        return;
-      }
-
-      try {
-        const user = await getCurrentUser();
-
-        if (isMounted) {
-          setCurrentUser(user);
-        }
-      } catch {
-        if (isMounted) {
-          setCurrentUser(null);
-        }
-      } finally {
-        if (isMounted) {
-          setIsCheckingSession(false);
-        }
-      }
-    }
-
     void checkSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [checkSession]);
 
   useEffect(() => {
     function handleSecuritySettingsChange() {
@@ -139,10 +146,18 @@ export function AuthGate() {
 
   if (isCheckingSession) {
     return (
+      <PageLoading
+        title="Verificando sua sessão"
+        description="Estamos preparando seu ambiente financeiro."
+      />
+    );
+  }
+
+  if (sessionError) {
+    return (
       <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
-        <div className="rounded-3xl border border-stone-200 bg-white p-6 text-center shadow-sm">
-          <p className="text-sm font-bold text-stone-950">Carregando...</p>
-          <p className="mt-1 text-sm text-stone-500">Verificando sessão.</p>
+        <div className="w-full max-w-xl">
+          <ConnectionErrorState onRetry={checkSession} />
         </div>
       </main>
     );

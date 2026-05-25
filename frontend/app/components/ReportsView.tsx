@@ -5,6 +5,7 @@ import type { Income } from "../types/income";
 import type { CategoryTotal } from "../types/summary";
 import { formatCurrency } from "../utils/formatters";
 import { CategoryChart } from "./CategoryChart";
+import { EmptyState } from "./AppFeedback";
 
 type ReportsViewProps = {
   expenses: Expense[];
@@ -66,6 +67,8 @@ export function ReportsView({
   }, [monthlyExpenses]);
 
   const highestCategory = categoryTotals[0];
+  const hasMonthlyData =
+    monthlyExpenses.length > 0 || monthlyIncomes.length > 0;
 
   return (
     <div className="space-y-5">
@@ -98,56 +101,67 @@ export function ReportsView({
           </label>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
-          <ReportCard
-            label="Ganhos do mês"
-            value={formatCurrency(monthlyIncomeTotal)}
-            variant="positive"
-          />
+        {!hasMonthlyData ? (
+          <div className="mt-5">
+            <EmptyState
+              title="Sem dados para este mês"
+              description="Cadastre ganhos ou gastos para liberar os relatórios, comparativos e gráficos deste período."
+            />
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <ReportCard
+                label="Ganhos do mês"
+                value={formatCurrency(monthlyIncomeTotal)}
+                variant="positive"
+              />
 
-          <ReportCard
-            label="Gastos do mês"
-            value={formatCurrency(monthlyExpenseTotal)}
-            variant="negative"
-          />
+              <ReportCard
+                label="Gastos do mês"
+                value={formatCurrency(monthlyExpenseTotal)}
+                variant="negative"
+              />
 
-          <ReportCard
-            label="Saldo do mês"
-            value={formatCurrency(monthlyBalance)}
-            variant={monthlyBalance >= 0 ? "positive" : "negative"}
-          />
+              <ReportCard
+                label="Saldo do mês"
+                value={formatCurrency(monthlyBalance)}
+                variant={monthlyBalance >= 0 ? "positive" : "negative"}
+              />
 
-          <ReportCard
-            label="Quantidade de gastos"
-            value={`${monthlyExpenses.length}`}
-          />
-        </div>
+              <ReportCard
+                label="Quantidade de gastos"
+                value={`${monthlyExpenses.length}`}
+              />
+            </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <ReportCard
-            label="Quantidade de ganhos"
-            value={`${monthlyIncomes.length}`}
-          />
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <ReportCard
+                label="Quantidade de ganhos"
+                value={`${monthlyIncomes.length}`}
+              />
 
-          <ReportCard
-            label="Maior categoria"
-            value={highestCategory ? highestCategory.category : "—"}
-          />
+              <ReportCard
+                label="Maior categoria"
+                value={highestCategory ? highestCategory.category : "—"}
+              />
 
-          <ReportCard
-            label="Mês anterior"
-            value={formatCurrency(previousMonthBalance)}
-            variant={previousMonthBalance >= 0 ? "positive" : "negative"}
-          />
-        </div>
+              <ReportCard
+                label="Mês anterior"
+                value={formatCurrency(previousMonthBalance)}
+                variant={previousMonthBalance >= 0 ? "positive" : "negative"}
+              />
+            </div>
 
-        <MonthlyComparison
-          currentMonth={formatMonthLabel(selectedMonth)}
-          previousMonth={formatMonthLabel(previousMonth)}
-          currentBalance={monthlyBalance}
-          previousBalance={previousMonthBalance}
-          difference={balanceDifference}
-        />
+            <MonthlyComparison
+              currentMonth={formatMonthLabel(selectedMonth)}
+              previousMonth={formatMonthLabel(previousMonth)}
+              currentBalance={monthlyBalance}
+              previousBalance={previousMonthBalance}
+              difference={balanceDifference}
+            />
+          </>
+        )}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
@@ -178,10 +192,17 @@ export function ReportsView({
           </p>
 
           <div className="mt-5">
-            <CategoryChart
-              categoryTotals={categoryTotals}
-              total={monthlyExpenseTotal}
-            />
+            {categoryTotals.length === 0 ? (
+              <EmptyState
+                title="Gráfico indisponível"
+                description="Cadastre gastos neste mês para visualizar a distribuição por categoria."
+              />
+            ) : (
+              <CategoryChart
+                categoryTotals={categoryTotals}
+                total={monthlyExpenseTotal}
+              />
+            )}
           </div>
         </div>
       </section>
@@ -333,9 +354,10 @@ function CategoryTotalsList({
 }: CategoryTotalsListProps) {
   if (categoryTotals.length === 0) {
     return (
-      <p className="rounded-3xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500">
-        Nenhum gasto encontrado para este mês.
-      </p>
+      <EmptyState
+        title="Nenhuma categoria encontrada"
+        description="Cadastre gastos neste mês para visualizar os totais por categoria."
+      />
     );
   }
 

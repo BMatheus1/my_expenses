@@ -1,11 +1,15 @@
-import type { FormEvent, ReactNode } from "react";
+"use client";
+
+import type { FormEvent } from "react";
+
+import { LoadingButton } from "./AppFeedback";
 
 type ExpenseFormProps = {
   description: string;
   amount: string;
   category: string;
   date: string;
-  categories: readonly string[];
+  categories: string[];
   isSubmitting: boolean;
   isEditing: boolean;
   errorMessage: string;
@@ -43,7 +47,7 @@ export function ExpenseForm({
             type="text"
             value={description}
             onChange={(event) => onDescriptionChange(event.target.value)}
-            placeholder="Ex: mercado, farmácia..."
+            placeholder="Ex: mercado, aluguel..."
             className="app-input"
           />
         </FormField>
@@ -54,38 +58,34 @@ export function ExpenseForm({
             value={amount}
             onChange={(event) => onAmountChange(event.target.value)}
             inputMode="decimal"
-            placeholder="Ex: 25,90"
+            placeholder="Ex: 120,50"
             className="app-input"
           />
         </FormField>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-medium text-stone-700">
-              Categoria
-            </span>
+        <FormField label="Categoria">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+            <select
+              value={category}
+              onChange={(event) => onCategoryChange(event.target.value)}
+              className="app-input min-w-0 flex-1"
+            >
+              {categories.map((categoryName) => (
+                <option key={categoryName} value={categoryName}>
+                  {categoryName}
+                </option>
+              ))}
+            </select>
 
             <button
               type="button"
               onClick={onManageCategoriesClick}
-              className="rounded-full border border-stone-200 px-3 py-1 text-xs font-bold text-stone-500 transition hover:bg-stone-50 hover:text-stone-800"
+              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 sm:w-auto"
             >
-              Gerenciar
+              Categorias
             </button>
           </div>
-
-          <select
-            value={category}
-            onChange={(event) => onCategoryChange(event.target.value)}
-            className="app-input"
-          >
-            {categories.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </div>
+        </FormField>
 
         <FormField label="Data">
           <input
@@ -97,35 +97,32 @@ export function ExpenseForm({
         </FormField>
       </div>
 
-      {errorMessage && (
-        <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {errorMessage ? (
+        <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {errorMessage}
         </p>
-      )}
+      ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <button
+        <LoadingButton
           type="submit"
-          disabled={isSubmitting}
+          isLoading={isSubmitting}
+          loadingLabel="Salvando..."
           className="app-button-primary sm:w-auto"
         >
-          {isSubmitting
-            ? "Salvando..."
-            : isEditing
-              ? "Salvar alterações"
-              : "Adicionar gasto"}
-        </button>
+          {isEditing ? "Salvar alterações" : "Adicionar gasto"}
+        </LoadingButton>
 
-        {isEditing && (
+        {isEditing ? (
           <button
             type="button"
             onClick={onCancelEdit}
             disabled={isSubmitting}
-            className="app-button-secondary sm:w-auto"
+            className="app-button-secondary sm:w-auto disabled:cursor-not-allowed disabled:opacity-70"
           >
             Cancelar edição
           </button>
-        )}
+        ) : null}
       </div>
     </form>
   );
@@ -133,12 +130,12 @@ export function ExpenseForm({
 
 type FormFieldProps = {
   label: string;
-  children: ReactNode;
+  children: React.ReactNode;
 };
 
 function FormField({ label, children }: FormFieldProps) {
   return (
-    <label className="space-y-2 text-sm font-medium text-stone-700">
+    <label className="space-y-1.5 text-xs font-bold text-stone-600">
       <span>{label}</span>
       {children}
     </label>

@@ -2,6 +2,7 @@
 
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LoadingButton } from "./AppFeedback";
 
 import {
   loginWithEmail,
@@ -576,13 +577,14 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
               </p>
             ) : null}
 
-            <button
+            <LoadingButton
               type="submit"
-              disabled={isSubmitting}
+              isLoading={isSubmitting}
+              loadingLabel="Aguarde..."
               className="app-button-primary w-full"
             >
-              {isSubmitting ? "Aguarde..." : getSubmitLabel(mode)}
-            </button>
+              {getSubmitLabel(mode)}
+            </LoadingButton>
           </form>
 
           {!isForgotPasswordMode &&

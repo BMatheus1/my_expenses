@@ -27,19 +27,21 @@ export function Toast({
       ? "bg-emerald-700 text-white"
       : "bg-red-600 text-white";
 
+  const icon = variant === "success" ? "✓" : "!";
+
   return (
-    <div className="fixed right-6 top-6 z-50 w-full max-w-sm">
+    <div className="fixed inset-x-3 top-4 z-60 sm:left-auto sm:right-6 sm:top-6 sm:w-full sm:max-w-sm">
       <div
         className={`flex items-start gap-3 rounded-3xl border p-4 shadow-lg ${variantClasses}`}
       >
         <span
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${iconClasses}`}
         >
-          ✓
+          {icon}
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">{message}</p>
+          <p className="text-sm font-bold leading-5">{message}</p>
         </div>
 
         <button

@@ -213,6 +213,36 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
       setConfirmPassword("");
       setTermsAccepted(false);
     } catch (error) {
+      if (isLoginMode && isEmailVerificationRequiredError(error)) {
+        const pendingEmail = email.trim();
+
+        setEmail(pendingEmail);
+        setVerificationEmail(pendingEmail);
+        setPassword("");
+        setMode("verify-email");
+        setSuccessMessage(
+          "Sua conta está pendente de confirmação. Enviamos um novo link para seu e-mail.",
+        );
+        setErrorMessage("");
+        return;
+      }
+
+      if (isRegisterMode && isEmailVerificationRequiredError(error)) {
+        const pendingEmail = email.trim();
+
+        setEmail(pendingEmail);
+        setVerificationEmail(pendingEmail);
+        setPassword("");
+        setConfirmPassword("");
+        setTermsAccepted(false);
+        setMode("verify-email");
+        setSuccessMessage(
+          "Já existe uma conta pendente com este e-mail. Enviamos um novo link de confirmação.",
+        );
+        setErrorMessage("");
+        return;
+      }
+
       setErrorMessage(getAuthErrorMessage(error));
     } finally {
       setIsSubmitting(false);
@@ -774,6 +804,21 @@ function hasLetterAndNumber(value: string) {
   return /[A-Za-zÀ-ÿ]/.test(value) && /\d/.test(value);
 }
 
+function isEmailVerificationRequiredError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+
+  return (
+    message.includes("confirme seu e-mail") ||
+    message.includes("pendente de confirmação") ||
+    message.includes("pendente com este e-mail") ||
+    message.includes("novo link de confirmação")
+  );
+}
+
 function getAuthErrorMessage(error: unknown) {
   if (!(error instanceof Error)) {
     return "Não foi possível concluir a ação.";
@@ -792,8 +837,13 @@ function getAuthErrorMessage(error: unknown) {
     return "Formato de e-mail inválido. Verifique e tente novamente.";
   }
 
-  if (message.includes("confirme seu e-mail")) {
-    return "Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.";
+  if (
+    message.includes("confirme seu e-mail") ||
+    message.includes("pendente de confirmação") ||
+    message.includes("pendente com este e-mail") ||
+    message.includes("novo link de confirmação")
+  ) {
+    return "Sua conta está pendente de confirmação. Reenviamos um novo link para seu e-mail.";
   }
 
   if (

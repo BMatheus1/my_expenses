@@ -73,6 +73,14 @@ def register_user(user_data: AuthRegisterRequest) -> str:
     existing_user = get_user_record_by_email(email)
 
     if existing_user is not None:
+        if should_resend_verification_for_existing_user(existing_user):
+            request_email_verification_for_user(existing_user)
+
+            return (
+                "Já existe uma conta pendente com este e-mail. "
+                "Enviamos um novo link de confirmação."
+            )
+
         raise_existing_account_error(existing_user.provider)
 
     user = UserRecord(
@@ -110,17 +118,22 @@ def login_user(login_data: AuthLoginRequest) -> AuthResponse:
     if user.provider != PROVIDER_CREDENTIALS or user.password_hash is None:
         raise_invalid_credentials_error()
 
-    if not get_user_email_verified(user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Confirme seu e-mail antes de entrar. Enviamos um link de confirmação para sua caixa de entrada.",
-        )
-
     if not verify_password(login_data.password, user.password_hash):
         raise_invalid_credentials_error()
 
-    return build_auth_response(user)
+    if not get_user_email_verified(user.id):
+        request_email_verification_for_user(user)
 
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Confirme seu e-mail antes de entrar. "
+                "Sua conta está pendente de confirmação. "
+                "Enviamos um novo link para seu e-mail."
+            ),
+        )
+
+    return build_auth_response(user)
 
 def login_with_google(login_data: GoogleLoginRequest) -> AuthResponse:
     google_user = verify_google_credential(login_data.credential)
@@ -202,6 +215,11 @@ def resend_verification_email(data: ResendVerificationEmailRequest) -> str:
 
     return EMAIL_VERIFICATION_GENERIC_MESSAGE
 
+def should_resend_verification_for_existing_user(user: UserRecord) -> bool:
+    return (
+        user.provider == PROVIDER_CREDENTIALS
+        and not get_user_email_verified(user.id)
+    )
 
 def request_password_reset(reset_data: ForgotPasswordRequest) -> str:
     email = normalize_email(reset_data.email)

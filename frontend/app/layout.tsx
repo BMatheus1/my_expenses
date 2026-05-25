@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { ServiceWorkerRegister } from "./components/ServiceWorkerRegister";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,17 +17,38 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "My Expenses",
   description: "Controle mensal simples de gastos.",
-  icons: {   
+  applicationName: "My Expenses",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "My Expenses",
+    statusBarStyle: "default",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
     icon: [
       {
-        url: "/logo.png",
+        url: "/icon-192.png",
+        type: "image/png",
+        sizes: "192x192",
+      },
+      {
+        url: "/icon-512.png",
         type: "image/png",
         sizes: "512x512",
       },
     ],
-    shortcut: "/logo.png",
-    apple: "/logo.png",
+    shortcut: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#047857",
 };
 
 const THEME_BOOTSTRAP_SCRIPT = `
@@ -72,11 +94,13 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
       <head>
-        <meta name="theme-color" content="#f8fafc" />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
       </head>
 
-      <body>{children}</body>
+      <body>
+        <ServiceWorkerRegister />
+        {children}
+      </body>
     </html>
   );
 }

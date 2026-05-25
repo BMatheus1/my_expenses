@@ -10,6 +10,21 @@ import {
 } from "@/app/lib/business-navigation";
 import type { Business } from "@/app/types/business";
 import type { User } from "../types/auth";
+import {
+  BusinessIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ExpenseIcon,
+  IncomeIcon,
+  LogoutIcon,
+  PaletteIcon,
+  PlusIcon,
+  ReportsIcon,
+  SettingsIcon,
+  ShieldIcon,
+  WalletIcon,
+  type AppIcon,
+} from "./AppIcons";
 
 export type AppView =
   | "expenses"
@@ -30,7 +45,7 @@ type MenuItem = {
   view: AppView;
   label: string;
   description: string;
-  shortLabel: string;
+  icon: AppIcon;
 };
 
 const PERSONAL_FINANCE_ITEMS: MenuItem[] = [
@@ -38,19 +53,19 @@ const PERSONAL_FINANCE_ITEMS: MenuItem[] = [
     view: "incomes",
     label: "Ganhos",
     description: "Entradas de dinheiro",
-    shortLabel: "+",
+    icon: IncomeIcon,
   },
   {
     view: "expenses",
     label: "Gastos",
     description: "Despesas pessoais",
-    shortLabel: "-",
+    icon: ExpenseIcon,
   },
   {
     view: "reports",
     label: "Relatórios",
     description: "Resumo e gráficos",
-    shortLabel: "R",
+    icon: ReportsIcon,
   },
 ];
 
@@ -59,13 +74,13 @@ const SETTINGS_ITEMS: MenuItem[] = [
     view: "appearance-settings",
     label: "Aparência e tema",
     description: "Cores e modo escuro",
-    shortLabel: "🎨",
+    icon: PaletteIcon,
   },
   {
     view: "security-settings",
     label: "Segurança",
     description: "Sessão e proteção",
-    shortLabel: "🔐",
+    icon: ShieldIcon,
   },
 ];
 
@@ -206,13 +221,11 @@ export function Sidebar({
             aria-label={isCollapsed ? "Expandir menu" : "Recolher menu"}
             title={isCollapsed ? "Expandir menu" : "Recolher menu"}
           >
-            <span
-              className={`text-xl font-black leading-none transition-transform duration-200 group-hover:scale-110 ${
+            <ChevronLeftIcon
+              className={`h-5 w-5 transition-transform duration-200 group-hover:scale-110 ${
                 isCollapsed ? "rotate-180" : ""
               }`}
-            >
-              ❮
-            </span>
+            />
           </button>
         </div>
 
@@ -220,7 +233,7 @@ export function Sidebar({
           <SidebarGroupButton
             title="Minha Carteira"
             description="Ganhos, gastos e relatórios"
-            shortLabel="C"
+            icon={WalletIcon}
             isActive={isWalletActive}
             isCollapsed={isCollapsed}
             isOpen={isWalletMenuOpen}
@@ -246,7 +259,7 @@ export function Sidebar({
           <SidebarGroupButton
             title="Meus Negócios"
             description="Estoque e fichas"
-            shortLabel="N"
+            icon={BusinessIcon}
             isActive={isBusinessActive}
             isCollapsed={isCollapsed}
             isOpen={isBusinessMenuOpen}
@@ -261,9 +274,13 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={handleCreateBusiness}
-                className="app-brand-soft w-full rounded-2xl border border-dashed px-4 py-3 text-left text-sm font-black transition hover:shadow-sm"
+                className="app-brand-soft flex w-full items-center gap-3 rounded-2xl border border-dashed px-4 py-3 text-left text-sm font-black transition hover:shadow-sm"
               >
-                + Criar novo negócio
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/70">
+                  <PlusIcon className="h-4 w-4" />
+                </span>
+
+                <span>Criar novo negócio</span>
               </button>
 
               {businesses.length === 0 ? (
@@ -281,18 +298,24 @@ export function Sidebar({
                     key={business.id}
                     type="button"
                     onClick={() => handleSelectBusiness(business.id)}
-                    className={`w-full rounded-2xl px-4 py-3 text-left transition ${
+                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
                       isSelected
                         ? "app-sidebar-item-active"
                         : "app-sidebar-item"
                     }`}
                   >
-                    <span className="block truncate text-sm font-black">
-                      {business.name}
-                    </span>
+                    <SidebarIconFrame isActive={isSelected} compact>
+                      <BusinessIcon className="h-4 w-4" />
+                    </SidebarIconFrame>
 
-                    <span className="mt-0.5 block truncate text-xs opacity-75">
-                      {business.type}
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-black">
+                        {business.name}
+                      </span>
+
+                      <span className="mt-0.5 block truncate text-xs opacity-75">
+                        {business.type}
+                      </span>
                     </span>
                   </button>
                 );
@@ -308,7 +331,7 @@ export function Sidebar({
           <SidebarGroupButton
             title="Configurações"
             description="Aparência e segurança"
-            shortLabel="⚙"
+            icon={SettingsIcon}
             isActive={isSettingsActive}
             isCollapsed={isCollapsed}
             isOpen={isSettingsMenuOpen}
@@ -352,7 +375,7 @@ export function Sidebar({
             aria-label="Sair"
             title="Sair"
           >
-            <span aria-hidden="true">⎋</span>
+            <LogoutIcon className="h-4 w-4" />
             {!isCollapsed ? <span>Sair</span> : null}
           </button>
         </footer>
@@ -364,7 +387,7 @@ export function Sidebar({
 function SidebarGroupButton({
   title,
   description,
-  shortLabel,
+  icon,
   isActive,
   isCollapsed,
   isOpen,
@@ -373,31 +396,30 @@ function SidebarGroupButton({
 }: {
   title: string;
   description: string;
-  shortLabel: string;
+  icon: AppIcon;
   isActive: boolean;
   isCollapsed: boolean;
   isOpen: boolean;
   onClick: () => void;
   compact?: boolean;
 }) {
+  const Icon = icon;
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-3xl px-4 text-left transition ${
+      className={`flex w-full items-center rounded-3xl text-left transition ${
         compact ? "py-2.5" : "py-3"
+      } ${
+        isCollapsed ? "justify-center px-2" : "gap-3 px-4"
       } ${isActive ? "app-sidebar-item-active" : "app-sidebar-item"}`}
       aria-label={title}
       title={title}
     >
-      <span
-        className={`flex shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
-          compact ? "h-9 w-9" : "h-10 w-10"
-        } ${isActive ? "bg-white" : "app-brand-soft"}`}
-        style={{ color: isActive ? "var(--brand-primary)" : undefined }}
-      >
-        {shortLabel}
-      </span>
+      <SidebarIconFrame isActive={isActive} compact={compact}>
+        <Icon className={compact ? "h-4.5 w-4.5" : "h-5 w-5"} />
+      </SidebarIconFrame>
 
       {!isCollapsed ? (
         <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
@@ -409,7 +431,11 @@ function SidebarGroupButton({
             </span>
           </span>
 
-          <span className="text-sm font-black">{isOpen ? "−" : "+"}</span>
+          <ChevronDownIcon
+            className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
+              isOpen ? "rotate-0" : "-rotate-90"
+            }`}
+          />
         </span>
       ) : null}
     </button>
@@ -427,6 +453,8 @@ function SidebarSubItem({
   onClick: () => void;
   compact?: boolean;
 }) {
+  const Icon = item.icon;
+
   return (
     <button
       type="button"
@@ -435,14 +463,9 @@ function SidebarSubItem({
         compact ? "py-2.5" : "py-3"
       } ${isActive ? "app-sidebar-item-active" : "app-sidebar-item"}`}
     >
-      <span
-        className={`flex shrink-0 items-center justify-center rounded-xl text-xs font-black ${
-          compact ? "h-7 w-7" : "h-8 w-8"
-        } ${isActive ? "bg-white" : "app-brand-soft"}`}
-        style={{ color: isActive ? "var(--brand-primary)" : undefined }}
-      >
-        {item.shortLabel}
-      </span>
+      <SidebarIconFrame isActive={isActive} compact>
+        <Icon className="h-4 w-4" />
+      </SidebarIconFrame>
 
       <span className="min-w-0">
         <span className="block truncate text-sm font-black">{item.label}</span>
@@ -454,5 +477,31 @@ function SidebarSubItem({
         ) : null}
       </span>
     </button>
+  );
+}
+
+function SidebarIconFrame({
+  isActive,
+  compact = false,
+  children,
+}: {
+  isActive: boolean;
+  compact?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-2xl border transition ${
+        compact ? "h-8 w-8" : "h-10 w-10"
+      } ${isActive ? "bg-white shadow-sm" : "app-brand-soft"}`}
+      style={{
+        color: isActive ? "var(--brand-primary)" : undefined,
+        borderColor: isActive
+          ? "color-mix(in srgb, var(--brand-primary) 18%, transparent)"
+          : "transparent",
+      }}
+    >
+      {children}
+    </span>
   );
 }

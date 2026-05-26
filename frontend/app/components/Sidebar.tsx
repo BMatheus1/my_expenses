@@ -1,19 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
-import { listBusinesses } from "@/app/lib/business-api";
+import { listBusinesses } from "../lib/business-api";
 import {
   BUSINESS_REFRESH_EVENT,
   navigateToBusiness,
   navigateToCreateBusiness,
-} from "@/app/lib/business-navigation";
-import type { Business } from "@/app/types/business";
+} from "../lib/business-navigation";
 import type { User } from "../types/auth";
+import type { Business } from "../types/business";
 import {
   BusinessIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
+  CreditCardIcon,
   ExpenseIcon,
   IncomeIcon,
   LogoutIcon,
@@ -30,6 +31,7 @@ export type AppView =
   | "expenses"
   | "incomes"
   | "reports"
+  | "credit-cards"
   | "businesses"
   | "appearance-settings"
   | "security-settings";
@@ -60,6 +62,12 @@ const PERSONAL_FINANCE_ITEMS: MenuItem[] = [
     label: "Gastos",
     description: "Despesas pessoais",
     icon: ExpenseIcon,
+  },
+  {
+    view: "credit-cards",
+    label: "Cartões",
+    description: "Faturas e vencimentos",
+    icon: CreditCardIcon,
   },
   {
     view: "reports",
@@ -102,6 +110,7 @@ export function Sidebar({
   const isWalletActive =
     activeView === "incomes" ||
     activeView === "expenses" ||
+    activeView === "credit-cards" ||
     activeView === "reports";
 
   const isBusinessActive = activeView === "businesses";
@@ -112,6 +121,7 @@ export function Sidebar({
   const loadBusinesses = useCallback(async () => {
     try {
       const loadedBusinesses = await listBusinesses();
+
       setBusinesses(loadedBusinesses);
     } catch {
       setBusinesses([]);
@@ -136,9 +146,10 @@ export function Sidebar({
     setIsCollapsed((currentValue) => !currentValue);
   }
 
-  function openWalletArea() {
+  function handleWalletGroupClick() {
     if (isCollapsed) {
       onActiveViewChange("expenses");
+      setSelectedBusinessId(null);
       return;
     }
 
@@ -232,12 +243,12 @@ export function Sidebar({
         <nav className="mt-8 min-h-0 flex-1 space-y-3 overflow-y-auto pb-4 pr-1">
           <SidebarGroupButton
             title="Minha Carteira"
-            description="Ganhos, gastos e relatórios"
+            description="Ganhos, gastos e cartões"
             icon={WalletIcon}
             isActive={isWalletActive}
             isCollapsed={isCollapsed}
             isOpen={isWalletMenuOpen}
-            onClick={openWalletArea}
+            onClick={handleWalletGroupClick}
           />
 
           {!isCollapsed && isWalletMenuOpen ? (
@@ -418,7 +429,7 @@ function SidebarGroupButton({
       title={title}
     >
       <SidebarIconFrame isActive={isActive} compact={compact}>
-        <Icon className={compact ? "h-4.5 w-4.5" : "h-5 w-5"} />
+        <Icon className={compact ? "h-4 w-4" : "h-5 w-5"} />
       </SidebarIconFrame>
 
       {!isCollapsed ? (
@@ -487,7 +498,7 @@ function SidebarIconFrame({
 }: {
   isActive: boolean;
   compact?: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <span

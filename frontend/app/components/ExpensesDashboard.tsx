@@ -5,22 +5,31 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EXPENSE_CATEGORIES } from "../constants/categories";
 import {
+  createCreditCard,
   createExpense,
   createExpenseCategory,
   createIncome,
+  deleteCreditCard,
   deleteExpense,
   deleteExpenseCategory,
   deleteIncome,
+  getCreditCards,
   getExpenseCategories,
   getExpenses,
   getIncomes,
+  updateCreditCard,
   updateExpense,
   updateExpenseCategory,
   updateIncome,
 } from "../lib/api";
 import type { User } from "../types/auth";
 import type { ExpenseCategory } from "../types/category";
-import type { CreateExpenseRequest, Expense } from "../types/expense";
+import type { CreateCreditCardRequest, CreditCard } from "../types/credit-card";
+import type {
+  CreateExpenseRequest,
+  Expense,
+  PaymentMethod,
+} from "../types/expense";
 import type { CreateIncomeRequest, Income } from "../types/income";
 import type { CategoryTotal } from "../types/summary";
 import {
@@ -36,6 +45,7 @@ import BusinessWorkspace from "./BusinessWorkspace";
 import { CategoryManagerModal } from "./CategoryManagerModal";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ConfirmModal } from "./ConfirmModal";
+import { CreditCardsView } from "./CreditCardsView";
 import { ExpenseFilters } from "./ExpenseFilters";
 import { ExpenseForm } from "./ExpenseForm";
 import { ExpenseList } from "./ExpenseList";
@@ -76,6 +86,7 @@ export function ExpensesDashboard({
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
+  const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
   const [categoryRecords, setCategoryRecords] = useState<ExpenseCategory[]>(
     () => createLocalDefaultCategories()
   );
@@ -87,6 +98,7 @@ export function ExpensesDashboard({
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(
     null
   );
+  const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
 
   const [selectedMonth, setSelectedMonth] = useState(() => getCurrentMonth());
   const [selectedReportMonth, setSelectedReportMonth] = useState(() =>
@@ -99,14 +111,20 @@ export function ExpensesDashboard({
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
   const [date, setDate] = useState(() => getCurrentDate());
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
+  const [creditCardId, setCreditCardId] = useState("");
+  const [installmentsCount, setInstallmentsCount] = useState("1");
 
   const [isLoadingExpenses, setIsLoadingExpenses] = useState(true);
   const [isLoadingIncomes, setIsLoadingIncomes] = useState(true);
+  const [isLoadingCards, setIsLoadingCards] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [isSavingCard, setIsSavingCard] = useState(false);
   const [isConfirmingAction, setIsConfirmingAction] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [categoryManagerError, setCategoryManagerError] = useState("");
+  const [cardManagerError, setCardManagerError] = useState("");
 
   const [isFormOpen, setIsFormOpen] = useState(true);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -158,6 +176,23 @@ export function ExpensesDashboard({
     }
   }, []);
 
+  const loadCreditCards = useCallback(async () => {
+    try {
+      setIsLoadingCards(true);
+
+      const data = await getCreditCards();
+
+      setCreditCards(data);
+    } catch (error) {
+      console.error(error);
+      setCardManagerError(
+        getDashboardErrorMessage(error, "Não foi possível carregar os cartões.")
+      );
+    } finally {
+      setIsLoadingCards(false);
+    }
+  }, []);
+
   const loadExpenses = useCallback(async () => {
     try {
       setIsLoadingExpenses(true);
@@ -195,9 +230,10 @@ export function ExpensesDashboard({
 
   useEffect(() => {
     void loadCategories();
+    void loadCreditCards();
     void loadExpenses();
     void loadIncomes();
-  }, [loadCategories, loadExpenses, loadIncomes]);
+  }, [loadCategories, loadCreditCards, loadExpenses, loadIncomes]);
 
   const monthlyExpenses = useMemo(() => {
     return expenses.filter((expense) => expense.date.startsWith(selectedMonth));
@@ -297,6 +333,19 @@ export function ExpensesDashboard({
     setAmount(sanitizeMoneyInput(value));
   }
 
+  function handlePaymentMethodChange(value: PaymentMethod) {
+    setPaymentMethod(value);
+
+    if (value !== "credit_card") {
+      setCreditCardId("");
+      setInstallmentsCount("1");
+    }
+  }
+
+  function handleInstallmentsCountChange(value: string) {
+    setInstallmentsCount(value.replace(/\D/g, "").slice(0, 2) || "1");
+  }
+
   function handleNewExpenseClick() {
     resetForm();
     setIsFormOpen(true);
@@ -306,6 +355,113 @@ export function ExpensesDashboard({
       delayMs: 120,
       focusFirstField: true,
     });
+  }
+
+  async function handleCreateCreditCard(cardData: CreateCreditCardRequest) {
+    try {
+      setIsSavingCard(true);
+      setCardManagerError("");
+
+      const createdCard = await createCreditCard(cardData);
+
+      setCreditCards((currentCards) => [createdCard, ...currentCards]);
+      setCreditCardId(createdCard.id);
+      showSuccessToast("Cartão cadastrado com sucesso.");
+
+      return true;
+    } catch (error) {
+      console.error(error);
+      setCardManagerError(
+        getDashboardErrorMessage(error, "Não foi possível cadastrar o cartão.")
+      );
+      return false;
+    } finally {
+      setIsSavingCard(false);
+    }
+  }
+
+  async function handleUpdateCreditCard(
+    cardId: string,
+    cardData: CreateCreditCardRequest
+  ) {
+    try {
+      setIsSavingCard(true);
+      setCardManagerError("");
+
+      const updatedCard = await updateCreditCard(cardId, cardData);
+
+      setCreditCards((currentCards) =>
+        currentCards.map((card) =>
+          card.id === updatedCard.id ? updatedCard : card
+        )
+      );
+
+      setExpenses((currentExpenses) =>
+        currentExpenses.map((expense) =>
+          expense.credit_card_id === updatedCard.id
+            ? {
+                ...expense,
+                credit_card: {
+                  id: updatedCard.id,
+                  name: updatedCard.name,
+                  brand: updatedCard.brand,
+                  last_four_digits: updatedCard.last_four_digits,
+                  color: updatedCard.color,
+                  due_day: updatedCard.due_day,
+                },
+              }
+            : expense
+        )
+      );
+
+      showSuccessToast("Cartão atualizado com sucesso.");
+
+      return true;
+    } catch (error) {
+      console.error(error);
+      setCardManagerError(
+        getDashboardErrorMessage(error, "Não foi possível editar o cartão.")
+      );
+      return false;
+    } finally {
+      setIsSavingCard(false);
+    }
+  }
+
+  function requestDeleteCreditCard(card: CreditCard) {
+    setConfirmation({
+      title: "Excluir cartão?",
+      description: `O cartão "${card.name} •••• ${card.last_four_digits}" será removido da sua carteira.`,
+      confirmLabel: "Excluir cartão",
+      variant: "danger",
+      onConfirm: () => removeCreditCard(card),
+    });
+  }
+
+  async function removeCreditCard(card: CreditCard) {
+    try {
+      setDeletingCardId(card.id);
+      setCardManagerError("");
+
+      await deleteCreditCard(card.id);
+
+      setCreditCards((currentCards) =>
+        currentCards.filter((currentCard) => currentCard.id !== card.id)
+      );
+
+      if (creditCardId === card.id) {
+        setCreditCardId("");
+      }
+
+      showSuccessToast("Cartão removido.");
+    } catch (error) {
+      console.error(error);
+      setCardManagerError(
+        getDashboardErrorMessage(error, "Não foi possível excluir o cartão.")
+      );
+    } finally {
+      setDeletingCardId(null);
+    }
   }
 
   async function handleCreateCategory(categoryName: string) {
@@ -354,6 +510,7 @@ export function ExpensesDashboard({
       setIsSavingCategory(false);
     }
   }
+
   async function handleUpdateCategory(
     categoryToUpdate: ExpenseCategory,
     categoryName: string
@@ -503,6 +660,9 @@ export function ExpensesDashboard({
     setAmount(String(expense.amount).replace(".", ","));
     setCategory(expense.category);
     setDate(expense.date);
+    setPaymentMethod(expense.payment_method ?? "pix");
+    setCreditCardId(expense.credit_card_id ?? "");
+    setInstallmentsCount(String(expense.installments_count || 1));
     setErrorMessage("");
     setIsFormOpen(true);
     setActiveView("expenses");
@@ -581,15 +741,40 @@ export function ExpensesDashboard({
       return;
     }
 
+    const parsedInstallmentsCount = Number(installmentsCount);
+
+    if (paymentMethod === "credit_card" && !creditCardId) {
+      setErrorMessage("Selecione o cartão usado neste gasto.");
+      return;
+    }
+
+    if (
+      paymentMethod === "credit_card" &&
+      (!Number.isInteger(parsedInstallmentsCount) ||
+        parsedInstallmentsCount < 1 ||
+        parsedInstallmentsCount > 24)
+    ) {
+      setErrorMessage("Informe uma quantidade de parcelas entre 1 e 24.");
+      return;
+    }
+
     const successMessage = editingExpenseId
       ? "Gasto atualizado com sucesso."
-      : "Gasto cadastrado com sucesso.";
+      : paymentMethod === "credit_card" && parsedInstallmentsCount > 1
+        ? "Compra parcelada cadastrada com sucesso."
+        : "Gasto cadastrado com sucesso.";
 
     const expenseData: CreateExpenseRequest = {
       description: trimmedDescription,
       amount: parsedAmount,
       category,
       date,
+      payment_method: paymentMethod,
+      credit_card_id: paymentMethod === "credit_card" ? creditCardId : null,
+      installments_count:
+        paymentMethod === "credit_card" && !editingExpenseId
+          ? parsedInstallmentsCount
+          : 1,
     };
 
     try {
@@ -610,6 +795,10 @@ export function ExpensesDashboard({
         const createdExpense = await createExpense(expenseData);
 
         setExpenses((currentExpenses) => [createdExpense, ...currentExpenses]);
+
+        if (expenseData.installments_count > 1) {
+          void loadExpenses();
+        }
       }
 
       void loadCategories();
@@ -650,6 +839,9 @@ export function ExpensesDashboard({
     setAmount("");
     setCategory(categoryNames[0] ?? EXPENSE_CATEGORIES[0]);
     setDate(getCurrentDate());
+    setPaymentMethod("pix");
+    setCreditCardId("");
+    setInstallmentsCount("1");
   }
 
   function clearFilters() {
@@ -716,6 +908,19 @@ export function ExpensesDashboard({
         />
       ) : activeView === "businesses" ? (
         <BusinessWorkspace />
+      ) : activeView === "credit-cards" ? (
+        <CreditCardsView
+          cards={creditCards}
+          expenses={expenses}
+          isLoading={isLoadingCards}
+          isSaving={isSavingCard}
+          deletingCardId={deletingCardId}
+          errorMessage={cardManagerError}
+          onCreateCard={handleCreateCreditCard}
+          onUpdateCard={handleUpdateCreditCard}
+          onDeleteCard={requestDeleteCreditCard}
+          onClearError={() => setCardManagerError("")}
+        />
       ) : activeView === "reports" ? (
         <ReportsView
           expenses={expenses}
@@ -742,6 +947,7 @@ export function ExpensesDashboard({
           filteredExpenses={filteredExpenses}
           categoryTotals={categoryTotals}
           categories={categoryNames}
+          creditCards={creditCards}
           isLoadingExpenses={isLoadingExpenses}
           deletingExpenseId={deletingExpenseId}
           isFormOpen={isFormOpen}
@@ -753,6 +959,9 @@ export function ExpensesDashboard({
           amount={amount}
           category={category}
           date={date}
+          paymentMethod={paymentMethod}
+          creditCardId={creditCardId}
+          installmentsCount={installmentsCount}
           selectedMonth={selectedMonth}
           selectedCategory={selectedCategory}
           searchTerm={searchTerm}
@@ -763,9 +972,16 @@ export function ExpensesDashboard({
           onAmountChange={handleAmountChange}
           onCategoryChange={setCategory}
           onDateChange={setDate}
+          onPaymentMethodChange={handlePaymentMethodChange}
+          onCreditCardChange={setCreditCardId}
+          onInstallmentsCountChange={handleInstallmentsCountChange}
           onManageCategoriesClick={() => {
             setCategoryManagerError("");
             setIsCategoryManagerOpen(true);
+          }}
+          onManageCardsClick={() => {
+            setCardManagerError("");
+            setActiveView("credit-cards");
           }}
           onCancelEdit={resetForm}
           onSubmit={handleSubmit}
@@ -822,6 +1038,7 @@ type ExpensesViewProps = {
   filteredExpenses: Expense[];
   categoryTotals: CategoryTotal[];
   categories: string[];
+  creditCards: CreditCard[];
   isLoadingExpenses: boolean;
   deletingExpenseId: string | null;
   isFormOpen: boolean;
@@ -833,6 +1050,9 @@ type ExpensesViewProps = {
   amount: string;
   category: string;
   date: string;
+  paymentMethod: PaymentMethod;
+  creditCardId: string;
+  installmentsCount: string;
   selectedMonth: string;
   selectedCategory: string;
   searchTerm: string;
@@ -843,7 +1063,11 @@ type ExpensesViewProps = {
   onAmountChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
   onDateChange: (value: string) => void;
+  onPaymentMethodChange: (value: PaymentMethod) => void;
+  onCreditCardChange: (value: string) => void;
+  onInstallmentsCountChange: (value: string) => void;
   onManageCategoriesClick: () => void;
+  onManageCardsClick: () => void;
   onCancelEdit: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSelectedMonthChange: (value: string) => void;
@@ -864,6 +1088,7 @@ function ExpensesView({
   filteredExpenses,
   categoryTotals,
   categories,
+  creditCards,
   isLoadingExpenses,
   deletingExpenseId,
   isFormOpen,
@@ -875,6 +1100,9 @@ function ExpensesView({
   amount,
   category,
   date,
+  paymentMethod,
+  creditCardId,
+  installmentsCount,
   selectedMonth,
   selectedCategory,
   searchTerm,
@@ -885,7 +1113,11 @@ function ExpensesView({
   onAmountChange,
   onCategoryChange,
   onDateChange,
+  onPaymentMethodChange,
+  onCreditCardChange,
+  onInstallmentsCountChange,
   onManageCategoriesClick,
+  onManageCardsClick,
   onCancelEdit,
   onSubmit,
   onSelectedMonthChange,
@@ -929,6 +1161,10 @@ function ExpensesView({
               amount={amount}
               category={category}
               date={date}
+              paymentMethod={paymentMethod}
+              creditCardId={creditCardId}
+              installmentsCount={installmentsCount}
+              creditCards={creditCards}
               categories={categories}
               isSubmitting={isSubmitting}
               isEditing={isEditing}
@@ -937,7 +1173,11 @@ function ExpensesView({
               onAmountChange={onAmountChange}
               onCategoryChange={onCategoryChange}
               onDateChange={onDateChange}
+              onPaymentMethodChange={onPaymentMethodChange}
+              onCreditCardChange={onCreditCardChange}
+              onInstallmentsCountChange={onInstallmentsCountChange}
               onManageCategoriesClick={onManageCategoriesClick}
+              onManageCardsClick={onManageCardsClick}
               onCancelEdit={onCancelEdit}
               onSubmit={onSubmit}
             />
@@ -1106,7 +1346,7 @@ function hasCategoryName(
 
 function getDashboardErrorMessage(
   error: unknown,
-  fallbackMessage: string,
+  fallbackMessage: string
 ): string {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return "Você está sem internet. Conecte-se e tente novamente.";

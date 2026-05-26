@@ -6,10 +6,10 @@ from pathlib import Path
 import psycopg
 from psycopg import Connection
 from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
 
 from app.config import settings
 from app.schemas import (
+    CreditCardRecord,
     ExpenseCategoryRecord,
     ExpenseRecord,
     ExpenseResponse,
@@ -17,44 +17,10 @@ from app.schemas import (
     UserRecord,
 )
 
-database_pool: ConnectionPool | None = None
-
-
-def open_database_pool() -> None:
-    global database_pool
-
-    if database_pool is not None:
-        return
-
-    database_pool = ConnectionPool(
-        conninfo=settings.database_url,
-        min_size=settings.database_pool_min_size,
-        max_size=settings.database_pool_max_size,
-        kwargs={"row_factory": dict_row},
-        open=True,
-    )
-
-
-def close_database_pool() -> None:
-    global database_pool
-
-    if database_pool is None:
-        return
-
-    database_pool.close()
-    database_pool = None
-
 
 @contextmanager
 def get_connection() -> Iterator[Connection]:
-    pool = database_pool
-
-    if pool is None:
-        connection = psycopg.connect(settings.database_url, row_factory=dict_row)
-        should_return_to_pool = False
-    else:
-        connection = pool.getconn()
-        should_return_to_pool = True
+    connection = psycopg.connect(settings.database_url, row_factory=dict_row)
 
     try:
         yield connection
@@ -63,15 +29,14 @@ def get_connection() -> Iterator[Connection]:
         connection.rollback()
         raise
     finally:
-        if should_return_to_pool:
-            pool.putconn(connection)
-        else:
-            connection.close()
+        connection.close()
+
 
 def initialize_database() -> None:
     with get_connection() as connection:
         create_users_table(connection)
         create_expense_categories_table(connection)
+        create_credit_cards_table(connection)
         create_expenses_table(connection)
         create_incomes_table(connection)
         create_database_indexes(connection)
@@ -109,6 +74,26 @@ def create_expense_categories_table(connection: Connection) -> None:
     )
 
 
+def create_credit_cards_table(connection: Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS credit_cards (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            brand TEXT NOT NULL,
+            last_four_digits TEXT NOT NULL,
+            closing_day INTEGER NOT NULL,
+            due_day INTEGER NOT NULL,
+            limit_amount NUMERIC(12, 2),
+            color TEXT NOT NULL DEFAULT 'slate',
+            created_at TIMESTAMPTZ NOT NULL,
+            UNIQUE(user_id, name, last_four_digits)
+        )
+        """
+    )
+
+
 def create_expenses_table(connection: Connection) -> None:
     connection.execute(
         """
@@ -119,8 +104,51 @@ def create_expenses_table(connection: Connection) -> None:
             amount NUMERIC(12, 2) NOT NULL,
             category TEXT NOT NULL,
             date DATE NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL
+            created_at TIMESTAMPTZ NOT NULL,
+            payment_method TEXT NOT NULL DEFAULT 'cash',
+            credit_card_id TEXT REFERENCES credit_cards(id) ON DELETE SET NULL,
+            installments_count INTEGER NOT NULL DEFAULT 1,
+            installment_number INTEGER NOT NULL DEFAULT 1,
+            installment_group_id TEXT,
+            invoice_month TEXT
         )
+        """
+    )
+
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'cash'
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS credit_card_id TEXT REFERENCES credit_cards(id) ON DELETE SET NULL
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS installments_count INTEGER NOT NULL DEFAULT 1
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS installment_number INTEGER NOT NULL DEFAULT 1
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS installment_group_id TEXT
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS invoice_month TEXT
         """
     )
 
@@ -158,6 +186,18 @@ def create_database_indexes(connection: Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_expense_categories_user
         ON expense_categories(user_id)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_credit_cards_user
+        ON credit_cards(user_id)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_expenses_credit_card_invoice
+        ON expenses(user_id, credit_card_id, invoice_month)
         """
     )
 
@@ -432,21 +472,183 @@ def delete_expense_category_record(category_id: str, user_id: str) -> bool:
         return cursor.rowcount > 0
 
 
-def list_expense_records(user_id: str) -> list[ExpenseRecord]:
+def list_credit_card_records(user_id: str) -> list[CreditCardRecord]:
     with get_connection() as connection:
         rows = connection.execute(
             """
             SELECT
                 id,
                 user_id,
-                description,
-                amount,
-                category,
-                date,
+                name,
+                brand,
+                last_four_digits,
+                closing_day,
+                due_day,
+                limit_amount,
+                color,
                 created_at
-            FROM expenses
+            FROM credit_cards
             WHERE user_id = %s
-            ORDER BY date DESC, created_at DESC
+            ORDER BY LOWER(name), created_at DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+    return [CreditCardRecord.model_validate(row) for row in rows]
+
+
+def get_credit_card_record_by_id(
+    card_id: str,
+    user_id: str,
+) -> CreditCardRecord | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                name,
+                brand,
+                last_four_digits,
+                closing_day,
+                due_day,
+                limit_amount,
+                color,
+                created_at
+            FROM credit_cards
+            WHERE id = %s AND user_id = %s
+            """,
+            (card_id, user_id),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return CreditCardRecord.model_validate(row)
+
+
+def create_credit_card_record(card: CreditCardRecord) -> CreditCardRecord:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO credit_cards (
+                id,
+                user_id,
+                name,
+                brand,
+                last_four_digits,
+                closing_day,
+                due_day,
+                limit_amount,
+                color,
+                created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                card.id,
+                card.user_id,
+                card.name,
+                card.brand,
+                card.last_four_digits,
+                card.closing_day,
+                card.due_day,
+                card.limit_amount,
+                card.color,
+                card.created_at,
+            ),
+        )
+
+    return card
+
+
+def update_credit_card_record(card: CreditCardRecord) -> CreditCardRecord:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE credit_cards
+            SET
+                name = %s,
+                brand = %s,
+                last_four_digits = %s,
+                closing_day = %s,
+                due_day = %s,
+                limit_amount = %s,
+                color = %s
+            WHERE id = %s AND user_id = %s
+            """,
+            (
+                card.name,
+                card.brand,
+                card.last_four_digits,
+                card.closing_day,
+                card.due_day,
+                card.limit_amount,
+                card.color,
+                card.id,
+                card.user_id,
+            ),
+        )
+
+    return card
+
+
+def delete_credit_card_record(card_id: str, user_id: str) -> bool:
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            DELETE FROM credit_cards
+            WHERE id = %s AND user_id = %s
+            """,
+            (card_id, user_id),
+        )
+
+        return cursor.rowcount > 0
+
+
+def count_expenses_by_credit_card(user_id: str, card_id: str) -> int:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM expenses
+            WHERE user_id = %s AND credit_card_id = %s
+            """,
+            (user_id, card_id),
+        ).fetchone()
+
+    return int(row["total"])
+
+
+def list_expense_records(user_id: str) -> list[ExpenseRecord]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                expenses.id,
+                expenses.user_id,
+                expenses.description,
+                expenses.amount,
+                expenses.category,
+                expenses.date,
+                expenses.created_at,
+                expenses.payment_method,
+                expenses.credit_card_id,
+                expenses.installments_count,
+                expenses.installment_number,
+                expenses.installment_group_id,
+                expenses.invoice_month,
+                credit_cards.name AS credit_card_name,
+                credit_cards.brand AS credit_card_brand,
+                credit_cards.last_four_digits AS credit_card_last_four_digits,
+                credit_cards.color AS credit_card_color,
+                credit_cards.due_day AS credit_card_due_day
+            FROM expenses
+            LEFT JOIN credit_cards
+                ON credit_cards.id = expenses.credit_card_id
+                AND credit_cards.user_id = expenses.user_id
+            WHERE expenses.user_id = %s
+            ORDER BY expenses.date DESC, expenses.created_at DESC
             """,
             (user_id,),
         ).fetchall()
@@ -462,15 +664,29 @@ def get_expense_record_by_id(
         row = connection.execute(
             """
             SELECT
-                id,
-                user_id,
-                description,
-                amount,
-                category,
-                date,
-                created_at
+                expenses.id,
+                expenses.user_id,
+                expenses.description,
+                expenses.amount,
+                expenses.category,
+                expenses.date,
+                expenses.created_at,
+                expenses.payment_method,
+                expenses.credit_card_id,
+                expenses.installments_count,
+                expenses.installment_number,
+                expenses.installment_group_id,
+                expenses.invoice_month,
+                credit_cards.name AS credit_card_name,
+                credit_cards.brand AS credit_card_brand,
+                credit_cards.last_four_digits AS credit_card_last_four_digits,
+                credit_cards.color AS credit_card_color,
+                credit_cards.due_day AS credit_card_due_day
             FROM expenses
-            WHERE id = %s AND user_id = %s
+            LEFT JOIN credit_cards
+                ON credit_cards.id = expenses.credit_card_id
+                AND credit_cards.user_id = expenses.user_id
+            WHERE expenses.id = %s AND expenses.user_id = %s
             """,
             (expense_id, user_id),
         ).fetchone()
@@ -492,9 +708,15 @@ def create_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
                 amount,
                 category,
                 date,
-                created_at
+                created_at,
+                payment_method,
+                credit_card_id,
+                installments_count,
+                installment_number,
+                installment_group_id,
+                invoice_month
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 expense.id,
@@ -504,6 +726,12 @@ def create_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
                 expense.category,
                 expense.date,
                 expense.created_at,
+                expense.payment_method,
+                expense.credit_card_id,
+                expense.installments_count,
+                expense.installment_number,
+                expense.installment_group_id,
+                expense.invoice_month,
             ),
         )
 
@@ -519,7 +747,13 @@ def update_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
                 description = %s,
                 amount = %s,
                 category = %s,
-                date = %s
+                date = %s,
+                payment_method = %s,
+                credit_card_id = %s,
+                installments_count = %s,
+                installment_number = %s,
+                installment_group_id = %s,
+                invoice_month = %s
             WHERE id = %s AND user_id = %s
             """,
             (
@@ -527,6 +761,12 @@ def update_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
                 expense.amount,
                 expense.category,
                 expense.date,
+                expense.payment_method,
+                expense.credit_card_id,
+                expense.installments_count,
+                expense.installment_number,
+                expense.installment_group_id,
+                expense.invoice_month,
                 expense.id,
                 expense.user_id,
             ),
@@ -732,19 +972,3 @@ def load_legacy_expenses(file_path: Path) -> list[ExpenseResponse]:
     data = json.loads(raw_content)
 
     return [ExpenseResponse.model_validate(item) for item in data]
-
-def get_user_record_by_id(user_id: str) -> UserRecord | None:
-    with get_connection() as connection:
-        row = connection.execute(
-            """
-            SELECT id, name, email, password_hash, provider, created_at
-            FROM users
-            WHERE id = %s
-            """,
-            (user_id,),
-        ).fetchone()
-
-    if row is None:
-        return None
-
-    return UserRecord.model_validate(row)

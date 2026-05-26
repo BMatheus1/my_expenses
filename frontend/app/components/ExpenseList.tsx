@@ -1,4 +1,4 @@
-import type { Expense } from "../types/expense";
+import type { Expense, PaymentMethod } from "../types/expense";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { EmptyState, LoadingCard } from "./AppFeedback";
 
@@ -86,9 +86,13 @@ function ExpenseItem({
           {expense.description}
         </h3>
 
-        <p className="mt-1 text-sm text-stone-500">
-          {expense.category} • {formatDate(expense.date)}
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-stone-500">
+          <span>
+            {expense.category} • {formatDate(expense.date)}
+          </span>
+
+          <PaymentMethodBadge expense={expense} />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -115,4 +119,41 @@ function ExpenseItem({
       </div>
     </article>
   );
+}
+
+function PaymentMethodBadge({ expense }: { expense: Expense }) {
+  const label = getPaymentMethodLabel(expense.payment_method);
+
+  const installmentLabel =
+    expense.payment_method === "credit_card" && expense.installments_count > 1
+      ? ` • ${expense.installment_number}/${expense.installments_count}`
+      : "";
+
+  if (expense.payment_method === "credit_card" && expense.credit_card) {
+    return (
+      <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-black text-stone-600">
+        {expense.credit_card.name} •••• {expense.credit_card.last_four_digits}
+        {installmentLabel}
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-black text-stone-600">
+      {label}
+    </span>
+  );
+}
+
+function getPaymentMethodLabel(paymentMethod: PaymentMethod) {
+  const labels: Record<PaymentMethod, string> = {
+    cash: "Dinheiro",
+    pix: "Pix",
+    debit_card: "Débito",
+    credit_card: "Crédito",
+    bank_transfer: "Transferência",
+    other: "Outro",
+  };
+
+  return labels[paymentMethod] ?? "Outro";
 }

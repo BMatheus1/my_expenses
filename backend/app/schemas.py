@@ -150,12 +150,14 @@ class ResendVerificationEmailRequest(BaseModel):
 
     email: EmailStr
 
+
 class DeleteAccountRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     confirmation: str = Field(min_length=7, max_length=20)
     password: str | None = Field(default=None, max_length=72)
     google_credential: str | None = Field(default=None, min_length=10)
+
 
 class AuthResponse(BaseModel):
     access_token: str
@@ -197,6 +199,56 @@ class ExpenseCategoryRecord(BaseModel):
     created_at: datetime
 
 
+class CreditCardBase(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(min_length=2, max_length=40)
+    brand: str = Field(min_length=2, max_length=24)
+    last_four_digits: str = Field(min_length=4, max_length=4)
+    closing_day: int = Field(ge=1, le=31)
+    due_day: int = Field(ge=1, le=31)
+    limit_amount: float | None = Field(default=None, ge=0)
+    color: str = Field(default="slate", min_length=2, max_length=20)
+
+    @field_validator("last_four_digits")
+    @classmethod
+    def validate_last_four_digits(cls, value: str) -> str:
+        if not value.isdigit():
+            raise ValueError("Informe apenas os 4 últimos números do cartão.")
+
+        return value
+
+
+class CreditCardCreate(CreditCardBase):
+    pass
+
+
+class CreditCardUpdate(CreditCardBase):
+    pass
+
+
+class CreditCardResponse(CreditCardBase):
+    id: str
+    created_at: datetime
+
+
+class CreditCardRecord(CreditCardBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    created_at: datetime
+
+
+class CreditCardSummaryResponse(BaseModel):
+    id: str
+    name: str
+    brand: str
+    last_four_digits: str
+    color: str
+    due_day: int
+
+
 class ExpenseCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -204,6 +256,9 @@ class ExpenseCreate(BaseModel):
     amount: float = Field(gt=0)
     category: str = Field(min_length=2, max_length=50)
     date: date
+    payment_method: str = Field(default="pix", min_length=2, max_length=30)
+    credit_card_id: str | None = None
+    installments_count: int = Field(default=1, ge=1, le=48)
 
 
 class ExpenseUpdate(ExpenseCreate):
@@ -217,6 +272,13 @@ class ExpenseResponse(BaseModel):
     category: str
     date: date
     created_at: datetime
+    payment_method: str = "pix"
+    credit_card_id: str | None = None
+    credit_card: CreditCardSummaryResponse | None = None
+    installments_count: int = 1
+    installment_number: int = 1
+    installment_group_id: str | None = None
+    invoice_month: str | None = None
 
 
 class ExpenseRecord(BaseModel):
@@ -229,6 +291,17 @@ class ExpenseRecord(BaseModel):
     category: str
     date: date
     created_at: datetime
+    payment_method: str = "pix"
+    credit_card_id: str | None = None
+    installments_count: int = 1
+    installment_number: int = 1
+    installment_group_id: str | None = None
+    invoice_month: str | None = None
+    credit_card_name: str | None = None
+    credit_card_brand: str | None = None
+    credit_card_last_four_digits: str | None = None
+    credit_card_color: str | None = None
+    credit_card_due_day: int | None = None
 
 
 class IncomeCreate(BaseModel):

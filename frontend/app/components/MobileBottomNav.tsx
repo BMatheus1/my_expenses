@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { User } from "../types/auth";
 import {
   BusinessIcon,
+  CreditCardIcon,
   ExpenseIcon,
   IncomeIcon,
   LogoutIcon,
@@ -39,6 +40,11 @@ const MAIN_NAV_ITEMS: MobileNavItem[] = [
     view: "incomes",
     label: "Ganhos",
     icon: IncomeIcon,
+  },
+  {
+    view: "credit-cards",
+    label: "Cartões",
+    icon: CreditCardIcon,
   },
   {
     view: "reports",
@@ -181,7 +187,7 @@ export function MobileBottomNav({
         }}
         aria-label="Navegação principal mobile"
       >
-        <div className="mx-auto grid max-w-xl grid-cols-5 gap-1.5">
+        <div className="mx-auto grid max-w-xl grid-cols-6 gap-1">
           {MAIN_NAV_ITEMS.map((item) => (
             <MobileNavButton
               key={item.view}
@@ -312,6 +318,7 @@ function AccountMenuButton({
 
       <span className="min-w-0">
         <span className="block truncate text-sm font-black">{title}</span>
+
         <span className="mt-0.5 block truncate text-xs opacity-75">
           {description}
         </span>

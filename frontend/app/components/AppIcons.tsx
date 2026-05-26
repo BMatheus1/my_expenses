@@ -63,13 +63,53 @@ export function IncomeIcon({ className }: IconProps) {
   );
 }
 
+export function CreditCardIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 6.5h16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M2 10h20" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M6.5 14.5h4M15 14.5h2.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function ReportsIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M5 19V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M12 19V5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M19 19v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M4 19h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M5 19V10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 19V5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M19 19v-7"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M4 19h16"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -197,7 +237,12 @@ export function LogoutIcon({ className }: IconProps) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path d="M18 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M18 12H9"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -205,8 +250,18 @@ export function LogoutIcon({ className }: IconProps) {
 export function PlusIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 5v14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M12 5v14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M5 12h14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

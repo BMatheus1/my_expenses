@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 
 from app.auth import (
     clear_refresh_token_cookie,
@@ -334,12 +334,16 @@ def edit_credit_card(
 )
 def remove_credit_card(
     card_id: str,
+    delete_linked_expenses: bool = Query(default=False),
     current_user: UserResponse = Depends(get_current_user),
 ):
-    delete_credit_card(card_id, current_user.id)
+    delete_credit_card(
+        card_id=card_id,
+        user_id=current_user.id,
+        delete_linked_expenses=delete_linked_expenses,
+    )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
 
 @router.get(
     "/expenses",

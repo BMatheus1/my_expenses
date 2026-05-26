@@ -130,9 +130,27 @@ function PaymentMethodBadge({ expense }: { expense: Expense }) {
       : "";
 
   if (expense.payment_method === "credit_card" && expense.credit_card) {
+    const deletedLabel = expense.credit_card.is_deleted
+      ? " · cartão excluído"
+      : "";
+
+    const className = expense.credit_card.is_deleted
+      ? "rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-700"
+      : "rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-black text-stone-600";
+
     return (
-      <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-black text-stone-600">
+      <span className={className}>
         {expense.credit_card.name} •••• {expense.credit_card.last_four_digits}
+        {installmentLabel}
+        {deletedLabel}
+      </span>
+    );
+  }
+
+  if (expense.payment_method === "credit_card") {
+    return (
+      <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-700">
+        Crédito · cartão removido
         {installmentLabel}
       </span>
     );

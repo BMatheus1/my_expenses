@@ -565,8 +565,22 @@ export async function updateCreditCard(
   });
 }
 
-export async function deleteCreditCard(creditCardId: string): Promise<void> {
-  return apiFetch<void>(`/credit-cards/${creditCardId}`, {
+export async function deleteCreditCard(
+  creditCardId: string,
+  options: { deleteLinkedExpenses?: boolean } = {},
+): Promise<void> {
+  const searchParams = new URLSearchParams();
+
+  if (options.deleteLinkedExpenses) {
+    searchParams.set("delete_linked_expenses", "true");
+  }
+
+  const queryString = searchParams.toString();
+  const path = queryString
+    ? `/credit-cards/${creditCardId}?${queryString}`
+    : `/credit-cards/${creditCardId}`;
+
+  return apiFetch<void>(path, {
     method: "DELETE",
   });
 }

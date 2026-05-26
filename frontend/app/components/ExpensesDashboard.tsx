@@ -2,6 +2,7 @@
 
 import type { FormEvent, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CreditCardDeleteModal } from "./CreditCardDeleteModal";
 
 import { EXPENSE_CATEGORIES } from "../constants/categories";
 
@@ -111,6 +112,8 @@ export function ExpensesDashboard({
     null
   );
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+  const [creditCardDeletion, setCreditCardDeletion] =
+  useState<CreditCardDeletionState | null>(null);
 
   const [selectedMonth, setSelectedMonth] = useState(() => getCurrentMonth());
   const [selectedReportMonth, setSelectedReportMonth] = useState(() =>
@@ -448,7 +451,7 @@ export function ExpensesDashboard({
 
   async function handleUpdateCreditCard(
     cardId: string,
-    cardData: CreateCreditCardRequest
+    cardData: CreateCreditCardRequest,
   ) {
     try {
       setIsSavingCard(true);
@@ -458,26 +461,29 @@ export function ExpensesDashboard({
 
       setCreditCards((currentCards) =>
         currentCards.map((card) =>
-          card.id === updatedCard.id ? updatedCard : card
-        )
+          card.id === updatedCard.id ? updatedCard : card,
+        ),
       );
 
       setExpenses((currentExpenses) =>
-        currentExpenses.map((expense) =>
-          expense.credit_card_id === updatedCard.id
-            ? {
-                ...expense,
-                credit_card: {
-                  id: updatedCard.id,
-                  name: updatedCard.name,
-                  brand: updatedCard.brand,
-                  last_four_digits: updatedCard.last_four_digits,
-                  color: updatedCard.color,
-                  due_day: updatedCard.due_day,
-                },
-              }
-            : expense
-        )
+        currentExpenses.map((expense) => {
+          if (expense.credit_card_id !== updatedCard.id) {
+            return expense;
+          }
+
+          return {
+            ...expense,
+            credit_card: {
+              id: updatedCard.id,
+              name: updatedCard.name,
+              brand: updatedCard.brand,
+              last_four_digits: updatedCard.last_four_digits,
+              color: updatedCard.color,
+              due_day: updatedCard.due_day,
+              is_deleted: false,
+            },
+          };
+        }),
       );
 
       showSuccessToast("Cartão atualizado com sucesso.");
@@ -486,7 +492,7 @@ export function ExpensesDashboard({
     } catch (error) {
       console.error(error);
       setCardManagerError(
-        getDashboardErrorMessage(error, "Não foi possível editar o cartão.")
+        getDashboardErrorMessage(error, "Não foi possível editar o cartão."),
       );
       return false;
     } finally {
@@ -495,35 +501,59 @@ export function ExpensesDashboard({
   }
 
   function requestDeleteCreditCard(card: CreditCard) {
-    setConfirmation({
-      title: "Excluir cartão?",
-      description: `O cartão "${card.name} •••• ${card.last_four_digits}" será removido da sua carteira.`,
-      confirmLabel: "Excluir cartão",
-      variant: "danger",
-      onConfirm: () => removeCreditCard(card),
+    const linkedExpensesCount = expenses.filter(
+      (expense) => expense.credit_card_id === card.id,
+    ).length;
+
+    setCardManagerError("");
+    setCreditCardDeletion({
+      card,
+      linkedExpensesCount,
     });
   }
 
-  async function removeCreditCard(card: CreditCard) {
+  async function removeCreditCard(deleteLinkedExpenses: boolean) {
+    if (!creditCardDeletion) {
+      return;
+    }
+
+    const { card } = creditCardDeletion;
+
     try {
       setDeletingCardId(card.id);
       setCardManagerError("");
 
-      await deleteCreditCard(card.id);
+      await deleteCreditCard(card.id, {
+        deleteLinkedExpenses,
+      });
 
       setCreditCards((currentCards) =>
-        currentCards.filter((currentCard) => currentCard.id !== card.id)
+        currentCards.filter((currentCard) => currentCard.id !== card.id),
       );
+
+      if (deleteLinkedExpenses) {
+        setExpenses((currentExpenses) =>
+          currentExpenses.filter((expense) => expense.credit_card_id !== card.id),
+        );
+
+        showSuccessToast("Cartão e lançamentos removidos.");
+      } else {
+        setExpenses((currentExpenses) =>
+          markExpensesCreditCardAsDeleted(currentExpenses, card),
+        );
+
+        showSuccessToast("Cartão removido. Lançamentos mantidos no histórico.");
+      }
 
       if (creditCardId === card.id) {
         setCreditCardId("");
       }
 
-      showSuccessToast("Cartão removido.");
+      setCreditCardDeletion(null);
     } catch (error) {
       console.error(error);
       setCardManagerError(
-        getDashboardErrorMessage(error, "Não foi possível excluir o cartão.")
+        getDashboardErrorMessage(error, "Não foi possível excluir o cartão."),
       );
     } finally {
       setDeletingCardId(null);
@@ -1074,7 +1104,14 @@ export function ExpensesDashboard({
         onUpdateCategory={handleUpdateCategory}
         onDeleteCategory={requestDeleteCategory}
       />
-
+      <CreditCardDeleteModal
+        card={creditCardDeletion?.card ?? null}
+        linkedExpensesCount={creditCardDeletion?.linkedExpensesCount ?? 0}
+        isLoading={deletingCardId !== null}
+        onKeepExpenses={() => void removeCreditCard(false)}
+        onDeleteExpenses={() => void removeCreditCard(true)}
+        onCancel={() => setCreditCardDeletion(null)}
+      />
       <ConfirmModal
         isOpen={confirmation !== null}
         title={confirmation?.title ?? ""}
@@ -1386,6 +1423,11 @@ function PageHeader({
   );
 }
 
+type CreditCardDeletionState = {
+  card: CreditCard;
+  linkedExpensesCount: number;
+};
+
 type HeaderMetricProps = {
   label: string;
   value: string;
@@ -1475,6 +1517,31 @@ function getDashboardErrorMessage(
   }
 
   return fallbackMessage;
+}
+
+function markExpensesCreditCardAsDeleted(
+  expenses: Expense[],
+  card: CreditCard,
+): Expense[] {
+  return expenses.map((expense) => {
+    if (expense.credit_card_id !== card.id) {
+      return expense;
+    }
+
+    return {
+      ...expense,
+      credit_card_id: null,
+      credit_card: {
+        id: null,
+        name: card.name,
+        brand: card.brand,
+        last_four_digits: card.last_four_digits,
+        color: card.color,
+        due_day: card.due_day,
+        is_deleted: true,
+      },
+    };
+  });
 }
 
 function normalizeCategoryKey(value: string) {

@@ -49,6 +49,8 @@ from app.storage import (
     update_expense_record,
     update_expenses_category_name,
     update_income_record,
+    delete_expenses_by_credit_card,
+    snapshot_expenses_credit_card,
 )
 
 DEFAULT_EXPENSE_CATEGORIES = [
@@ -317,28 +319,25 @@ def update_credit_card(
     return to_credit_card_response(saved_card)
 
 
-def delete_credit_card(card_id: str, user_id: str) -> None:
+def delete_credit_card(
+    card_id: str,
+    user_id: str,
+    delete_linked_expenses: bool = False,
+) -> None:
     card = get_credit_card_record_by_id(card_id, user_id)
 
     if card is None:
         raise_not_found_error("Cartão não encontrado.")
 
-    linked_expenses = count_expenses_by_credit_card(user_id, card_id)
-
-    if linked_expenses > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Este cartão possui gastos vinculados. "
-                "Edite ou remova esses gastos antes de excluir o cartão."
-            ),
-        )
+    if delete_linked_expenses:
+        delete_expenses_by_credit_card(user_id, card_id)
+    else:
+        snapshot_expenses_credit_card(user_id, card)
 
     deleted = delete_credit_card_record(card_id, user_id)
 
     if not deleted:
         raise_not_found_error("Cartão não encontrado.")
-
 
 def list_expenses(user_id: str) -> list[ExpenseResponse]:
     records = list_expense_records(user_id)
@@ -772,6 +771,7 @@ def to_expense_response(expense: ExpenseRecord) -> ExpenseResponse:
             last_four_digits=expense.credit_card_last_four_digits or "0000",
             color=expense.credit_card_color or "slate",
             due_day=expense.credit_card_due_day or 1,
+            is_deleted=expense.credit_card_is_deleted,
         )
 
     return ExpenseResponse(

@@ -77,6 +77,7 @@ def initialize_database() -> None:
         create_expenses_table(connection)
         create_incomes_table(connection)
         create_database_indexes(connection)
+        backfill_expense_credit_card_snapshots(connection)
 
     migrate_legacy_json_to_postgres()
 
@@ -188,6 +189,36 @@ def create_expenses_table(connection: Connection) -> None:
         ADD COLUMN IF NOT EXISTS invoice_month TEXT
         """
     )
+    connection.execute(
+    """
+    ALTER TABLE expenses
+    ADD COLUMN IF NOT EXISTS credit_card_name TEXT
+    """
+)
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS credit_card_brand TEXT
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS credit_card_last_four_digits TEXT
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS credit_card_color TEXT
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS credit_card_due_day INTEGER
+        """
+    )
 
 
 def create_incomes_table(connection: Connection) -> None:
@@ -238,7 +269,70 @@ def create_database_indexes(connection: Connection) -> None:
         """
     )
 
+def backfill_expense_credit_card_snapshots(connection: Connection) -> None:
+    connection.execute(
+        """
+        UPDATE expenses AS expense
+        SET
+            credit_card_name = COALESCE(expense.credit_card_name, card.name),
+            credit_card_brand = COALESCE(expense.credit_card_brand, card.brand),
+            credit_card_last_four_digits = COALESCE(
+                expense.credit_card_last_four_digits,
+                card.last_four_digits
+            ),
+            credit_card_color = COALESCE(expense.credit_card_color, card.color),
+            credit_card_due_day = COALESCE(expense.credit_card_due_day, card.due_day)
+        FROM credit_cards AS card
+        WHERE
+            expense.credit_card_id = card.id
+            AND expense.user_id = card.user_id
+            AND expense.payment_method = 'credit_card'
+        """
+    )
 
+def snapshot_expenses_credit_card(
+    user_id: str,
+    card: CreditCardRecord,
+) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE expenses
+            SET
+                credit_card_name = %s,
+                credit_card_brand = %s,
+                credit_card_last_four_digits = %s,
+                credit_card_color = %s,
+                credit_card_due_day = %s
+            WHERE
+                user_id = %s
+                AND credit_card_id = %s
+                AND payment_method = 'credit_card'
+            """,
+            (
+                card.name,
+                card.brand,
+                card.last_four_digits,
+                card.color,
+                card.due_day,
+                user_id,
+                card.id,
+            ),
+        )
+
+
+def delete_expenses_by_credit_card(user_id: str, card_id: str) -> int:
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            DELETE FROM expenses
+            WHERE user_id = %s AND credit_card_id = %s
+            """,
+            (user_id, card_id),
+        )
+
+        return cursor.rowcount
+    
 def create_user_record(user: UserRecord) -> UserRecord:
     with get_connection() as connection:
         connection.execute(
@@ -660,7 +754,7 @@ def count_expenses_by_credit_card(user_id: str, card_id: str) -> int:
 def list_expense_records(user_id: str) -> list[ExpenseRecord]:
     with get_connection() as connection:
         rows = connection.execute(
-            """
+                        """
             SELECT
                 expenses.id,
                 expenses.user_id,
@@ -675,11 +769,21 @@ def list_expense_records(user_id: str) -> list[ExpenseRecord]:
                 expenses.installment_number,
                 expenses.installment_group_id,
                 expenses.invoice_month,
-                credit_cards.name AS credit_card_name,
-                credit_cards.brand AS credit_card_brand,
-                credit_cards.last_four_digits AS credit_card_last_four_digits,
-                credit_cards.color AS credit_card_color,
-                credit_cards.due_day AS credit_card_due_day
+                COALESCE(credit_cards.name, expenses.credit_card_name) AS credit_card_name,
+                COALESCE(credit_cards.brand, expenses.credit_card_brand) AS credit_card_brand,
+                COALESCE(
+                    credit_cards.last_four_digits,
+                    expenses.credit_card_last_four_digits
+                ) AS credit_card_last_four_digits,
+                COALESCE(credit_cards.color, expenses.credit_card_color) AS credit_card_color,
+                COALESCE(credit_cards.due_day, expenses.credit_card_due_day) AS credit_card_due_day,
+                CASE
+                    WHEN expenses.payment_method = 'credit_card'
+                        AND expenses.credit_card_name IS NOT NULL
+                        AND credit_cards.id IS NULL
+                    THEN TRUE
+                    ELSE FALSE
+                END AS credit_card_is_deleted
             FROM expenses
             LEFT JOIN credit_cards
                 ON credit_cards.id = expenses.credit_card_id
@@ -699,7 +803,7 @@ def get_expense_record_by_id(
 ) -> ExpenseRecord | None:
     with get_connection() as connection:
         row = connection.execute(
-            """
+                        """
             SELECT
                 expenses.id,
                 expenses.user_id,
@@ -714,11 +818,21 @@ def get_expense_record_by_id(
                 expenses.installment_number,
                 expenses.installment_group_id,
                 expenses.invoice_month,
-                credit_cards.name AS credit_card_name,
-                credit_cards.brand AS credit_card_brand,
-                credit_cards.last_four_digits AS credit_card_last_four_digits,
-                credit_cards.color AS credit_card_color,
-                credit_cards.due_day AS credit_card_due_day
+                COALESCE(credit_cards.name, expenses.credit_card_name) AS credit_card_name,
+                COALESCE(credit_cards.brand, expenses.credit_card_brand) AS credit_card_brand,
+                COALESCE(
+                    credit_cards.last_four_digits,
+                    expenses.credit_card_last_four_digits
+                ) AS credit_card_last_four_digits,
+                COALESCE(credit_cards.color, expenses.credit_card_color) AS credit_card_color,
+                COALESCE(credit_cards.due_day, expenses.credit_card_due_day) AS credit_card_due_day,
+                CASE
+                    WHEN expenses.payment_method = 'credit_card'
+                        AND expenses.credit_card_name IS NOT NULL
+                        AND credit_cards.id IS NULL
+                    THEN TRUE
+                    ELSE FALSE
+                END AS credit_card_is_deleted
             FROM expenses
             LEFT JOIN credit_cards
                 ON credit_cards.id = expenses.credit_card_id
@@ -751,9 +865,14 @@ def create_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
                 installments_count,
                 installment_number,
                 installment_group_id,
-                invoice_month
+                invoice_month,
+                credit_card_name,
+                credit_card_brand,
+                credit_card_last_four_digits,
+                credit_card_color,
+                credit_card_due_day
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 expense.id,
@@ -769,11 +888,15 @@ def create_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
                 expense.installment_number,
                 expense.installment_group_id,
                 expense.invoice_month,
+                expense.credit_card_name,
+                expense.credit_card_brand,
+                expense.credit_card_last_four_digits,
+                expense.credit_card_color,
+                expense.credit_card_due_day,
             ),
         )
 
     return expense
-
 
 def update_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
     with get_connection() as connection:
@@ -790,7 +913,12 @@ def update_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
                 installments_count = %s,
                 installment_number = %s,
                 installment_group_id = %s,
-                invoice_month = %s
+                invoice_month = %s,
+                credit_card_name = %s,
+                credit_card_brand = %s,
+                credit_card_last_four_digits = %s,
+                credit_card_color = %s,
+                credit_card_due_day = %s
             WHERE id = %s AND user_id = %s
             """,
             (
@@ -804,13 +932,17 @@ def update_expense_record(expense: ExpenseRecord) -> ExpenseRecord:
                 expense.installment_number,
                 expense.installment_group_id,
                 expense.invoice_month,
+                expense.credit_card_name,
+                expense.credit_card_brand,
+                expense.credit_card_last_four_digits,
+                expense.credit_card_color,
+                expense.credit_card_due_day,
                 expense.id,
                 expense.user_id,
             ),
         )
 
     return expense
-
 
 def delete_expense_record(expense_id: str, user_id: str) -> bool:
     with get_connection() as connection:

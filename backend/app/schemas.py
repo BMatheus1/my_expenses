@@ -241,12 +241,13 @@ class CreditCardRecord(CreditCardBase):
 
 
 class CreditCardSummaryResponse(BaseModel):
-    id: str
+    id: str | None = None
     name: str
     brand: str
     last_four_digits: str
     color: str
     due_day: int
+    is_deleted: bool = False
 
 
 class ExpenseCreate(BaseModel):
@@ -302,6 +303,7 @@ class ExpenseRecord(BaseModel):
     credit_card_last_four_digits: str | None = None
     credit_card_color: str | None = None
     credit_card_due_day: int | None = None
+    credit_card_is_deleted: bool = False
 
 
 class IncomeCreate(BaseModel):

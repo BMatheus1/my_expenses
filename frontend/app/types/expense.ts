@@ -1,4 +1,4 @@
-import type { CreditCard, CreditCardColor } from "./credit-card";
+import type { CreditCardColor } from "./credit-card";
 
 export type PaymentMethod =
   | "cash"
@@ -8,11 +8,14 @@ export type PaymentMethod =
   | "bank_transfer"
   | "other";
 
-export type ExpenseCreditCardSummary = Pick<
-  CreditCard,
-  "id" | "name" | "brand" | "last_four_digits" | "due_day"
-> & {
+export type ExpenseCreditCardSummary = {
+  id: string | null;
+  name: string;
+  brand: string;
+  last_four_digits: string;
+  due_day: number;
   color: CreditCardColor;
+  is_deleted: boolean;
 };
 
 export type Expense = {

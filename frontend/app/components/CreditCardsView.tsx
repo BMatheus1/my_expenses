@@ -61,6 +61,7 @@ type CardFormState = typeof EMPTY_FORM;
 type CreditCardsViewProps = {
   cards: CreditCard[];
   expenses: Expense[];
+  isOnline: boolean;
   isLoading: boolean;
   isSaving: boolean;
   deletingCardId: string | null;
@@ -77,6 +78,7 @@ type CreditCardsViewProps = {
 export function CreditCardsView({
   cards,
   expenses,
+  isOnline,
   isLoading,
   isSaving,
   deletingCardId,
@@ -150,6 +152,10 @@ export function CreditCardsView({
   }
 
   function openCreateForm() {
+    if (!isOnline) {
+      return;
+    }
+
     onClearError();
     setEditingCard(null);
     setForm(EMPTY_FORM);
@@ -158,6 +164,10 @@ export function CreditCardsView({
   }
 
   function openEditForm(card: CreditCard) {
+    if (!isOnline) {
+      return;
+    }
+
     onClearError();
     setEditingCard(card);
     setForm({
@@ -196,6 +206,10 @@ export function CreditCardsView({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!isOnline) {
+      return;
+    }
+
     const requestData = buildCreditCardRequest(form);
 
     if (!requestData) {
@@ -232,13 +246,21 @@ export function CreditCardsView({
             <button
               type="button"
               onClick={openCreateForm}
-              className="app-button-primary touch-button"
+              disabled={!isOnline}
+              className="app-button-primary touch-button disabled:cursor-not-allowed disabled:opacity-60"
             >
-              + Novo cartão
+              {isOnline ? "+ Novo cartão" : "Novo cartão disponível com internet"}
             </button>
           </div>
         </div>
       </header>
+
+      {!isOnline ? (
+        <section className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 shadow-sm">
+          Você está offline. Seus cartões continuam disponíveis para consulta,
+          mas para cadastrar, editar ou excluir é necessário conectar à internet.
+        </section>
+      ) : null}
 
       <section className="grid gap-3 md:grid-cols-3">
         <SummaryCard
@@ -288,6 +310,12 @@ export function CreditCardsView({
             </button>
           </div>
 
+          {!isOnline ? (
+            <div className="mb-5 rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+              Você está offline. Conecte-se para salvar alterações neste cartão.
+            </div>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
               <FormField label="Apelido do cartão">
@@ -296,6 +324,7 @@ export function CreditCardsView({
                   onChange={(event) => updateForm("name", event.target.value)}
                   className="app-input"
                   placeholder="Ex: Nubank Roxinho"
+                  disabled={!isOnline}
                 />
               </FormField>
 
@@ -304,6 +333,7 @@ export function CreditCardsView({
                   value={form.brand}
                   onChange={(event) => updateForm("brand", event.target.value)}
                   className="app-input"
+                  disabled={!isOnline}
                 >
                   {CARD_BRANDS.map((brand) => (
                     <option key={brand} value={brand}>
@@ -326,6 +356,7 @@ export function CreditCardsView({
                   maxLength={4}
                   className="app-input"
                   placeholder="Ex: 1234"
+                  disabled={!isOnline}
                 />
               </FormField>
 
@@ -341,6 +372,7 @@ export function CreditCardsView({
                   inputMode="decimal"
                   className="app-input"
                   placeholder="Ex: 2500,00"
+                  disabled={!isOnline}
                 />
               </FormField>
 
@@ -356,6 +388,7 @@ export function CreditCardsView({
                   inputMode="numeric"
                   className="app-input"
                   placeholder="Ex: 28"
+                  disabled={!isOnline}
                 />
               </FormField>
 
@@ -371,6 +404,7 @@ export function CreditCardsView({
                   inputMode="numeric"
                   className="app-input"
                   placeholder="Ex: 10"
+                  disabled={!isOnline}
                 />
               </FormField>
             </div>
@@ -386,7 +420,8 @@ export function CreditCardsView({
                     key={color.value}
                     type="button"
                     onClick={() => updateForm("color", color.value)}
-                    className={`touch-button rounded-full border px-4 py-2 text-xs font-black transition ${
+                    disabled={!isOnline}
+                    className={`touch-button rounded-full border px-4 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${
                       form.color === color.value
                         ? "app-brand-soft"
                         : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
@@ -408,9 +443,14 @@ export function CreditCardsView({
               type="submit"
               isLoading={isSaving}
               loadingLabel="Salvando..."
-              className="app-button-primary touch-button sm:w-auto"
+              disabled={!isOnline || isSaving}
+              className="app-button-primary touch-button sm:w-auto disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {editingCard ? "Salvar cartão" : "Cadastrar cartão"}
+              {!isOnline
+                ? "Disponível com internet"
+                : editingCard
+                  ? "Salvar cartão"
+                  : "Cadastrar cartão"}
             </LoadingButton>
           </form>
         </section>
@@ -421,8 +461,16 @@ export function CreditCardsView({
       ) : cards.length === 0 ? (
         <EmptyState
           title="Nenhum cartão cadastrado"
-          description="Cadastre seu primeiro cartão para lançar gastos no crédito e acompanhar vencimentos."
-          action={{ label: "Cadastrar cartão", onClick: openCreateForm }}
+          description={
+            isOnline
+              ? "Cadastre seu primeiro cartão para lançar gastos no crédito e acompanhar vencimentos."
+              : "Nenhum cartão salvo localmente. Conecte-se para carregar ou cadastrar cartões."
+          }
+          action={
+            isOnline
+              ? { label: "Cadastrar cartão", onClick: openCreateForm }
+              : undefined
+          }
         />
       ) : (
         <section className="grid gap-5 xl:grid-cols-2">
@@ -434,6 +482,7 @@ export function CreditCardsView({
               invoiceExpenses={summary.invoiceExpenses}
               dueLabel={summary.dueInfo.label}
               limitUsagePercentage={summary.limitUsagePercentage}
+              isOnline={isOnline}
               isDeleting={deletingCardId === summary.card.id}
               onEdit={() => openEditForm(summary.card)}
               onDelete={() => onDeleteCard(summary.card)}
@@ -451,6 +500,7 @@ type CreditCardPanelProps = {
   invoiceExpenses: Expense[];
   dueLabel: string;
   limitUsagePercentage: number | null;
+  isOnline: boolean;
   isDeleting: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -462,6 +512,7 @@ function CreditCardPanel({
   invoiceExpenses,
   dueLabel,
   limitUsagePercentage,
+  isOnline,
   isDeleting,
   onEdit,
   onDelete,
@@ -519,18 +570,19 @@ function CreditCardPanel({
           <button
             type="button"
             onClick={onEdit}
-            className="app-button-secondary touch-button text-sm"
+            disabled={!isOnline}
+            className="app-button-secondary touch-button text-sm disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Editar
+            {isOnline ? "Editar" : "Offline"}
           </button>
 
           <button
             type="button"
             onClick={onDelete}
-            disabled={isDeleting}
-            className="touch-button rounded-full border border-red-100 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isDeleting || !isOnline}
+            className="touch-button rounded-full border border-red-100 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
           >
-            {isDeleting ? "Excluindo..." : "Excluir"}
+            {isDeleting ? "Excluindo..." : isOnline ? "Excluir" : "Offline"}
           </button>
         </div>
       </div>

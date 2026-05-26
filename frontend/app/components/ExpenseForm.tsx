@@ -25,6 +25,7 @@ type ExpenseFormProps = {
   installmentsCount: string;
   creditCards: CreditCard[];
   categories: string[];
+  isOnline: boolean;
   isSubmitting: boolean;
   isEditing: boolean;
   errorMessage: string;
@@ -51,6 +52,7 @@ export function ExpenseForm({
   installmentsCount,
   creditCards,
   categories,
+  isOnline,
   isSubmitting,
   isEditing,
   errorMessage,
@@ -67,9 +69,17 @@ export function ExpenseForm({
   onSubmit,
 }: ExpenseFormProps) {
   const isCreditCardPayment = paymentMethod === "credit_card";
+  const isActionDisabled = isSubmitting || !isOnline;
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
+      {!isOnline ? (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          Você está offline. Os dados continuam visíveis, mas para cadastrar ou
+          editar gastos é necessário conectar à internet.
+        </div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
         <FormField label="Descrição">
           <input
@@ -78,6 +88,7 @@ export function ExpenseForm({
             onChange={(event) => onDescriptionChange(event.target.value)}
             placeholder="Ex: mercado, aluguel..."
             className="app-input"
+            disabled={!isOnline}
           />
         </FormField>
 
@@ -89,6 +100,7 @@ export function ExpenseForm({
             inputMode="decimal"
             placeholder="Ex: 120,50"
             className="app-input"
+            disabled={!isOnline}
           />
         </FormField>
 
@@ -98,6 +110,7 @@ export function ExpenseForm({
               value={category}
               onChange={(event) => onCategoryChange(event.target.value)}
               className="app-input min-w-0 flex-1"
+              disabled={!isOnline}
             >
               {categories.map((categoryName) => (
                 <option key={categoryName} value={categoryName}>
@@ -109,9 +122,10 @@ export function ExpenseForm({
             <button
               type="button"
               onClick={onManageCategoriesClick}
-              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 sm:w-auto"
+              disabled={!isOnline}
+              className="touch-button rounded-2xl border border-stone-200 px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 sm:w-auto"
             >
-              Categorias
+              {isOnline ? "Categorias" : "Com internet"}
             </button>
           </div>
         </FormField>
@@ -122,6 +136,7 @@ export function ExpenseForm({
             value={date}
             onChange={(event) => onDateChange(event.target.value)}
             className="app-input"
+            disabled={!isOnline}
           />
         </FormField>
       </div>
@@ -137,7 +152,8 @@ export function ExpenseForm({
               key={option.value}
               type="button"
               onClick={() => onPaymentMethodChange(option.value)}
-              className={`rounded-2xl border px-3 py-3 text-sm font-black transition ${
+              disabled={!isOnline}
+              className={`touch-button rounded-2xl border px-3 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 paymentMethod === option.value
                   ? "app-brand-soft shadow-sm"
                   : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
@@ -156,6 +172,7 @@ export function ExpenseForm({
                   value={creditCardId}
                   onChange={(event) => onCreditCardChange(event.target.value)}
                   className="app-input min-w-0 flex-1"
+                  disabled={!isOnline}
                 >
                   <option value="">Selecione um cartão</option>
                   {creditCards.map((card) => (
@@ -168,9 +185,10 @@ export function ExpenseForm({
                 <button
                   type="button"
                   onClick={onManageCardsClick}
-                  className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 sm:w-auto"
+                  disabled={!isOnline}
+                  className="touch-button rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 sm:w-auto"
                 >
-                  Cartões
+                  {isOnline ? "Cartões" : "Com internet"}
                 </button>
               </div>
             </FormField>
@@ -182,7 +200,7 @@ export function ExpenseForm({
                   onInstallmentsCountChange(event.target.value)
                 }
                 className="app-input"
-                disabled={isEditing}
+                disabled={isEditing || !isOnline}
               >
                 {Array.from({ length: 24 }, (_, index) => index + 1).map(
                   (installment) => (
@@ -214,9 +232,14 @@ export function ExpenseForm({
           type="submit"
           isLoading={isSubmitting}
           loadingLabel="Salvando..."
-          className="app-button-primary sm:w-auto"
+          disabled={isActionDisabled}
+          className="app-button-primary touch-button sm:w-auto disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isEditing ? "Salvar alterações" : "Adicionar gasto"}
+          {!isOnline
+            ? "Disponível com internet"
+            : isEditing
+              ? "Salvar alterações"
+              : "Adicionar gasto"}
         </LoadingButton>
 
         {isEditing ? (
@@ -224,7 +247,7 @@ export function ExpenseForm({
             type="button"
             onClick={onCancelEdit}
             disabled={isSubmitting}
-            className="app-button-secondary sm:w-auto disabled:cursor-not-allowed disabled:opacity-70"
+            className="app-button-secondary touch-button sm:w-auto disabled:cursor-not-allowed disabled:opacity-70"
           >
             Cancelar edição
           </button>

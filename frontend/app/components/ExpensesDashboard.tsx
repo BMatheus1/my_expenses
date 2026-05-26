@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CreditCardDeleteModal } from "./CreditCardDeleteModal";
 
 import { EXPENSE_CATEGORIES } from "../constants/categories";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
 import {
   readDashboardCache,
@@ -95,6 +96,8 @@ export function ExpensesDashboard({
   const expenseFormSectionRef = useRef<HTMLDivElement | null>(null);
   const expenseFiltersSectionRef = useRef<HTMLDivElement | null>(null);
 
+  const isOnline = useOnlineStatus();
+  
   const [activeView, setActiveView] = useState<AppView>("expenses");
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -427,6 +430,10 @@ export function ExpensesDashboard({
   }
 
   async function handleCreateCreditCard(cardData: CreateCreditCardRequest) {
+    if (blockOfflineAction("cadastrar um cartão")) {
+      return false;
+    }    
+    
     try {
       setIsSavingCard(true);
       setCardManagerError("");
@@ -453,6 +460,9 @@ export function ExpensesDashboard({
     cardId: string,
     cardData: CreateCreditCardRequest,
   ) {
+    if (blockOfflineAction("editar este cartão")) {
+      return false;
+    }
     try {
       setIsSavingCard(true);
       setCardManagerError("");
@@ -501,6 +511,10 @@ export function ExpensesDashboard({
   }
 
   function requestDeleteCreditCard(card: CreditCard) {
+    if (blockOfflineAction("excluir este cartão")) {
+      return;
+    }
+
     const linkedExpensesCount = expenses.filter(
       (expense) => expense.credit_card_id === card.id,
     ).length;
@@ -516,7 +530,9 @@ export function ExpensesDashboard({
     if (!creditCardDeletion) {
       return;
     }
-
+    if (blockOfflineAction("excluir este cartão")) {
+      return;
+    }
     const { card } = creditCardDeletion;
 
     try {
@@ -561,6 +577,9 @@ export function ExpensesDashboard({
   }
 
   async function handleCreateCategory(categoryName: string) {
+    if (blockOfflineAction("adicionar uma categoria")) {
+      return false;
+    }
     const trimmedCategoryName = categoryName.trim();
 
     if (trimmedCategoryName.length < 2) {
@@ -611,6 +630,10 @@ export function ExpensesDashboard({
     categoryToUpdate: ExpenseCategory,
     categoryName: string
   ) {
+
+    if (blockOfflineAction("editar uma categoria")) {
+      return false;
+    }
     if (!categoryToUpdate.id) {
       setCategoryManagerError("Categoria inválida para edição.");
       return false;
@@ -702,6 +725,9 @@ export function ExpensesDashboard({
   }
 
   async function removeCategory(categoryToDelete: ExpenseCategory) {
+    if (blockOfflineAction("excluir uma categoria")) {
+      return;
+    }
     if (!categoryToDelete.id) {
       return;
     }
@@ -784,6 +810,9 @@ export function ExpensesDashboard({
   }
 
   async function removeExpense(expenseId: string) {
+    if (blockOfflineAction("remover este gasto")) {
+      return;
+    }
     try {
       setDeletingExpenseId(expenseId);
       setErrorMessage("");
@@ -816,7 +845,9 @@ export function ExpensesDashboard({
     if (isSubmitting) {
       return;
     }
-
+    if (blockOfflineAction("salvar este gasto")) {
+      return;
+    }
     setErrorMessage("");
 
     const parsedAmount = parseMoneyToNumber(amount);
@@ -954,6 +985,26 @@ export function ExpensesDashboard({
     });
   }
 
+  function showErrorToast(message: string) {
+    setToast({
+      id: Date.now(),
+      message,
+      variant: "error",
+    });
+  }
+
+  function blockOfflineAction(actionDescription: string) {
+    if (isOnline) {
+      return false;
+    }
+
+    const message = `Você está offline. Conecte-se para ${actionDescription}.`;
+
+    setErrorMessage(message);
+    showErrorToast(message);
+
+    return true;
+  }
   function handleFormToggle() {
     setIsFormOpen((currentValue) => {
       const nextValue = !currentValue;
@@ -1008,6 +1059,7 @@ export function ExpensesDashboard({
         <CreditCardsView
           cards={creditCards}
           expenses={expenses}
+          isOnline={isOnline}
           isLoading={isLoadingCards}
           isSaving={isSavingCard}
           deletingCardId={deletingCardId}
@@ -1046,6 +1098,7 @@ export function ExpensesDashboard({
           categoryTotals={categoryTotals}
           categories={categoryNames}
           creditCards={creditCards}
+          isOnline={isOnline}
           isLoadingExpenses={isLoadingExpenses}
           deletingExpenseId={deletingExpenseId}
           isFormOpen={isFormOpen}
@@ -1147,6 +1200,7 @@ type ExpensesViewProps = {
   categoryTotals: CategoryTotal[];
   categories: string[];
   creditCards: CreditCard[];
+  isOnline: boolean;
   isLoadingExpenses: boolean;
   deletingExpenseId: string | null;
   isFormOpen: boolean;
@@ -1200,6 +1254,7 @@ function ExpensesView({
   categoryTotals,
   categories,
   creditCards,
+  isOnline,
   isLoadingExpenses,
   deletingExpenseId,
   isFormOpen,
@@ -1249,6 +1304,7 @@ function ExpensesView({
           monthlyExpenseTotal={monthlyExpenseTotal}
           monthlyIncomeTotal={monthlyIncomeTotal}
           monthlyBalance={monthlyBalance}
+          isOnline={isOnline}
           onNewExpenseClick={onNewExpenseClick}
         />
 
@@ -1266,6 +1322,7 @@ function ExpensesView({
         monthlyExpenseTotal={monthlyExpenseTotal}
         monthlyIncomeTotal={monthlyIncomeTotal}
         monthlyBalance={monthlyBalance}
+        isOnline={isOnline}
         onNewExpenseClick={onNewExpenseClick}
       />
 
@@ -1306,6 +1363,7 @@ function ExpensesView({
               creditCards={creditCards}
               categories={categories}
               isSubmitting={isSubmitting}
+              isOnline={isOnline}
               isEditing={isEditing}
               errorMessage={errorMessage}
               onDescriptionChange={onDescriptionChange}
@@ -1342,6 +1400,7 @@ function ExpensesView({
           <ExpenseList
             expenses={filteredExpenses}
             isLoading={isLoadingExpenses}
+            isOnline={isOnline}
             deletingExpenseId={deletingExpenseId}
             onEdit={onEditExpense}
             onDelete={onDeleteExpense}
@@ -1356,6 +1415,7 @@ type PageHeaderProps = {
   monthlyExpenseTotal: number;
   monthlyIncomeTotal: number;
   monthlyBalance: number;
+  isOnline: boolean;
   onNewExpenseClick: () => void;
 };
 
@@ -1363,6 +1423,7 @@ function PageHeader({
   monthlyExpenseTotal,
   monthlyIncomeTotal,
   monthlyBalance,
+  isOnline,
   onNewExpenseClick,
 }: PageHeaderProps) {
   return (
@@ -1376,7 +1437,7 @@ function PageHeader({
       >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+            <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
               My Expenses
             </p>
 
@@ -1414,9 +1475,10 @@ function PageHeader({
         <button
           type="button"
           onClick={onNewExpenseClick}
-          className="mt-5 flex min-h-12 w-full items-center justify-center rounded-2xl bg-stone-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 sm:w-auto"
+          disabled={!isOnline}
+          className="touch-button mt-5 flex w-full items-center justify-center rounded-2xl bg-stone-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 sm:w-auto"
         >
-          + Novo gasto
+          {isOnline ? "+ Novo gasto" : "Novo gasto disponível com internet"}
         </button>
       </div>
     </header>

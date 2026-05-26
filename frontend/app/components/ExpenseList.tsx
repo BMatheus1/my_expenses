@@ -5,6 +5,7 @@ import { EmptyState, LoadingCard } from "./AppFeedback";
 type ExpenseListProps = {
   expenses: Expense[];
   isLoading: boolean;
+  isOnline: boolean;
   deletingExpenseId: string | null;
   onEdit: (expense: Expense) => void;
   onDelete: (expenseId: string) => void;
@@ -13,6 +14,7 @@ type ExpenseListProps = {
 export function ExpenseList({
   expenses,
   isLoading,
+  isOnline,
   deletingExpenseId,
   onEdit,
   onDelete,
@@ -26,7 +28,9 @@ export function ExpenseList({
           </h2>
 
           <p className="mt-1 text-sm text-stone-500">
-            Edite ou remova despesas cadastradas.
+            {isOnline
+              ? "Edite ou remova despesas cadastradas."
+              : "Você está offline. Os gastos salvos continuam disponíveis para consulta."}
           </p>
         </div>
 
@@ -55,6 +59,7 @@ export function ExpenseList({
             <ExpenseItem
               key={expense.id}
               expense={expense}
+              isOnline={isOnline}
               isDeleting={deletingExpenseId === expense.id}
               onEdit={onEdit}
               onDelete={onDelete}
@@ -68,6 +73,7 @@ export function ExpenseList({
 
 type ExpenseItemProps = {
   expense: Expense;
+  isOnline: boolean;
   isDeleting: boolean;
   onEdit: (expense: Expense) => void;
   onDelete: (expenseId: string) => void;
@@ -75,6 +81,7 @@ type ExpenseItemProps = {
 
 function ExpenseItem({
   expense,
+  isOnline,
   isDeleting,
   onEdit,
   onDelete,
@@ -103,18 +110,19 @@ function ExpenseItem({
         <button
           type="button"
           onClick={() => onEdit(expense)}
-          className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+          disabled={!isOnline}
+          className="touch-button rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
         >
-          Editar
+          {isOnline ? "Editar" : "Offline"}
         </button>
 
         <button
           type="button"
           onClick={() => onDelete(expense.id)}
-          disabled={isDeleting}
-          className="rounded-full border border-red-100 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isDeleting || !isOnline}
+          className="touch-button rounded-full border border-red-100 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
         >
-          {isDeleting ? "Removendo..." : "Remover"}
+          {isDeleting ? "Removendo..." : isOnline ? "Remover" : "Offline"}
         </button>
       </div>
     </article>

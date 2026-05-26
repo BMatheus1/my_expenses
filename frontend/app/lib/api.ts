@@ -518,3 +518,19 @@ export async function deleteCreditCard(creditCardId: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+export async function registerWithEmail(
+  data: RegisterRequest,
+): Promise<AuthResponse> {
+  return registerUser(data);
+}
+
+export async function loginWithEmail(data: LoginRequest): Promise<AuthResponse> {
+  return loginUser(data);
+}
+
+export async function requestPasswordReset(
+  data: ForgotPasswordRequest,
+): Promise<MessageResponse> {
+  return forgotPassword(data);
+}

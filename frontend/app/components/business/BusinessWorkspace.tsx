@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 
+import { useOnlineStatus } from "@/app/hooks/useOnlineStatus";
 import {
   BUSINESS_NAVIGATION_EVENT,
   type BusinessNavigationPayload,
@@ -70,17 +71,19 @@ import type {
   SaleFormState,
   ServiceFormState,
 } from "./businessTypes";
-import {
-  AlertMessage,
-  EmptyBusinessState,
-} from "./BusinessShared";
+import { AlertMessage, EmptyBusinessState } from "./BusinessShared";
 import {
   dispatchBusinessRefresh,
   getErrorMessage,
   toNumber,
 } from "./businessUtils";
 
+const BUSINESS_OFFLINE_MESSAGE =
+  "Você está offline. Os dados já carregados continuam disponíveis para consulta, mas para criar, editar ou excluir informações é necessário conectar à internet.";
+
 export default function BusinessWorkspace() {
+  const isOnline = useOnlineStatus();
+
   const [negocios, setNegocios] = useState<Business[]>([]);
   const [negocioSelecionadoId, setNegocioSelecionadoId] = useState<string | null>(
     null,
@@ -188,43 +191,61 @@ export default function BusinessWorkspace() {
     };
   }, [materiais]);
 
-  const carregarDadosDoNegocio = useCallback(async (businessId: string) => {
-    try {
-      setErro(null);
+  const carregarDadosDoNegocio = useCallback(
+    async (businessId: string) => {
+      if (!isOnline) {
+        setErro(BUSINESS_OFFLINE_MESSAGE);
+        return;
+      }
 
-      const [
-        dashboardCarregado,
-        materiaisCarregados,
-        servicosCarregados,
-        vendasCarregadas,
-      ] = await Promise.all([
-        getBusinessDashboard(businessId),
-        listBusinessMaterials(businessId),
-        listBusinessServices(businessId),
-        listBusinessSales(businessId),
-      ]);
+      try {
+        setErro(null);
 
-      setDashboard(dashboardCarregado);
-      setMateriais(materiaisCarregados);
-      setServicos(servicosCarregados);
-      setVendas(vendasCarregadas);
+        const [
+          dashboardCarregado,
+          materiaisCarregados,
+          servicosCarregados,
+          vendasCarregadas,
+        ] = await Promise.all([
+          getBusinessDashboard(businessId),
+          listBusinessMaterials(businessId),
+          listBusinessServices(businessId),
+          listBusinessSales(businessId),
+        ]);
 
-      setFichaForm((formAtual) => ({
-        ...formAtual,
-        service_id: formAtual.service_id || servicosCarregados[0]?.id || "",
-        material_id: formAtual.material_id || materiaisCarregados[0]?.id || "",
-      }));
+        setDashboard(dashboardCarregado);
+        setMateriais(materiaisCarregados);
+        setServicos(servicosCarregados);
+        setVendas(vendasCarregadas);
 
-      setVendaForm((formAtual) => ({
-        ...formAtual,
-        service_id: formAtual.service_id || servicosCarregados[0]?.id || "",
-      }));
-    } catch (error) {
-      setErro(getErrorMessage(error));
-    }
-  }, []);
+        setFichaForm((formAtual) => ({
+          ...formAtual,
+          service_id: formAtual.service_id || servicosCarregados[0]?.id || "",
+          material_id: formAtual.material_id || materiaisCarregados[0]?.id || "",
+        }));
+
+        setVendaForm((formAtual) => ({
+          ...formAtual,
+          service_id: formAtual.service_id || servicosCarregados[0]?.id || "",
+        }));
+      } catch (error) {
+        setErro(getErrorMessage(error));
+      }
+    },
+    [isOnline],
+  );
 
   const carregarNegocios = useCallback(async () => {
+    if (!isOnline) {
+      setCarregando(false);
+
+      if (negocios.length === 0) {
+        setErro(BUSINESS_OFFLINE_MESSAGE);
+      }
+
+      return;
+    }
+
     try {
       setCarregando(true);
       setErro(null);
@@ -247,7 +268,7 @@ export default function BusinessWorkspace() {
     } finally {
       setCarregando(false);
     }
-  }, []);
+  }, [isOnline, negocios.length]);
 
   const atualizarNegocioSelecionado = useCallback(async () => {
     if (!negocioSelecionadoId) {
@@ -258,7 +279,7 @@ export default function BusinessWorkspace() {
   }, [carregarDadosDoNegocio, negocioSelecionadoId]);
 
   useEffect(() => {
-    carregarNegocios();
+    void carregarNegocios();
   }, [carregarNegocios]);
 
   useEffect(() => {
@@ -266,8 +287,14 @@ export default function BusinessWorkspace() {
       return;
     }
 
-    carregarDadosDoNegocio(negocioSelecionadoId);
+    void carregarDadosDoNegocio(negocioSelecionadoId);
   }, [carregarDadosDoNegocio, negocioSelecionadoId]);
+
+  useEffect(() => {
+    if (isOnline && erro === BUSINESS_OFFLINE_MESSAGE) {
+      setErro(null);
+    }
+  }, [erro, isOnline]);
 
   useEffect(() => {
     function applyNavigationPayload(payload: BusinessNavigationPayload | null) {
@@ -276,6 +303,12 @@ export default function BusinessWorkspace() {
       }
 
       if (payload.mode === "create") {
+        if (!isOnline) {
+          setErro("Você está offline. Conecte-se para criar um negócio.");
+          setSucesso(null);
+          return;
+        }
+
         setCriandoNegocio(true);
         setNegocioSelecionadoId(null);
         setErro(null);
@@ -307,10 +340,25 @@ export default function BusinessWorkspace() {
         handleBusinessNavigation,
       );
     };
-  }, []);
+  }, [isOnline]);
+
+  function blockOfflineAction(actionDescription: string) {
+    if (isOnline) {
+      return false;
+    }
+
+    setErro(`Você está offline. Conecte-se para ${actionDescription}.`);
+    setSucesso(null);
+
+    return true;
+  }
 
   async function handleCriarNegocio(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (blockOfflineAction("criar um negócio")) {
+      return;
+    }
 
     if (!negocioForm.name.trim()) {
       setErro("Informe o nome do negócio.");
@@ -343,6 +391,10 @@ export default function BusinessWorkspace() {
 
   async function handleEditarNegocio(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (blockOfflineAction("editar este negócio")) {
+      return;
+    }
 
     if (!negocioSelecionadoId) {
       return;
@@ -378,6 +430,10 @@ export default function BusinessWorkspace() {
     password?: string | null;
     google_credential?: string | null;
   }) {
+    if (blockOfflineAction("excluir este negócio")) {
+      return;
+    }
+
     if (!negocioSelecionadoId) {
       return;
     }
@@ -432,6 +488,10 @@ export default function BusinessWorkspace() {
   async function handleSalvarMaterial(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (blockOfflineAction("salvar material no estoque")) {
+      return;
+    }
+
     if (!negocioSelecionadoId) {
       return;
     }
@@ -473,6 +533,10 @@ export default function BusinessWorkspace() {
   }
 
   async function handleExcluirMaterial(material: BusinessMaterial) {
+    if (blockOfflineAction("excluir material do estoque")) {
+      return;
+    }
+
     if (!negocioSelecionadoId) {
       return;
     }
@@ -506,6 +570,10 @@ export default function BusinessWorkspace() {
 
   async function handleSalvarServico(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (blockOfflineAction("salvar serviço ou produto")) {
+      return;
+    }
 
     if (!negocioSelecionadoId) {
       return;
@@ -547,6 +615,10 @@ export default function BusinessWorkspace() {
   }
 
   async function handleExcluirServico(service: BusinessService) {
+    if (blockOfflineAction("excluir serviço ou produto")) {
+      return;
+    }
+
     if (!negocioSelecionadoId) {
       return;
     }
@@ -580,6 +652,10 @@ export default function BusinessWorkspace() {
 
   async function handleSalvarItemFicha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (blockOfflineAction("salvar item da ficha de custo")) {
+      return;
+    }
 
     if (!negocioSelecionadoId) {
       return;
@@ -625,6 +701,10 @@ export default function BusinessWorkspace() {
     service: BusinessService,
     item: BusinessRecipeItem,
   ) {
+    if (blockOfflineAction("remover item da ficha de custo")) {
+      return;
+    }
+
     if (!negocioSelecionadoId) {
       return;
     }
@@ -659,6 +739,10 @@ export default function BusinessWorkspace() {
   async function handleRegistrarVenda(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (blockOfflineAction("registrar uma venda")) {
+      return;
+    }
+
     if (!negocioSelecionadoId) {
       return;
     }
@@ -692,6 +776,10 @@ export default function BusinessWorkspace() {
   }
 
   function abrirEdicaoNegocio() {
+    if (blockOfflineAction("editar este negócio")) {
+      return;
+    }
+
     if (!negocioSelecionado) {
       return;
     }
@@ -704,7 +792,19 @@ export default function BusinessWorkspace() {
     setEditandoNegocio(true);
   }
 
+  function abrirExclusaoNegocio() {
+    if (blockOfflineAction("excluir este negócio")) {
+      return;
+    }
+
+    setDeleteBusinessModalOpen(true);
+  }
+
   function iniciarEdicaoMaterial(material: BusinessMaterial) {
+    if (blockOfflineAction("editar material do estoque")) {
+      return;
+    }
+
     setMaterialEmEdicaoId(material.id);
     setMaterialForm({
       name: material.name,
@@ -722,6 +822,10 @@ export default function BusinessWorkspace() {
   }
 
   function iniciarEdicaoServico(service: BusinessService) {
+    if (blockOfflineAction("editar serviço ou produto")) {
+      return;
+    }
+
     setServicoEmEdicaoId(service.id);
     setServicoForm({
       name: service.name,
@@ -738,30 +842,34 @@ export default function BusinessWorkspace() {
   }
 
   function iniciarEdicaoItemFicha(
-  service: BusinessService,
-  item: BusinessRecipeItem,
-) {
-  setItemFichaEmEdicaoId(item.id);
-  setFichaForm({
-    service_id: service.id,
-    material_id: item.material_id,
-    quantity_used: String(item.quantity_used).replace(".", ","),
-  });
-  setAbaAtiva("fichas");
-  setErro(null);
-  setSucesso(null);
-}
+    service: BusinessService,
+    item: BusinessRecipeItem,
+  ) {
+    if (blockOfflineAction("editar item da ficha de custo")) {
+      return;
+    }
 
-function abrirFichaDoServico(service: BusinessService) {
-  setFichaForm((formAtual) => ({
-    ...formAtual,
-    service_id: service.id,
-    material_id: formAtual.material_id || materiais[0]?.id || "",
-  }));
-  setAbaAtiva("fichas");
-  setErro(null);
-  setSucesso(null);
-}
+    setItemFichaEmEdicaoId(item.id);
+    setFichaForm({
+      service_id: service.id,
+      material_id: item.material_id,
+      quantity_used: String(item.quantity_used).replace(".", ","),
+    });
+    setAbaAtiva("fichas");
+    setErro(null);
+    setSucesso(null);
+  }
+
+  function abrirFichaDoServico(service: BusinessService) {
+    setFichaForm((formAtual) => ({
+      ...formAtual,
+      service_id: service.id,
+      material_id: formAtual.material_id || materiais[0]?.id || "",
+    }));
+    setAbaAtiva("fichas");
+    setErro(null);
+    setSucesso(null);
+  }
 
   function limparFormularioMaterial() {
     setMaterialEmEdicaoId(null);
@@ -783,6 +891,13 @@ function abrirFichaDoServico(service: BusinessService) {
 
   return (
     <section className="space-y-6">
+      {!isOnline ? (
+        <section className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 shadow-sm sm:px-5">
+          Você está offline. A área de negócios fica disponível para consulta
+          quando já tiver dados carregados, mas alterações precisam de internet.
+        </section>
+      ) : null}
+
       {erro ? (
         <AlertMessage
           type="error"
@@ -818,7 +933,7 @@ function abrirFichaDoServico(service: BusinessService) {
               vendas: vendas.length,
             }}
             onEdit={abrirEdicaoNegocio}
-            onDelete={() => setDeleteBusinessModalOpen(true)}
+            onDelete={abrirExclusaoNegocio}
           />
 
           <TabNavigation activeTab={abaAtiva} onChange={setAbaAtiva} />
@@ -904,7 +1019,15 @@ function abrirFichaDoServico(service: BusinessService) {
       ) : null}
 
       {!criandoNegocio && !negocioSelecionado && !carregando ? (
-        <EmptyBusinessState onCreate={() => setCriandoNegocio(true)} />
+        <EmptyBusinessState
+          onCreate={() => {
+            if (blockOfflineAction("criar um negócio")) {
+              return;
+            }
+
+            setCriandoNegocio(true);
+          }}
+        />
       ) : null}
 
       {editandoNegocio ? (

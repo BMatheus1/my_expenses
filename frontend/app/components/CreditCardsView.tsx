@@ -21,7 +21,6 @@ import {
   parseMoneyToNumber,
   sanitizeMoneyInput,
 } from "../utils/formatters";
-
 import { smartScrollToRef } from "../utils/smartScroll";
 import { EmptyState, LoadingButton } from "./AppFeedback";
 
@@ -87,21 +86,31 @@ export function CreditCardsView({
   onDeleteCard,
   onClearError,
 }: CreditCardsViewProps) {
+  const formSectionRef = useRef<HTMLDivElement | null>(null);
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
   const [form, setForm] = useState<CardFormState>(EMPTY_FORM);
-  const formSectionRef = useRef<HTMLDivElement | null>(null);
+
   const currentInvoiceMonth = getCurrentMonth();
 
   const cardSummaries = useMemo(() => {
     return cards.map((card) => {
-      const cardExpenses = expenses.filter(
-        (expense) => expense.credit_card_id === card.id,
-      );
+      const invoiceExpenses = expenses.filter((expense) => {
+        if (expense.payment_method !== "credit_card") {
+          return false;
+        }
 
-      const invoiceExpenses = cardExpenses.filter((expense) =>
-        isExpenseInInvoiceMonth(expense, currentInvoiceMonth),
-      );
+        if (expense.credit_card_id !== card.id) {
+          return false;
+        }
+
+        if (expense.invoice_month) {
+          return expense.invoice_month === currentInvoiceMonth;
+        }
+
+        return expense.date.startsWith(currentInvoiceMonth);
+      });
 
       const invoiceTotal = invoiceExpenses.reduce(
         (total, expense) => total + expense.amount,
@@ -114,7 +123,6 @@ export function CreditCardsView({
 
       return {
         card,
-        cardExpenses,
         invoiceExpenses,
         invoiceTotal,
         limitUsagePercentage,
@@ -130,9 +138,7 @@ export function CreditCardsView({
 
   const nextDueCard = [...cardSummaries]
     .filter((summary) => summary.invoiceTotal > 0)
-    .sort(
-      (first, second) => first.dueInfo.daysLeft - second.dueInfo.daysLeft,
-    )[0];
+    .sort((first, second) => first.dueInfo.priority - second.dueInfo.priority)[0];
 
   function scrollToCardForm() {
     window.setTimeout(() => {
@@ -141,7 +147,8 @@ export function CreditCardsView({
         focusFirstField: true,
       });
     }, 120);
-  }    
+  }
+
   function openCreateForm() {
     onClearError();
     setEditingCard(null);
@@ -168,6 +175,7 @@ export function CreditCardsView({
     setIsFormOpen(true);
     scrollToCardForm();
   }
+
   function closeForm() {
     onClearError();
     setIsFormOpen(false);
@@ -205,28 +213,30 @@ export function CreditCardsView({
 
   return (
     <div className="space-y-5">
-      <header className="app-card rounded-3xl p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="app-kicker">Cartões</p>
+      <header className="app-card overflow-hidden rounded-3xl">
+        <div className="soft-header-gradient p-5 sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="app-kicker">Cartões</p>
 
-            <h1 className="app-title mt-2 text-3xl font-black tracking-tight">
-              Cartões de crédito
-            </h1>
+              <h1 className="app-title mt-2 text-3xl font-black tracking-tight">
+                Cartões de crédito
+              </h1>
 
-            <p className="app-muted mt-2 max-w-2xl text-sm leading-6">
-              Cadastre seus cartões e acompanhe a fatura sem transformar cartão
-              em categoria de gasto.
-            </p>
+              <p className="app-muted mt-2 max-w-2xl text-sm leading-6">
+                Acompanhe faturas, vencimentos e compras no crédito sem
+                transformar cartão em categoria.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={openCreateForm}
+              className="app-button-primary touch-button"
+            >
+              + Novo cartão
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={openCreateForm}
-            className="app-button-primary"
-          >
-            + Novo cartão
-          </button>
         </div>
       </header>
 
@@ -238,9 +248,9 @@ export function CreditCardsView({
         />
 
         <SummaryCard
-          label="Cartões cadastrados"
+          label="Cartões"
           value={String(cards.length)}
-          description="Cartões ativos na carteira"
+          description="Cadastrados na carteira"
         />
 
         <SummaryCard
@@ -257,22 +267,22 @@ export function CreditCardsView({
           ref={formSectionRef}
           className="app-card scroll-mt-5 rounded-3xl p-5 sm:p-6"
         >
-          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="app-title text-lg font-black">
                 {editingCard ? "Editar cartão" : "Novo cartão"}
               </h2>
 
-              <p className="app-muted mt-1 text-sm">
-                Use apenas apelido, bandeira e final do cartão. Não salve número
-                completo, validade ou CVV.
+              <p className="app-muted mt-1 text-sm leading-6">
+                Salve apenas apelido, bandeira e final do cartão. Nunca salve
+                número completo, validade ou CVV.
               </p>
             </div>
 
             <button
               type="button"
               onClick={closeForm}
-              className="app-button-secondary text-sm"
+              className="app-button-secondary touch-button text-sm"
             >
               Cancelar
             </button>
@@ -319,7 +329,7 @@ export function CreditCardsView({
                 />
               </FormField>
 
-              <FormField label="Limite do cartão opcional">
+              <FormField label="Limite opcional">
                 <input
                   value={form.limitAmount}
                   onChange={(event) =>
@@ -376,7 +386,7 @@ export function CreditCardsView({
                     key={color.value}
                     type="button"
                     onClick={() => updateForm("color", color.value)}
-                    className={`rounded-full border px-3 py-2 text-xs font-black transition ${
+                    className={`touch-button rounded-full border px-4 py-2 text-xs font-black transition ${
                       form.color === color.value
                         ? "app-brand-soft"
                         : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
@@ -398,7 +408,7 @@ export function CreditCardsView({
               type="submit"
               isLoading={isSaving}
               loadingLabel="Salvando..."
-              className="app-button-primary sm:w-auto"
+              className="app-button-primary touch-button sm:w-auto"
             >
               {editingCard ? "Salvar cartão" : "Cadastrar cartão"}
             </LoadingButton>
@@ -407,12 +417,7 @@ export function CreditCardsView({
       ) : null}
 
       {isLoading ? (
-        <section className="app-card rounded-3xl p-8 text-center">
-          <p className="app-title text-base font-black">Carregando cartões...</p>
-          <p className="app-muted mt-2 text-sm">
-            Buscando sua carteira de cartões.
-          </p>
-        </section>
+        <CardsLoadingState />
       ) : cards.length === 0 ? (
         <EmptyState
           title="Nenhum cartão cadastrado"
@@ -462,21 +467,25 @@ function CreditCardPanel({
   onDelete,
 }: CreditCardPanelProps) {
   return (
-    <article className="app-card overflow-hidden rounded-3xl">
-      <div className={`${getCardGradientClass(card.color)} p-5 text-white`}>
-
+    <article className="app-card mobile-card-shadow overflow-hidden rounded-3xl">
+      <div
+        className="p-5 text-white"
+        style={{
+          background: getCardGradient(card.color),
+        }}
+      >
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-widest text-white opacity-75">
               {card.brand}
             </p>
 
-            <h2 className="mt-2 text-2xl font-black tracking-tight">
+            <h2 className="mt-2 truncate text-2xl font-black tracking-tight">
               {card.name}
             </h2>
           </div>
 
-          <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-black backdrop-blur">
+          <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black text-stone-900">
             •••• {card.last_four_digits}
           </span>
         </div>
@@ -504,47 +513,13 @@ function CreditCardPanel({
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-black text-stone-900">
-              Últimos gastos da fatura
-            </h3>
+        <InvoicePreview expenses={invoiceExpenses} />
 
-            <span className="text-xs font-bold text-stone-500">
-              {invoiceExpenses.length} item
-              {invoiceExpenses.length === 1 ? "" : "s"}
-            </span>
-          </div>
-
-          <div className="mt-3 space-y-2">
-            {invoiceExpenses.length === 0 ? (
-              <p className="text-sm text-stone-500">
-                Nenhum gasto nessa fatura.
-              </p>
-            ) : (
-              invoiceExpenses.slice(0, 4).map((expense) => (
-                <div
-                  key={expense.id}
-                  className="flex items-center justify-between gap-3 text-sm"
-                >
-                  <span className="min-w-0 truncate text-stone-600">
-                    {expense.description}
-                  </span>
-
-                  <strong className="whitespace-nowrap text-stone-950">
-                    {formatCurrency(expense.amount)}
-                  </strong>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="grid gap-2 sm:grid-cols-2">
           <button
             type="button"
             onClick={onEdit}
-            className="app-button-secondary text-sm sm:w-auto"
+            className="app-button-secondary touch-button text-sm"
           >
             Editar
           </button>
@@ -553,13 +528,48 @@ function CreditCardPanel({
             type="button"
             onClick={onDelete}
             disabled={isDeleting}
-            className="rounded-full border border-red-100 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            className="touch-button rounded-full border border-red-100 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isDeleting ? "Excluindo..." : "Excluir"}
           </button>
         </div>
       </div>
     </article>
+  );
+}
+
+function InvoicePreview({ expenses }: { expenses: Expense[] }) {
+  return (
+    <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-black text-stone-900">Gastos da fatura</h3>
+
+        <span className="text-xs font-bold text-stone-500">
+          {expenses.length} item{expenses.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {expenses.length === 0 ? (
+          <p className="text-sm text-stone-500">Nenhum gasto nessa fatura.</p>
+        ) : (
+          expenses.slice(0, 4).map((expense) => (
+            <div
+              key={expense.id}
+              className="flex items-center justify-between gap-3 text-sm"
+            >
+              <span className="min-w-0 truncate text-stone-600">
+                {expense.description}
+              </span>
+
+              <strong className="whitespace-nowrap text-stone-950">
+                {formatCurrency(expense.amount)}
+              </strong>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -587,12 +597,10 @@ function SummaryCard({
 
 function CardMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white/15 p-3 backdrop-blur">
-      <p className="text-xs font-bold text-white/70">{label}</p>
+    <div className="rounded-2xl bg-white p-3 text-stone-950 opacity-95">
+      <p className="text-xs font-bold text-stone-500">{label}</p>
 
-      <strong className="mt-1 block truncate text-sm font-black text-white">
-        {value}
-      </strong>
+      <strong className="mt-1 block truncate text-sm font-black">{value}</strong>
     </div>
   );
 }
@@ -609,6 +617,15 @@ function FormField({
       <span>{label}</span>
       {children}
     </label>
+  );
+}
+
+function CardsLoadingState() {
+  return (
+    <section className="grid gap-5 xl:grid-cols-2">
+      <div className="h-96 animate-pulse rounded-3xl border border-stone-100 bg-stone-100" />
+      <div className="h-96 animate-pulse rounded-3xl border border-stone-100 bg-stone-100" />
+    </section>
   );
 }
 
@@ -652,14 +669,6 @@ function isValidCardDay(day: number) {
   return Number.isInteger(day) && day >= 1 && day <= 31;
 }
 
-function isExpenseInInvoiceMonth(expense: Expense, invoiceMonth: string) {
-  if (expense.invoice_month) {
-    return expense.invoice_month === invoiceMonth;
-  }
-
-  return expense.date.startsWith(invoiceMonth);
-}
-
 function getDueInfo(invoiceMonth: string, dueDay: number) {
   const [year, month] = invoiceMonth.split("-").map(Number);
   const lastDay = new Date(year, month, 0).getDate();
@@ -675,35 +684,35 @@ function getDueInfo(invoiceMonth: string, dueDay: number) {
 
   if (rawDaysLeft === 0) {
     return {
-      daysLeft: 0,
-      label: `Vence hoje · ${dueDateLabel}`,
+      priority: 0,
+      label: `Hoje · ${dueDateLabel}`,
     };
   }
 
   if (rawDaysLeft === 1) {
     return {
-      daysLeft: 1,
-      label: `Vence amanhã · ${dueDateLabel}`,
+      priority: 1,
+      label: `Amanhã · ${dueDateLabel}`,
     };
   }
 
   if (rawDaysLeft > 1 && rawDaysLeft <= 7) {
     return {
-      daysLeft: rawDaysLeft,
-      label: `Vence em ${rawDaysLeft} dias · ${dueDateLabel}`,
+      priority: rawDaysLeft,
+      label: `${rawDaysLeft} dias · ${dueDateLabel}`,
     };
   }
 
   if (rawDaysLeft > 7) {
     return {
-      daysLeft: rawDaysLeft,
-      label: `Vence ${dueDateLabel}`,
+      priority: rawDaysLeft,
+      label: dueDateLabel,
     };
   }
 
   return {
-    daysLeft: 999,
-    label: `Vence ${dueDateLabel}`,
+    priority: 999,
+    label: dueDateLabel,
   };
 }
 
@@ -714,15 +723,15 @@ function formatShortDueDate(date: Date) {
   return `dia ${day}/${month}`;
 }
 
-function getCardGradientClass(color: CreditCardColor) {
+function getCardGradient(color: CreditCardColor) {
   const gradients: Record<CreditCardColor, string> = {
-    purple: "bg-gradient-to-br from-violet-950 via-purple-800 to-fuchsia-600",
-    blue: "bg-gradient-to-br from-sky-950 via-blue-800 to-cyan-500",
-    emerald: "bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-500",
-    rose: "bg-gradient-to-br from-rose-950 via-pink-800 to-rose-500",
-    amber: "bg-gradient-to-br from-stone-950 via-amber-800 to-orange-500",
-    black: "bg-gradient-to-br from-stone-950 via-stone-800 to-stone-600",
-    slate: "bg-gradient-to-br from-slate-950 via-slate-700 to-slate-500",
+    purple: "linear-gradient(135deg, #2e1065 0%, #7e22ce 55%, #c026d3 100%)",
+    blue: "linear-gradient(135deg, #082f49 0%, #1d4ed8 55%, #06b6d4 100%)",
+    emerald: "linear-gradient(135deg, #022c22 0%, #047857 55%, #14b8a6 100%)",
+    rose: "linear-gradient(135deg, #4c0519 0%, #be185d 55%, #f43f5e 100%)",
+    amber: "linear-gradient(135deg, #1c1917 0%, #b45309 55%, #f97316 100%)",
+    black: "linear-gradient(135deg, #0c0a09 0%, #292524 55%, #57534e 100%)",
+    slate: "linear-gradient(135deg, #020617 0%, #334155 55%, #64748b 100%)",
   };
 
   return gradients[color] ?? gradients.slate;

@@ -4,6 +4,12 @@ import type { FormEvent, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EXPENSE_CATEGORIES } from "../constants/categories";
+
+import {
+  readDashboardCache,
+  saveDashboardCache,
+} from "../lib/dashboard-cache";
+
 import {
   createCreditCard,
   createExpense,
@@ -50,6 +56,12 @@ import { ExpenseFilters } from "./ExpenseFilters";
 import { ExpenseForm } from "./ExpenseForm";
 import { ExpenseList } from "./ExpenseList";
 import { IncomesView } from "./IncomesView";
+import {
+  CachedDataNotice,
+  MobileDashboardSkeleton,
+  OfflineStatusBanner,
+  UpcomingInvoicesStrip,
+} from "./MobileReadyPolish";
 import { ReportsView } from "./ReportsView";
 import SettingsPage from "./settings/SettingsPage";
 import type { AppView } from "./Sidebar";
@@ -133,7 +145,11 @@ export function ExpensesDashboard({
     null
   );
   const [toast, setToast] = useState<ToastState | null>(null);
-
+  const [cachedDashboardSavedAt, setCachedDashboardSavedAt] = useState<
+    string | null
+  >(null);
+  const [hasHydratedDashboardCache, setHasHydratedDashboardCache] =
+    useState(false);
   const isEditing = editingExpenseId !== null;
 
   const categoryNames = useMemo(() => {
@@ -229,11 +245,61 @@ export function ExpensesDashboard({
   }, []);
 
   useEffect(() => {
+    const cachedDashboard = readDashboardCache();
+
+    if (!cachedDashboard) {
+      setHasHydratedDashboardCache(true);
+      return;
+    }
+
+    setExpenses(cachedDashboard.expenses);
+    setIncomes(cachedDashboard.incomes);
+    setCreditCards(cachedDashboard.creditCards);
+
+    if (cachedDashboard.categoryRecords.length > 0) {
+      setCategoryRecords(cachedDashboard.categoryRecords);
+    }
+
+    setCachedDashboardSavedAt(cachedDashboard.savedAt);
+    setHasHydratedDashboardCache(true);
+  }, []);
+
+  useEffect(() => {
     void loadCategories();
     void loadCreditCards();
     void loadExpenses();
     void loadIncomes();
   }, [loadCategories, loadCreditCards, loadExpenses, loadIncomes]);
+
+  useEffect(() => {
+    if (!hasHydratedDashboardCache) {
+      return;
+    }
+
+    if (isLoadingExpenses || isLoadingIncomes || isLoadingCards) {
+      return;
+    }
+
+    saveDashboardCache({
+      expenses,
+      incomes,
+      creditCards,
+      categoryRecords,
+    });
+
+    if (typeof navigator !== "undefined" && navigator.onLine) {
+      setCachedDashboardSavedAt(null);
+    }
+  }, [
+    categoryRecords,
+    creditCards,
+    expenses,
+    hasHydratedDashboardCache,
+    incomes,
+    isLoadingCards,
+    isLoadingExpenses,
+    isLoadingIncomes,
+  ]);
 
   const monthlyExpenses = useMemo(() => {
     return expenses.filter((expense) => expense.date.startsWith(selectedMonth));
@@ -945,6 +1011,8 @@ export function ExpensesDashboard({
           monthlyBalance={monthlyBalance}
           filteredExpenseTotal={filteredExpenseTotal}
           filteredExpenses={filteredExpenses}
+          allExpenses={expenses}
+          cachedDashboardSavedAt={cachedDashboardSavedAt}
           categoryTotals={categoryTotals}
           categories={categoryNames}
           creditCards={creditCards}
@@ -983,6 +1051,7 @@ export function ExpensesDashboard({
             setCardManagerError("");
             setActiveView("credit-cards");
           }}
+          onOpenCreditCards={() => setActiveView("credit-cards")}
           onCancelEdit={resetForm}
           onSubmit={handleSubmit}
           onSelectedMonthChange={setSelectedMonth}
@@ -1036,6 +1105,8 @@ type ExpensesViewProps = {
   monthlyBalance: number;
   filteredExpenseTotal: number;
   filteredExpenses: Expense[];
+  allExpenses: Expense[];
+  cachedDashboardSavedAt: string | null;
   categoryTotals: CategoryTotal[];
   categories: string[];
   creditCards: CreditCard[];
@@ -1068,6 +1139,7 @@ type ExpensesViewProps = {
   onInstallmentsCountChange: (value: string) => void;
   onManageCategoriesClick: () => void;
   onManageCardsClick: () => void;
+  onOpenCreditCards: () => void;
   onCancelEdit: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSelectedMonthChange: (value: string) => void;
@@ -1086,6 +1158,8 @@ function ExpensesView({
   monthlyBalance,
   filteredExpenseTotal,
   filteredExpenses,
+  allExpenses,
+  cachedDashboardSavedAt,
   categoryTotals,
   categories,
   creditCards,
@@ -1118,6 +1192,7 @@ function ExpensesView({
   onInstallmentsCountChange,
   onManageCategoriesClick,
   onManageCardsClick,
+  onOpenCreditCards,
   onCancelEdit,
   onSubmit,
   onSelectedMonthChange,
@@ -1127,13 +1202,40 @@ function ExpensesView({
   onEditExpense,
   onDeleteExpense,
 }: ExpensesViewProps) {
+  if (isLoadingExpenses && filteredExpenses.length === 0) {
+    return (
+      <div className="space-y-5">
+        <OfflineStatusBanner />
+        <CachedDataNotice savedAt={cachedDashboardSavedAt} />
+
+        <PageHeader
+          monthlyExpenseTotal={monthlyExpenseTotal}
+          monthlyIncomeTotal={monthlyIncomeTotal}
+          monthlyBalance={monthlyBalance}
+          onNewExpenseClick={onNewExpenseClick}
+        />
+
+        <MobileDashboardSkeleton />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
+      <OfflineStatusBanner />
+      <CachedDataNotice savedAt={cachedDashboardSavedAt} />
+
       <PageHeader
         monthlyExpenseTotal={monthlyExpenseTotal}
         monthlyIncomeTotal={monthlyIncomeTotal}
         monthlyBalance={monthlyBalance}
         onNewExpenseClick={onNewExpenseClick}
+      />
+
+      <UpcomingInvoicesStrip
+        creditCards={creditCards}
+        expenses={allExpenses}
+        onOpenCards={onOpenCreditCards}
       />
 
       <SummaryCards
@@ -1227,50 +1329,59 @@ function PageHeader({
   onNewExpenseClick,
 }: PageHeaderProps) {
   return (
-    <header className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700">
-            My Expenses
-          </p>
-
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-stone-950">
-            Gastos
-          </h1>
-
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
-            Cadastre, filtre e acompanhe suas despesas mensais.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3 lg:w-full lg:max-w-xl">
-          <HeaderMetric
-            label="Ganhos"
-            value={formatCurrency(monthlyIncomeTotal)}
-            variant="positive"
-          />
-
-          <HeaderMetric
-            label="Gastos"
-            value={formatCurrency(monthlyExpenseTotal)}
-            variant="negative"
-          />
-
-          <HeaderMetric
-            label="Saldo"
-            value={formatCurrency(monthlyBalance)}
-            variant={monthlyBalance >= 0 ? "positive" : "negative"}
-          />
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={onNewExpenseClick}
-        className="app-button-primary mt-5"
+    <header className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
+      <div
+        className="p-5 sm:p-6"
+        style={{
+          background:
+            "linear-gradient(135deg, #ffffff 0%, #fafaf9 55%, #ecfdf5 100%)",
+        }}
       >
-        + Novo gasto
-      </button>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+              My Expenses
+            </p>
+
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-950 sm:text-4xl">
+              Gastos
+            </h1>
+
+            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-stone-600">
+              Cadastre, filtre e acompanhe suas despesas mensais de forma
+              simples.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 lg:w-full lg:max-w-xl">
+            <HeaderMetric
+              label="Ganhos"
+              value={formatCurrency(monthlyIncomeTotal)}
+              variant="positive"
+            />
+
+            <HeaderMetric
+              label="Gastos"
+              value={formatCurrency(monthlyExpenseTotal)}
+              variant="negative"
+            />
+
+            <HeaderMetric
+              label="Saldo"
+              value={formatCurrency(monthlyBalance)}
+              variant={monthlyBalance >= 0 ? "positive" : "negative"}
+            />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onNewExpenseClick}
+          className="mt-5 flex min-h-12 w-full items-center justify-center rounded-2xl bg-stone-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 sm:w-auto"
+        >
+          + Novo gasto
+        </button>
+      </div>
     </header>
   );
 }
@@ -1282,14 +1393,17 @@ type HeaderMetricProps = {
 };
 
 function HeaderMetric({ label, value, variant }: HeaderMetricProps) {
+  const valueClassName =
+    variant === "positive" ? "text-emerald-700" : "text-red-700";
+
   return (
-    <article className="rounded-3xl border border-stone-200 bg-stone-50 p-4">
-      <p className="text-sm font-medium text-stone-500">{label}</p>
+    <article className="rounded-3xl border border-white bg-white p-4 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-widest text-stone-500">
+        {label}
+      </p>
 
       <strong
-        className={`mt-2 block truncate text-lg font-bold ${
-          variant === "positive" ? "text-emerald-700" : "text-red-700"
-        }`}
+        className={`mt-2 block truncate text-lg font-black tracking-tight ${valueClassName}`}
       >
         {value}
       </strong>

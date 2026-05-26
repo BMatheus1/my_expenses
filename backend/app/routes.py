@@ -9,6 +9,7 @@ from app.auth import (
     set_refresh_token_cookie,
 )
 from app.auth_service import (
+    delete_current_user_account,
     login_user,
     login_with_google,
     logout_refresh_session,
@@ -18,13 +19,16 @@ from app.auth_service import (
     resend_verification_email,
     reset_user_password,
     verify_user_email,
-    delete_current_user_account,
 )
 from app.business_routes import router as business_router
 from app.schemas import (
     AuthLoginRequest,
     AuthRegisterRequest,
     AuthResponse,
+    CreditCardCreate,
+    CreditCardResponse,
+    CreditCardUpdate,
+    DeleteAccountRequest,
     ExpenseCategoryCreate,
     ExpenseCategoryResponse,
     ExpenseCategoryUpdate,
@@ -42,20 +46,23 @@ from app.schemas import (
     ResetPasswordRequest,
     UserResponse,
     VerifyEmailRequest,
-    DeleteAccountRequest,
 )
 from app.security import auth_rate_limit, write_rate_limit
 from app.services import (
+    create_credit_card,
     create_expense,
     create_expense_category,
     create_income,
+    delete_credit_card,
     delete_expense,
     delete_expense_category,
     delete_income,
     get_app_status,
+    list_credit_cards,
     list_expense_categories,
     list_expenses,
     list_incomes,
+    update_credit_card,
     update_expense,
     update_expense_category,
     update_income,
@@ -203,16 +210,6 @@ def get_me(current_user: UserResponse = Depends(get_current_user)):
     return current_user
 
 
-@router.get(
-    "/expense-categories",
-    response_model=list[ExpenseCategoryResponse],
-    tags=["Expense Categories"],
-)
-def get_expense_categories(
-    current_user: UserResponse = Depends(get_current_user),
-):
-    return list_expense_categories(current_user.id)
-
 @router.delete(
     "/auth/account",
     response_model=MessageResponse,
@@ -232,6 +229,19 @@ def delete_account(
     clear_refresh_token_cookie(response)
 
     return MessageResponse(message=message)
+
+
+@router.get(
+    "/expense-categories",
+    response_model=list[ExpenseCategoryResponse],
+    tags=["Expense Categories"],
+)
+def get_expense_categories(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return list_expense_categories(current_user.id)
+
+
 @router.post(
     "/expense-categories",
     response_model=ExpenseCategoryResponse,
@@ -275,6 +285,58 @@ def remove_expense_category(
     current_user: UserResponse = Depends(get_current_user),
 ):
     delete_expense_category(category_id, current_user.id)
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/credit-cards",
+    response_model=list[CreditCardResponse],
+    tags=["Credit Cards"],
+)
+def get_credit_cards(current_user: UserResponse = Depends(get_current_user)):
+    return list_credit_cards(current_user.id)
+
+
+@router.post(
+    "/credit-cards",
+    response_model=CreditCardResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Credit Cards"],
+    dependencies=[Depends(write_rate_limit)],
+)
+def add_credit_card(
+    card_data: CreditCardCreate,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return create_credit_card(card_data, current_user.id)
+
+
+@router.put(
+    "/credit-cards/{card_id}",
+    response_model=CreditCardResponse,
+    tags=["Credit Cards"],
+    dependencies=[Depends(write_rate_limit)],
+)
+def edit_credit_card(
+    card_id: str,
+    card_data: CreditCardUpdate,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return update_credit_card(card_id, card_data, current_user.id)
+
+
+@router.delete(
+    "/credit-cards/{card_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Credit Cards"],
+    dependencies=[Depends(write_rate_limit)],
+)
+def remove_credit_card(
+    card_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    delete_credit_card(card_id, current_user.id)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

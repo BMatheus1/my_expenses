@@ -37,22 +37,6 @@ const API_URL = (
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
 
-function isBrowserOffline() {
-  return typeof navigator !== "undefined" && navigator.onLine === false;
-}
-
-function getNetworkErrorMessage(error?: unknown) {
-  if (isBrowserOffline()) {
-    return "Você está sem internet. Conecte-se para sincronizar suas informações.";
-  }
-
-  if (error instanceof Error && error.name === "AbortError") {
-    return "A conexão demorou mais que o esperado. Verifique sua internet e tente novamente.";
-  }
-
-  return "Não foi possível conectar ao servidor agora. Tente novamente em alguns segundos.";
-}
-
 type ApiValidationError = {
   msg?: string;
 };
@@ -94,15 +78,54 @@ export function clearAuthToken() {
   clearStoredAuthToken();
 }
 
-export async function logoutCurrentSession(): Promise<void> {
+function isBrowserOffline() {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
+function getNetworkErrorMessage(error?: unknown) {
+  if (isBrowserOffline()) {
+    return "Você está sem internet. Conecte-se para sincronizar suas informações.";
+  }
+
+  if (error instanceof Error && error.name === "AbortError") {
+    return "A conexão demorou mais que o esperado. Verifique sua internet e tente novamente.";
+  }
+
+  return "Não foi possível conectar ao servidor agora. Tente novamente em alguns segundos.";
+}
+
+async function refreshAccessTokenRequest(): Promise<boolean> {
+  if (isBrowserOffline()) {
+    throw new ApiError(getNetworkErrorMessage(), 0);
+  }
+
+  const requestUrl = `${API_URL}/auth/refresh`;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, DEFAULT_REQUEST_TIMEOUT_MS);
+
   try {
-    await fetch(`${API_URL}/auth/logout`, {
+    const response = await fetch(requestUrl, {
       method: "POST",
       credentials: "include",
       cache: "no-store",
+      signal: controller.signal,
     });
+
+    if (!response.ok) {
+      clearAuthToken();
+      return false;
+    }
+
+    const authResponse = (await response.json()) as AuthResponse;
+    setAuthToken(authResponse.access_token);
+
+    return true;
+  } catch (error) {
+    throw new ApiError(getNetworkErrorMessage(error), 0);
   } finally {
-    clearAuthToken();
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -116,42 +139,6 @@ export async function refreshAccessToken(): Promise<boolean> {
   });
 
   return refreshPromise;
-}
-
-async function refreshAccessTokenRequest(): Promise<boolean> {
-  if (isBrowserOffline()) {
-    throw new ApiError(getNetworkErrorMessage(), 0);
-  }
-
-  let response: Response;
-  const requestUrl = `${API_URL}/auth/refresh`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, DEFAULT_REQUEST_TIMEOUT_MS);
-
-  try {
-    response = await fetch(requestUrl, {
-      method: "POST",
-      credentials: "include",
-      cache: "no-store",
-      signal: controller.signal,
-    });
-  } catch (error) {
-    throw new ApiError(getNetworkErrorMessage(error), 0);
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) {
-    clearAuthToken();
-    return false;
-  }
-
-  const authResponse = (await response.json()) as AuthResponse;
-  setAuthToken(authResponse.access_token);
-
-  return true;
 }
 
 async function requestWithAuth(
@@ -176,7 +163,7 @@ async function requestWithAuth(
 
   const requestUrl = `${API_URL}${path}`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
+  const timeoutId = window.setTimeout(() => {
     controller.abort();
   }, config.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
 
@@ -191,7 +178,7 @@ async function requestWithAuth(
   } catch (error) {
     throw new ApiError(getNetworkErrorMessage(error), 0);
   } finally {
-    clearTimeout(timeoutId);
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -268,8 +255,24 @@ async function extractApiErrorMessage(response: Response): Promise<string> {
   return "Não foi possível concluir a operação.";
 }
 
-export async function registerUser(data: RegisterRequest): Promise<AuthResponse> {
-  const response = await apiFetch<AuthResponse>(
+/**
+ * Função genérica mantida para compatibilidade com arquivos antigos,
+ * como business-api.ts.
+ */
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return apiFetch<T>(path, options);
+}
+
+/**
+ * Auth
+ */
+export async function registerUser(
+  data: RegisterRequest,
+): Promise<MessageResponse> {
+  return apiFetch<MessageResponse>(
     "/auth/register",
     {
       method: "POST",
@@ -280,10 +283,6 @@ export async function registerUser(data: RegisterRequest): Promise<AuthResponse>
       skipAuthRefresh: true,
     },
   );
-
-  setAuthToken(response.access_token);
-
-  return response;
 }
 
 export async function loginUser(data: LoginRequest): Promise<AuthResponse> {
@@ -330,8 +329,8 @@ export async function getCurrentUser(): Promise<User> {
 
 export async function verifyEmail(
   data: VerifyEmailRequest,
-): Promise<MessageResponse> {
-  return apiFetch<MessageResponse>(
+): Promise<AuthResponse> {
+  const response = await apiFetch<AuthResponse>(
     "/auth/verify-email",
     {
       method: "POST",
@@ -342,6 +341,10 @@ export async function verifyEmail(
       skipAuthRefresh: true,
     },
   );
+
+  setAuthToken(response.access_token);
+
+  return response;
 }
 
 export async function resendVerificationEmail(
@@ -392,10 +395,22 @@ export async function resetPassword(
   );
 }
 
+export async function logoutCurrentSession(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    });
+  } finally {
+    clearAuthToken();
+  }
+}
+
 export async function deleteCurrentAccount(
   data: DeleteAccountRequest,
 ): Promise<MessageResponse> {
-  const response = await apiFetch<MessageResponse>("/auth/delete-account", {
+  const response = await apiFetch<MessageResponse>("/auth/account", {
     method: "DELETE",
     body: JSON.stringify(data),
   });
@@ -405,6 +420,34 @@ export async function deleteCurrentAccount(
   return response;
 }
 
+/**
+ * Aliases para manter compatibilidade com componentes antigos.
+ */
+export async function registerWithEmail(
+  data: RegisterRequest,
+): Promise<MessageResponse> {
+  return registerUser(data);
+}
+
+export async function loginWithEmail(data: LoginRequest): Promise<AuthResponse> {
+  return loginUser(data);
+}
+
+export async function requestPasswordReset(
+  data: ForgotPasswordRequest,
+): Promise<MessageResponse> {
+  return forgotPassword(data);
+}
+
+export async function deleteAccount(
+  data: DeleteAccountRequest,
+): Promise<MessageResponse> {
+  return deleteCurrentAccount(data);
+}
+
+/**
+ * Expenses
+ */
 export async function getExpenses(): Promise<Expense[]> {
   return apiFetch<Expense[]>("/expenses");
 }
@@ -434,6 +477,9 @@ export async function deleteExpense(expenseId: string): Promise<void> {
   });
 }
 
+/**
+ * Incomes
+ */
 export async function getIncomes(): Promise<Income[]> {
   return apiFetch<Income[]>("/incomes");
 }
@@ -461,6 +507,9 @@ export async function deleteIncome(incomeId: string): Promise<void> {
   });
 }
 
+/**
+ * Expense categories
+ */
 export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
   return apiFetch<ExpenseCategory[]>("/expense-categories");
 }
@@ -490,6 +539,9 @@ export async function deleteExpenseCategory(categoryId: string): Promise<void> {
   });
 }
 
+/**
+ * Credit cards
+ */
 export async function getCreditCards(): Promise<CreditCard[]> {
   return apiFetch<CreditCard[]>("/credit-cards");
 }
@@ -517,20 +569,4 @@ export async function deleteCreditCard(creditCardId: string): Promise<void> {
   return apiFetch<void>(`/credit-cards/${creditCardId}`, {
     method: "DELETE",
   });
-}
-
-export async function registerWithEmail(
-  data: RegisterRequest,
-): Promise<AuthResponse> {
-  return registerUser(data);
-}
-
-export async function loginWithEmail(data: LoginRequest): Promise<AuthResponse> {
-  return loginUser(data);
-}
-
-export async function requestPasswordReset(
-  data: ForgotPasswordRequest,
-): Promise<MessageResponse> {
-  return forgotPassword(data);
 }

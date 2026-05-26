@@ -26,6 +26,8 @@ type InvoiceSummary = {
   daysUntilDue: number;
 };
 
+const INVOICE_ALERT_DAYS_BEFORE_DUE = 3;
+
 export function OfflineStatusBanner() {
   const isOnline = useOnlineStatus();
 
@@ -252,9 +254,15 @@ function buildUpcomingInvoiceSummaries(
         daysUntilDue: dueInfo.daysUntilDue,
       };
     })
-    .filter((summary) => summary.total > 0)
+    .filter((summary) => {
+      const hasInvoiceValue = summary.total > 0;
+      const isExactlyThreeDaysBeforeDue =
+        summary.daysUntilDue === INVOICE_ALERT_DAYS_BEFORE_DUE;
+
+      return hasInvoiceValue && isExactlyThreeDaysBeforeDue;
+    })
     .sort((first, second) => first.daysUntilDue - second.daysUntilDue)
-    .slice(0, 4);
+    .slice(0, 3);
 }
 
 function getInvoiceDueInfo(invoiceMonth: string, dueDay: number) {
@@ -264,48 +272,14 @@ function getInvoiceDueInfo(invoiceMonth: string, dueDay: number) {
   const dueDate = new Date(year, month - 1, safeDueDay);
   const today = new Date(`${getCurrentDate()}T00:00:00`);
 
-  const rawDaysUntilDue = Math.ceil(
+  const daysUntilDue = Math.ceil(
     (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
   );
 
-  const dueDateLabel = formatDueDateLabel(dueDate);
-
-  if (rawDaysUntilDue === 0) {
-    return {
-      daysUntilDue: 0,
-      label: `Hoje · ${dueDateLabel}`,
-      tone: "attention" as const,
-    };
-  }
-
-  if (rawDaysUntilDue === 1) {
-    return {
-      daysUntilDue: 1,
-      label: `Amanhã · ${dueDateLabel}`,
-      tone: "attention" as const,
-    };
-  }
-
-  if (rawDaysUntilDue > 1 && rawDaysUntilDue <= 5) {
-    return {
-      daysUntilDue: rawDaysUntilDue,
-      label: `${rawDaysUntilDue} dias · ${dueDateLabel}`,
-      tone: "attention" as const,
-    };
-  }
-
-  if (rawDaysUntilDue > 5) {
-    return {
-      daysUntilDue: rawDaysUntilDue,
-      label: dueDateLabel,
-      tone: "soft" as const,
-    };
-  }
-
   return {
-    daysUntilDue: 999,
-    label: dueDateLabel,
-    tone: "neutral" as const,
+    daysUntilDue,
+    label: `Vence ${formatDueDateLabel(dueDate)}`,
+    tone: "attention" as const,
   };
 }
 

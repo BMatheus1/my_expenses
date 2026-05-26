@@ -1,8 +1,7 @@
 "use client";
 
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { LoadingButton } from "./AppFeedback";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   loginWithEmail,
@@ -13,8 +12,10 @@ import {
   setAuthToken,
   verifyEmail,
 } from "../lib/api";
+import { saveCachedAuthenticatedUser } from "../lib/auth-session-cache";
 import type { User } from "../types/auth";
 import { smartScrollToRef } from "../utils/smartScroll";
+import { LoadingButton } from "./AppFeedback";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 
 type AuthMode =
@@ -77,7 +78,15 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
   const passwordStrength = useMemo(
     () => getPasswordStrength(password),
-    [password]
+    [password],
+  );
+
+  const handleAuthenticated = useCallback(
+    (user: User) => {
+      saveCachedAuthenticatedUser(user);
+      onAuthenticated(user);
+    },
+    [onAuthenticated],
   );
 
   useEffect(() => {
@@ -106,7 +115,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
           setAuthToken(authResponse.access_token);
           clearUrlTokens();
-          onAuthenticated(authResponse.user);
+          handleAuthenticated(authResponse.user);
         } catch (error) {
           if (!isMounted) {
             return;
@@ -140,7 +149,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     setErrorMessage("");
     setSuccessMessage("");
     setIsSubmitting(false);
-  }, [onAuthenticated]);
+  }, [handleAuthenticated]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -236,7 +245,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         });
 
         setAuthToken(authResponse.access_token);
-        onAuthenticated(authResponse.user);
+        handleAuthenticated(authResponse.user);
         return;
       }
 
@@ -270,7 +279,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         setPassword("");
         setMode("verify-email");
         setSuccessMessage(
-          "Sua conta está pendente de confirmação. Enviamos um novo link para seu e-mail."
+          "Sua conta está pendente de confirmação. Enviamos um novo link para seu e-mail.",
         );
         setErrorMessage("");
 
@@ -291,7 +300,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         setTermsAccepted(false);
         setMode("verify-email");
         setSuccessMessage(
-          "Já existe uma conta pendente com este e-mail. Enviamos um novo link de confirmação."
+          "Já existe uma conta pendente com este e-mail. Enviamos um novo link de confirmação.",
         );
         setErrorMessage("");
 
@@ -610,7 +619,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
               </div>
 
               <GoogleSignInButton
-                onAuthenticated={onAuthenticated}
+                onAuthenticated={handleAuthenticated}
                 onError={setErrorMessage}
               />
             </>
@@ -833,7 +842,8 @@ function getAuthDescription(mode: AuthMode) {
       "Crie sua conta com os dados essenciais para proteger seu acesso.",
     "forgot-password":
       "Informe seu e-mail. Se existir uma conta, enviaremos o link de recuperação.",
-    "reset-password": "Informe e confirme sua nova senha para recuperar o acesso.",
+    "reset-password":
+      "Informe e confirme sua nova senha para recuperar o acesso.",
     "verify-email":
       "Enviamos um link para confirmar sua conta. Verifique sua caixa de entrada.",
   };
@@ -975,17 +985,11 @@ function getAuthErrorMessage(error: unknown) {
   }
 
   if (
-    message.includes("sem internet") ||
     message.includes("failed to fetch") ||
     message.includes("não foi possível conectar") ||
-    message.includes("network") ||
-    message.includes("conexão demorou")
+    message.includes("network")
   ) {
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      return "Você está sem internet. Conecte-se e tente novamente.";
-    }
-
-    return "Não foi possível conectar ao servidor agora. Tente novamente em alguns segundos.";
+    return "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.";
   }
 
   return error.message || "Não foi possível concluir a ação.";

@@ -323,8 +323,16 @@ export async function loginWithGoogle(
   return response;
 }
 
-export async function getCurrentUser(): Promise<User> {
-  return apiFetch<User>("/auth/me");
+export async function getCurrentUser(
+  options: { timeoutMs?: number } = {},
+): Promise<User> {
+  return apiFetch<User>(
+    "/auth/me",
+    {},
+    {
+      timeoutMs: options.timeoutMs,
+    },
+  );
 }
 
 export async function verifyEmail(

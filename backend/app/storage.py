@@ -2,10 +2,10 @@ import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-
 import psycopg
 from psycopg import Connection
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 from app.config import settings
 from app.schemas import (
@@ -18,9 +18,44 @@ from app.schemas import (
 )
 
 
+database_pool: ConnectionPool | None = None
+
+
+def open_database_pool() -> None:
+    global database_pool
+
+    if database_pool is not None:
+        return
+
+    database_pool = ConnectionPool(
+        conninfo=settings.database_url,
+        min_size=settings.database_pool_min_size,
+        max_size=settings.database_pool_max_size,
+        kwargs={"row_factory": dict_row},
+        open=True,
+    )
+
+
+def close_database_pool() -> None:
+    global database_pool
+
+    if database_pool is None:
+        return
+
+    database_pool.close()
+    database_pool = None
+
+
 @contextmanager
 def get_connection() -> Iterator[Connection]:
-    connection = psycopg.connect(settings.database_url, row_factory=dict_row)
+    pool = database_pool
+
+    if pool is None:
+        connection = psycopg.connect(settings.database_url, row_factory=dict_row)
+        should_return_to_pool = False
+    else:
+        connection = pool.getconn()
+        should_return_to_pool = True
 
     try:
         yield connection
@@ -29,8 +64,10 @@ def get_connection() -> Iterator[Connection]:
         connection.rollback()
         raise
     finally:
-        connection.close()
-
+        if should_return_to_pool:
+            pool.putconn(connection)
+        else:
+            connection.close()
 
 def initialize_database() -> None:
     with get_connection() as connection:

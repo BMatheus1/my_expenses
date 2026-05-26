@@ -27,7 +27,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         close_database_pool()
 
-
 app = FastAPI(
     title=settings.app_name,
     debug=False if settings.is_production else settings.app_debug,

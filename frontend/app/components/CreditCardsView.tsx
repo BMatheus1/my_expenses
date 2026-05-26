@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+
 import type {
   CreateCreditCardRequest,
   CreditCard,
@@ -14,6 +21,8 @@ import {
   parseMoneyToNumber,
   sanitizeMoneyInput,
 } from "../utils/formatters";
+
+import { smartScrollToRef } from "../utils/smartScroll";
 import { EmptyState, LoadingButton } from "./AppFeedback";
 
 const CARD_BRANDS = [
@@ -81,6 +90,7 @@ export function CreditCardsView({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
   const [form, setForm] = useState<CardFormState>(EMPTY_FORM);
+  const formSectionRef = useRef<HTMLDivElement | null>(null);
   const currentInvoiceMonth = getCurrentMonth();
 
   const cardSummaries = useMemo(() => {
@@ -124,11 +134,20 @@ export function CreditCardsView({
       (first, second) => first.dueInfo.daysLeft - second.dueInfo.daysLeft,
     )[0];
 
+  function scrollToCardForm() {
+    window.setTimeout(() => {
+      smartScrollToRef(formSectionRef, {
+        delayMs: 0,
+        focusFirstField: true,
+      });
+    }, 120);
+  }    
   function openCreateForm() {
     onClearError();
     setEditingCard(null);
     setForm(EMPTY_FORM);
     setIsFormOpen(true);
+    scrollToCardForm();
   }
 
   function openEditForm(card: CreditCard) {
@@ -147,8 +166,8 @@ export function CreditCardsView({
       color: card.color,
     });
     setIsFormOpen(true);
+    scrollToCardForm();
   }
-
   function closeForm() {
     onClearError();
     setIsFormOpen(false);
@@ -234,7 +253,10 @@ export function CreditCardsView({
       </section>
 
       {isFormOpen ? (
-        <section className="app-card rounded-3xl p-5 sm:p-6">
+        <section
+          ref={formSectionRef}
+          className="app-card scroll-mt-5 rounded-3xl p-5 sm:p-6"
+        >
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="app-title text-lg font-black">
@@ -641,26 +663,55 @@ function isExpenseInInvoiceMonth(expense: Expense, invoiceMonth: string) {
 function getDueInfo(invoiceMonth: string, dueDay: number) {
   const [year, month] = invoiceMonth.split("-").map(Number);
   const lastDay = new Date(year, month, 0).getDate();
-  const dueDate = new Date(year, month - 1, Math.min(dueDay, lastDay));
+  const safeDueDay = Math.min(dueDay, lastDay);
+  const dueDate = new Date(year, month - 1, safeDueDay);
   const today = new Date(`${getCurrentDate()}T00:00:00`);
 
-  const daysLeft = Math.ceil(
+  const rawDaysLeft = Math.ceil(
     (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
   );
 
-  if (daysLeft < 0) {
-    return { daysLeft, label: "Venceu" };
+  const dueDateLabel = formatShortDueDate(dueDate);
+
+  if (rawDaysLeft === 0) {
+    return {
+      daysLeft: 0,
+      label: `Vence hoje · ${dueDateLabel}`,
+    };
   }
 
-  if (daysLeft === 0) {
-    return { daysLeft, label: "Vence hoje" };
+  if (rawDaysLeft === 1) {
+    return {
+      daysLeft: 1,
+      label: `Vence amanhã · ${dueDateLabel}`,
+    };
   }
 
-  if (daysLeft === 1) {
-    return { daysLeft, label: "Vence amanhã" };
+  if (rawDaysLeft > 1 && rawDaysLeft <= 7) {
+    return {
+      daysLeft: rawDaysLeft,
+      label: `Vence em ${rawDaysLeft} dias · ${dueDateLabel}`,
+    };
   }
 
-  return { daysLeft, label: `Vence em ${daysLeft} dias` };
+  if (rawDaysLeft > 7) {
+    return {
+      daysLeft: rawDaysLeft,
+      label: `Vence ${dueDateLabel}`,
+    };
+  }
+
+  return {
+    daysLeft: 999,
+    label: `Vence ${dueDateLabel}`,
+  };
+}
+
+function formatShortDueDate(date: Date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+
+  return `dia ${day}/${month}`;
 }
 
 function getCardGradientClass(color: CreditCardColor) {

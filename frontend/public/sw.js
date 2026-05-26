@@ -1,4 +1,4 @@
-const APP_VERSION = "my-expenses-v5";
+const APP_VERSION = "my-expenses-v6";
 const STATIC_CACHE = `${APP_VERSION}-static`;
 
 const STATIC_ASSETS = [
@@ -7,6 +7,7 @@ const STATIC_ASSETS = [
   "/icon-512.png",
   "/maskable-icon-512.png",
   "/apple-touch-icon.png",
+  "/manifest.webmanifest",
 ];
 
 self.addEventListener("install", (event) => {
@@ -28,6 +29,7 @@ self.addEventListener("activate", (event) => {
           .filter((cacheName) => cacheName !== STATIC_CACHE)
           .map((cacheName) => caches.delete(cacheName)),
       );
+
       await self.clients.claim();
     }),
   );
@@ -60,7 +62,8 @@ self.addEventListener("fetch", (event) => {
     requestUrl.pathname === "/icon-192.png" ||
     requestUrl.pathname === "/icon-512.png" ||
     requestUrl.pathname === "/maskable-icon-512.png" ||
-    requestUrl.pathname === "/apple-touch-icon.png";
+    requestUrl.pathname === "/apple-touch-icon.png" ||
+    requestUrl.pathname === "/manifest.webmanifest";
 
   if (!shouldUseCacheFirst) {
     return;

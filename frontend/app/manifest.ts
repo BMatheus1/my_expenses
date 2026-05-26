@@ -2,16 +2,17 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "My Expenses",
-    short_name: "Expenses",
-    description: "Controle seus gastos, ganhos, cartões e negócios em um só lugar.",
+    name: "My Expenses - Controle de Gastos",
+    short_name: "My Expenses",
+    description:
+      "Controle seus ganhos, gastos, cartões, relatórios e negócios pelo celular.",
     start_url: "/app",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#fafaf9",
-    theme_color: "#059669",
-    categories: ["finance", "productivity"],
+    background_color: "#0c0a09",
+    theme_color: "#0c0a09",
+    categories: ["finance", "productivity", "business"],
     lang: "pt-BR",
     icons: [
       {
@@ -31,6 +32,12 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
+      },
+      {
+        src: "/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+        purpose: "any",
       },
     ],
   };

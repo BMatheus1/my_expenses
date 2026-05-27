@@ -9,7 +9,7 @@ import {
   type AppThemeName,
   getSavedAppMode,
   getSavedAppTheme,
-  initializeAppTheme,
+  initializeUserAppTheme,
   saveAndApplyAppMode,
   saveAndApplyAppTheme,
 } from "@/app/lib/theme";
@@ -74,23 +74,23 @@ export default function SettingsPage({
   const sessionInfo = getSessionSecurityInfo();
 
   useEffect(() => {
-    initializeAppTheme();
-    setSelectedTheme(getSavedAppTheme());
-    setSelectedMode(getSavedAppMode());
+    initializeUserAppTheme(currentUser.id);
+    setSelectedTheme(getSavedAppTheme(currentUser.id));
+    setSelectedMode(getSavedAppMode(currentUser.id));
     setRememberSession(getRememberSession());
     setAutoLogoutEnabled(getAutoLogoutEnabled());
     setAutoLogoutMinutes(getAutoLogoutMinutes());
     refreshSessionInfo((currentValue) => currentValue + 1);
-  }, []);
+  }, [currentUser.id]);
 
   function handleThemeChange(theme: AppThemeName) {
     setSelectedTheme(theme);
-    saveAndApplyAppTheme(theme);
+    saveAndApplyAppTheme(theme, currentUser.id);
   }
 
   function handleModeChange(mode: AppColorMode) {
     setSelectedMode(mode);
-    saveAndApplyAppMode(mode);
+    saveAndApplyAppMode(mode, currentUser.id);
   }
 
   function handleRememberSessionChange(value: boolean) {

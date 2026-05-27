@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-
+import { MonthSelect } from "./MonthSelect";
 import type { Expense } from "../types/expense";
 import type { Income } from "../types/income";
 import type { CategoryTotal } from "../types/summary";
@@ -92,10 +92,9 @@ export function ReportsView({
           <label className="space-y-1.5 text-sm font-bold text-stone-700">
             <span>Mês</span>
 
-            <input
-              type="month"
+            <MonthSelect
               value={selectedMonth}
-              onChange={(event) => onSelectedMonthChange(event.target.value)}
+              onChange={onSelectedMonthChange}
               className="app-input max-w-xs px-4 py-3 text-sm"
             />
           </label>

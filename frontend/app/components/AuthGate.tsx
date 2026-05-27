@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-
+import {
+  applyDefaultAppAppearance,
+  initializeUserAppTheme,
+} from "../lib/theme";
 import {
   ApiError,
   getCurrentUser,
@@ -76,10 +79,14 @@ export function AuthGate() {
   const [sessionError, setSessionError] = useState(false);
   const [sessionErrorMessage, setSessionErrorMessage] = useState("");
   const [securitySettingsVersion, setSecuritySettingsVersion] = useState(0);
-
+  
+  const currentUserId = currentUser?.id ?? null;
+  
+  
   const handleLogout = useCallback(() => {
     void logoutCurrentSession();
     clearCachedAuthenticatedUser();
+    applyDefaultAppAppearance();
     setCurrentUser(null);
   }, []);
 
@@ -158,6 +165,20 @@ export function AuthGate() {
       setUnauthorizedHandler(null);
     };
   }, [handleLogout]);
+
+  useEffect(() => {
+    if (isCheckingSession) {
+      return;
+    }
+
+    if (currentUserId) {
+      initializeUserAppTheme(currentUserId);
+      return;
+    }
+
+    applyDefaultAppAppearance();
+  }, [currentUserId, isCheckingSession]);
+
 
   useEffect(() => {
     void checkSession();

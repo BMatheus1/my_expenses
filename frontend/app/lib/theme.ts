@@ -123,21 +123,27 @@ export const APP_THEMES: AppTheme[] = [
 
 const APP_THEME_NAMES = APP_THEMES.map((theme) => theme.name);
 
-export function getSavedAppTheme(): AppThemeName {
+export function getSavedAppTheme(userId?: string | null): AppThemeName {
   if (typeof window === "undefined") {
     return DEFAULT_APP_THEME;
   }
 
-  const savedTheme = window.localStorage.getItem(APP_THEME_STORAGE_KEY);
+  const savedTheme = window.localStorage.getItem(
+    getAppearanceStorageKey(APP_THEME_STORAGE_KEY, userId),
+  );
+
   return isAppThemeName(savedTheme) ? savedTheme : DEFAULT_APP_THEME;
 }
 
-export function getSavedAppMode(): AppColorMode {
+export function getSavedAppMode(userId?: string | null): AppColorMode {
   if (typeof window === "undefined") {
     return DEFAULT_APP_MODE;
   }
 
-  const savedMode = window.localStorage.getItem(APP_MODE_STORAGE_KEY);
+  const savedMode = window.localStorage.getItem(
+    getAppearanceStorageKey(APP_MODE_STORAGE_KEY, userId),
+  );
+
   return isAppColorMode(savedMode) ? savedMode : DEFAULT_APP_MODE;
 }
 
@@ -148,27 +154,83 @@ export function applyAppAppearance(theme: AppThemeName, mode: AppColorMode) {
 
   document.documentElement.dataset.appTheme = theme;
   document.documentElement.dataset.appMode = mode;
+
   updateBrowserThemeColor(mode);
 }
 
-export function saveAndApplyAppTheme(theme: AppThemeName) {
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(APP_THEME_STORAGE_KEY, theme);
-  }
-
-  applyAppAppearance(theme, getSavedAppMode());
-}
-
-export function saveAndApplyAppMode(mode: AppColorMode) {
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(APP_MODE_STORAGE_KEY, mode);
-  }
-
-  applyAppAppearance(getSavedAppTheme(), mode);
+export function applyDefaultAppAppearance() {
+  applyAppAppearance(DEFAULT_APP_THEME, DEFAULT_APP_MODE);
 }
 
 export function initializeAppTheme() {
   applyAppAppearance(getSavedAppTheme(), getSavedAppMode());
+}
+
+export function initializeUserAppTheme(userId: string) {
+  applyAppAppearance(getSavedAppTheme(userId), getSavedAppMode(userId));
+}
+
+export function saveAndApplyAppTheme(
+  theme: AppThemeName,
+  userId?: string | null,
+) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(
+      getAppearanceStorageKey(APP_THEME_STORAGE_KEY, userId),
+      theme,
+    );
+  }
+
+  applyAppAppearance(theme, getSavedAppMode(userId));
+}
+
+export function saveAndApplyAppMode(
+  mode: AppColorMode,
+  userId?: string | null,
+) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(
+      getAppearanceStorageKey(APP_MODE_STORAGE_KEY, userId),
+      mode,
+    );
+  }
+
+  applyAppAppearance(getSavedAppTheme(userId), mode);
+}
+
+export function clearAppAppearancePreferences() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(APP_THEME_STORAGE_KEY);
+  window.localStorage.removeItem(APP_MODE_STORAGE_KEY);
+
+  applyDefaultAppAppearance();
+}
+
+export function clearUserAppAppearancePreferences(userId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(
+    getAppearanceStorageKey(APP_THEME_STORAGE_KEY, userId),
+  );
+
+  window.localStorage.removeItem(
+    getAppearanceStorageKey(APP_MODE_STORAGE_KEY, userId),
+  );
+
+  applyDefaultAppAppearance();
+}
+
+function getAppearanceStorageKey(baseKey: string, userId?: string | null) {
+  if (!userId) {
+    return baseKey;
+  }
+
+  return `${baseKey}:${userId}`;
 }
 
 function isAppThemeName(value: string | null): value is AppThemeName {

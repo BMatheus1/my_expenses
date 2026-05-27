@@ -3,7 +3,7 @@
 import type { FormEvent, ReactNode } from "react";
 import { useMemo, useRef, useState } from "react";
 import { EmptyState, LoadingButton, LoadingCard } from "./AppFeedback";
-
+import { MonthSelect } from "./MonthSelect";
 import { INCOME_SOURCES } from "../constants/incomeSources";
 import type { Income } from "../types/income";
 import {
@@ -591,11 +591,9 @@ function IncomeFilters({
         <div className="border-t border-stone-100 p-4">
           <div className="grid gap-3 md:grid-cols-3">
             <FormField label="Mês">
-              <input
-                type="month"
+              <MonthSelect
                 value={selectedMonth}
-                onChange={(event) => onSelectedMonthChange(event.target.value)}
-                className="app-input px-4 py-3 text-sm"
+                onChange={onSelectedMonthChange}
               />
             </FormField>
 

@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { MonthSelect } from "./MonthSelect";
+
 type ExpenseFiltersProps = {
   selectedMonth: string;
   selectedCategory: string;
@@ -39,11 +41,11 @@ export function ExpenseFilters({
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-bold text-stone-950">Filtros</h2>
 
-            {hasActiveFilters && (
+            {hasActiveFilters ? (
               <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
                 Ativo
               </span>
-            )}
+            ) : null}
           </div>
 
           <p className="mt-1 text-xs text-stone-500">
@@ -56,45 +58,46 @@ export function ExpenseFilters({
         </span>
       </button>
 
-      {isOpen && (
+      {isOpen ? (
         <div className="border-t border-stone-100 p-4">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-4">
             <FilterField label="Mês">
-              <input
-                type="month"
+              <MonthSelect
                 value={selectedMonth}
-                onChange={(event) => onSelectedMonthChange(event.target.value)}
-                className="app-input px-4 py-3 text-sm"
+                onChange={onSelectedMonthChange}
+                variant="wheel"
               />
             </FilterField>
 
-            <FilterField label="Categoria">
-              <select
-                value={selectedCategory}
-                onChange={(event) =>
-                  onSelectedCategoryChange(event.target.value)
-                }
-                className="app-input px-4 py-3 text-sm"
-              >
-                <option value="Todas">Todas</option>
+            <div className="grid gap-3 md:grid-cols-2">
+              <FilterField label="Categoria">
+                <select
+                  value={selectedCategory}
+                  onChange={(event) =>
+                    onSelectedCategoryChange(event.target.value)
+                  }
+                  className="app-input px-4 py-3 text-sm"
+                >
+                  <option value="Todas">Todas</option>
 
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </FilterField>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </FilterField>
 
-            <FilterField label="Buscar">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(event) => onSearchTermChange(event.target.value)}
-                placeholder="Descrição..."
-                className="app-input px-4 py-3 text-sm"
-              />
-            </FilterField>
+              <FilterField label="Buscar">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => onSearchTermChange(event.target.value)}
+                  placeholder="Descrição..."
+                  className="app-input px-4 py-3 text-sm"
+                />
+              </FilterField>
+            </div>
           </div>
 
           <div className="mt-4 flex justify-end">
@@ -107,7 +110,7 @@ export function ExpenseFilters({
             </button>
           </div>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

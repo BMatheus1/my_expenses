@@ -1,8 +1,13 @@
 "use client";
 
+import { Capacitor } from "@capacitor/core";
 import { useRef, useState } from "react";
 
 import { deleteAccount, getCurrentUser } from "../lib/api";
+import {
+  clearAppAppearancePreferences,
+  clearUserAppAppearancePreferences,
+} from "../lib/theme";
 import type { User } from "../types/auth";
 
 type GoogleCredentialResponse = {
@@ -27,7 +32,22 @@ type WindowWithGoogle = Window & {
   google?: GoogleIdentityApi;
 };
 
+type NativeGoogleLoginResult = {
+  provider?: string;
+  result?: {
+    idToken?: string | null;
+    responseType?: "online" | "offline";
+    profile?: {
+      email?: string | null;
+      name?: string | null;
+      imageUrl?: string | null;
+    };
+  };
+};
+
 const GOOGLE_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
+
+let nativeGoogleInitializePromise: Promise<void> | null = null;
 
 export function AccountDeletionSection() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -40,6 +60,7 @@ export function AccountDeletionSection() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
+  const [isConfirmingGoogle, setIsConfirmingGoogle] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const googleInitializedRef = useRef(false);
@@ -48,8 +69,12 @@ export function AccountDeletionSection() {
   const isCredentialsAccount = currentUser?.provider === "credentials";
 
   async function loadCurrentUserIfNeeded() {
-    if (currentUser || isLoadingUser) {
-      return;
+    if (currentUser) {
+      return currentUser;
+    }
+
+    if (isLoadingUser) {
+      return null;
     }
 
     try {
@@ -58,8 +83,11 @@ export function AccountDeletionSection() {
       const user = await getCurrentUser();
 
       setCurrentUser(user);
+
+      return user;
     } catch {
       setErrorMessage("Não foi possível carregar os dados da sua conta.");
+      return null;
     } finally {
       setIsLoadingUser(false);
     }
@@ -69,9 +97,69 @@ export function AccountDeletionSection() {
     setSuccessMessage("");
     setErrorMessage("");
 
-    await loadCurrentUserIfNeeded();
+    const user = await loadCurrentUserIfNeeded();
 
+    if (!user) {
+      return;
+    }
+
+    if (user.provider !== "google") {
+      setErrorMessage("Essa conta não foi criada com Google.");
+      return;
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      await handleNativeGoogleConfirmation();
+      return;
+    }
+
+    await handleWebGoogleConfirmation();
+  }
+
+  async function handleNativeGoogleConfirmation() {
     try {
+      setIsConfirmingGoogle(true);
+
+      await initializeNativeGoogle();
+
+      const { SocialLogin } = await import("@capgo/capacitor-social-login");
+
+      const response = (await SocialLogin.login({
+        provider: "google",
+        options: {
+          scopes: ["email", "profile"],
+          autoSelectEnabled: false,
+          filterByAuthorizedAccounts: false,
+        },
+      })) as NativeGoogleLoginResult;
+
+      const idToken = response.result?.idToken;
+
+      if (!idToken) {
+        setErrorMessage("Não foi possível receber a confirmação do Google.");
+        return;
+      }
+
+      setGoogleCredential(idToken);
+      setErrorMessage("");
+      setSuccessMessage("Conta Google confirmada para exclusão.");
+    } catch (error) {
+      console.error("Erro ao confirmar Google para exclusão:", error);
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível confirmar sua conta com Google.",
+      );
+    } finally {
+      setIsConfirmingGoogle(false);
+    }
+  }
+
+  async function handleWebGoogleConfirmation() {
+    try {
+      setIsConfirmingGoogle(true);
+
       await loadGoogleIdentityScript();
       initializeGoogleDeletionConfirmation();
 
@@ -85,6 +173,8 @@ export function AccountDeletionSection() {
       googleIdentity.accounts.id.prompt();
     } catch {
       setErrorMessage("Não foi possível carregar a confirmação com Google.");
+    } finally {
+      setIsConfirmingGoogle(false);
     }
   }
 
@@ -93,7 +183,7 @@ export function AccountDeletionSection() {
       return;
     }
 
-    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const googleClientId = getGoogleWebClientId();
 
     if (!googleClientId) {
       setErrorMessage("Login Google não configurado corretamente.");
@@ -130,19 +220,26 @@ export function AccountDeletionSection() {
     setSuccessMessage("");
     setErrorMessage("");
 
-    await loadCurrentUserIfNeeded();
+    const user = await loadCurrentUserIfNeeded();
+
+    if (!user) {
+      return;
+    }
+
+    const isCurrentUserGoogleAccount = user.provider === "google";
+    const isCurrentUserCredentialsAccount = user.provider === "credentials";
 
     if (confirmation.trim().toUpperCase() !== "EXCLUIR") {
       setErrorMessage("Digite EXCLUIR para confirmar.");
       return;
     }
 
-    if (isCredentialsAccount && !password.trim()) {
+    if (isCurrentUserCredentialsAccount && !password.trim()) {
       setErrorMessage("Informe sua senha para excluir a conta.");
       return;
     }
 
-    if (isGoogleAccount && !googleCredential) {
+    if (isCurrentUserGoogleAccount && !googleCredential) {
       setErrorMessage("Confirme sua identidade com Google antes de excluir a conta.");
       return;
     }
@@ -153,6 +250,12 @@ export function AccountDeletionSection() {
   async function handleDeleteAccount() {
     setSuccessMessage("");
     setErrorMessage("");
+
+    if (!currentUser) {
+      setErrorMessage("Não foi possível identificar a conta atual.");
+      setIsConfirmModalOpen(false);
+      return;
+    }
 
     try {
       setIsDeleting(true);
@@ -165,6 +268,9 @@ export function AccountDeletionSection() {
 
       setSuccessMessage(response.message);
       setIsConfirmModalOpen(false);
+
+      clearUserAppAppearancePreferences(currentUser.id);
+      clearAppAppearancePreferences();
 
       window.setTimeout(() => {
         window.location.assign("/");
@@ -241,9 +347,14 @@ export function AccountDeletionSection() {
             <button
               type="button"
               onClick={handleGoogleConfirmation}
-              className="mt-4 rounded-full border border-red-200 bg-white px-5 py-3 text-sm font-black text-red-700 transition hover:bg-red-50"
+              disabled={isConfirmingGoogle || isDeleting}
+              className="mt-4 rounded-full border border-red-200 bg-white px-5 py-3 text-sm font-black text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {googleCredential ? "Google confirmado" : "Confirmar com Google"}
+              {isConfirmingGoogle
+                ? "Confirmando..."
+                : googleCredential
+                  ? "Google confirmado"
+                  : "Confirmar com Google"}
             </button>
           </div>
         ) : null}
@@ -336,6 +447,66 @@ function DeleteAccountConfirmationModal({
   );
 }
 
+async function initializeNativeGoogle() {
+  if (nativeGoogleInitializePromise) {
+    return nativeGoogleInitializePromise;
+  }
+
+  nativeGoogleInitializePromise = initializeNativeGoogleRequest();
+
+  return nativeGoogleInitializePromise;
+}
+
+async function initializeNativeGoogleRequest() {
+  const webClientId = getGoogleWebClientId();
+  const iOSClientId = getGoogleIosClientId();
+  const iOSServerClientId = getGoogleIosServerClientId();
+
+  if (!webClientId) {
+    throw new Error("NEXT_PUBLIC_GOOGLE_CLIENT_ID não configurado.");
+  }
+
+  const { SocialLogin } = await import("@capgo/capacitor-social-login");
+
+  const googleConfig: {
+    webClientId: string;
+    iOSClientId?: string;
+    iOSServerClientId?: string;
+    mode: "online";
+  } = {
+    webClientId,
+    mode: "online",
+  };
+
+  if (Capacitor.getPlatform() === "ios") {
+    if (!iOSClientId) {
+      throw new Error("NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID não configurado.");
+    }
+
+    googleConfig.iOSClientId = iOSClientId;
+    googleConfig.iOSServerClientId = iOSServerClientId;
+  }
+
+  await SocialLogin.initialize({
+    google: googleConfig,
+  });
+}
+
+function getGoogleWebClientId() {
+  return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || "";
+}
+
+function getGoogleIosClientId() {
+  return process.env.NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() || "";
+}
+
+function getGoogleIosServerClientId() {
+  return (
+    process.env.NEXT_PUBLIC_GOOGLE_IOS_SERVER_CLIENT_ID?.trim() ||
+    getGoogleWebClientId()
+  );
+}
+
 function getGoogleIdentity() {
   if (typeof window === "undefined") {
     return undefined;
@@ -376,32 +547,6 @@ function loadGoogleIdentityScript() {
 function getDeleteAccountErrorMessage(error: unknown) {
   if (!(error instanceof Error)) {
     return "Não foi possível excluir a conta.";
-  }
-
-  const message = error.message.toLowerCase();
-
-  if (message.includes("senha incorreta")) {
-    return "Senha incorreta.";
-  }
-
-  if (message.includes("informe sua senha")) {
-    return "Informe sua senha para excluir a conta.";
-  }
-
-  if (message.includes("confirme sua identidade com google")) {
-    return "Confirme sua identidade com Google para excluir a conta.";
-  }
-
-  if (message.includes("não corresponde")) {
-    return "A conta Google confirmada não corresponde à conta atual.";
-  }
-
-  if (message.includes("digite excluir")) {
-    return "Digite EXCLUIR para confirmar.";
-  }
-
-  if (message.includes("401")) {
-    return "Sua sessão expirou. Faça login novamente.";
   }
 
   return error.message || "Não foi possível excluir a conta.";

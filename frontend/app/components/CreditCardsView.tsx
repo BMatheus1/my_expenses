@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -66,6 +68,7 @@ type CreditCardsViewProps = {
   isSaving: boolean;
   deletingCardId: string | null;
   errorMessage: string;
+  autoOpenCreateFormToken: number | null;
   onCreateCard: (card: CreateCreditCardRequest) => Promise<boolean>;
   onUpdateCard: (
     cardId: string,
@@ -73,6 +76,7 @@ type CreditCardsViewProps = {
   ) => Promise<boolean>;
   onDeleteCard: (card: CreditCard) => void;
   onClearError: () => void;
+  onAutoOpenCreateFormHandled: () => void;
 };
 
 export function CreditCardsView({
@@ -83,10 +87,12 @@ export function CreditCardsView({
   isSaving,
   deletingCardId,
   errorMessage,
+  autoOpenCreateFormToken,
   onCreateCard,
   onUpdateCard,
   onDeleteCard,
   onClearError,
+  onAutoOpenCreateFormHandled,
 }: CreditCardsViewProps) {
   const formSectionRef = useRef<HTMLDivElement | null>(null);
 
@@ -142,16 +148,16 @@ export function CreditCardsView({
     .filter((summary) => summary.invoiceTotal > 0)
     .sort((first, second) => first.dueInfo.priority - second.dueInfo.priority)[0];
 
-  function scrollToCardForm() {
+  const scrollToCardForm = useCallback(() => {
     window.setTimeout(() => {
       smartScrollToRef(formSectionRef, {
         delayMs: 0,
         focusFirstField: true,
       });
     }, 120);
-  }
+  }, []);
 
-  function openCreateForm() {
+  const openCreateForm = useCallback(() => {
     if (!isOnline) {
       return;
     }
@@ -161,7 +167,20 @@ export function CreditCardsView({
     setForm(EMPTY_FORM);
     setIsFormOpen(true);
     scrollToCardForm();
-  }
+  }, [isOnline, onClearError, scrollToCardForm]);
+
+  useEffect(() => {
+    if (!autoOpenCreateFormToken) {
+      return;
+    }
+
+    openCreateForm();
+    onAutoOpenCreateFormHandled();
+  }, [
+    autoOpenCreateFormToken,
+    onAutoOpenCreateFormHandled,
+    openCreateForm,
+  ]);
 
   function openEditForm(card: CreditCard) {
     if (!isOnline) {

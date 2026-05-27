@@ -1,9 +1,10 @@
 "use client";
 
-import type { FormEvent } from "react";
+import { useEffect, useRef, type FormEvent, type ReactNode } from "react";
 
 import type { CreditCard } from "../types/credit-card";
 import type { PaymentMethod } from "../types/expense";
+import { smartScrollToElement } from "../utils/smartScroll";
 import { LoadingButton } from "./AppFeedback";
 
 const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
@@ -26,6 +27,7 @@ type ExpenseFormProps = {
   creditCards: CreditCard[];
   categories: string[];
   isOnline: boolean;
+  isLoadingCreditCards: boolean;
   isSubmitting: boolean;
   isEditing: boolean;
   errorMessage: string;
@@ -38,6 +40,7 @@ type ExpenseFormProps = {
   onInstallmentsCountChange: (value: string) => void;
   onManageCategoriesClick: () => void;
   onManageCardsClick: () => void;
+  onRegisterCreditCardClick: () => void;
   onCancelEdit: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
@@ -53,6 +56,7 @@ export function ExpenseForm({
   creditCards,
   categories,
   isOnline,
+  isLoadingCreditCards,
   isSubmitting,
   isEditing,
   errorMessage,
@@ -65,11 +69,36 @@ export function ExpenseForm({
   onInstallmentsCountChange,
   onManageCategoriesClick,
   onManageCardsClick,
+  onRegisterCreditCardClick,
   onCancelEdit,
   onSubmit,
 }: ExpenseFormProps) {
+  const creditCardFieldsRef = useRef<HTMLDivElement | null>(null);
+  const previousPaymentMethodRef = useRef<PaymentMethod>(paymentMethod);
+
   const isCreditCardPayment = paymentMethod === "credit_card";
+  const hasCreditCards = creditCards.length > 0;
+  const shouldShowEmptyCreditCardState =
+    isCreditCardPayment && !isLoadingCreditCards && !hasCreditCards;
   const isActionDisabled = isSubmitting || !isOnline;
+
+  useEffect(() => {
+    const previousPaymentMethod = previousPaymentMethodRef.current;
+    const changedToCreditCard =
+      previousPaymentMethod !== "credit_card" && paymentMethod === "credit_card";
+
+    previousPaymentMethodRef.current = paymentMethod;
+
+    if (!changedToCreditCard || !isOnline) {
+      return;
+    }
+
+    smartScrollToElement(creditCardFieldsRef.current, {
+      delayMs: 140,
+      focusFirstField: true,
+      block: "center",
+    });
+  }, [paymentMethod, isOnline]);
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
@@ -165,58 +194,93 @@ export function ExpenseForm({
         </div>
 
         {isCreditCardPayment ? (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <FormField label="Cartão usado">
-              <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-                <select
-                  value={creditCardId}
-                  onChange={(event) => onCreditCardChange(event.target.value)}
-                  className="app-input min-w-0 flex-1"
-                  disabled={!isOnline}
-                >
-                  <option value="">Selecione um cartão</option>
-                  {creditCards.map((card) => (
-                    <option key={card.id} value={card.id}>
-                      {card.name} •••• {card.last_four_digits}
-                    </option>
-                  ))}
-                </select>
+          <div
+            ref={creditCardFieldsRef}
+            className="mt-4 scroll-mt-24 space-y-4"
+          >
+            {isLoadingCreditCards ? (
+              <div className="rounded-3xl border border-stone-200 bg-white px-4 py-3 text-sm font-bold text-stone-600">
+                Carregando seus cartões...
+              </div>
+            ) : shouldShowEmptyCreditCardState ? (
+              <div className="rounded-3xl border border-dashed border-stone-300 bg-white p-4">
+                <p className="text-sm font-black text-stone-800">
+                  Nenhum cartão cadastrado
+                </p>
+
+                <p className="mt-1 text-sm leading-6 text-stone-500">
+                  Para lançar um gasto no crédito, cadastre primeiro um cartão.
+                  Assim o app consegue organizar parcelas, faturas e gastos por
+                  cartão.
+                </p>
 
                 <button
                   type="button"
-                  onClick={onManageCardsClick}
+                  onClick={onRegisterCreditCardClick}
                   disabled={!isOnline}
-                  className="touch-button rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 sm:w-auto"
+                  className="app-button-primary touch-button mt-4 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {isOnline ? "Cartões" : "Com internet"}
+                  Cadastrar cartão de crédito
                 </button>
               </div>
-            </FormField>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField label="Cartão usado">
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                    <select
+                      value={creditCardId}
+                      onChange={(event) =>
+                        onCreditCardChange(event.target.value)
+                      }
+                      className="app-input min-w-0 flex-1"
+                      disabled={!isOnline}
+                    >
+                      <option value="">Selecione um cartão</option>
+                      {creditCards.map((card) => (
+                        <option key={card.id} value={card.id}>
+                          {card.name} •••• {card.last_four_digits}
+                        </option>
+                      ))}
+                    </select>
 
-            <FormField label="Parcelas">
-              <select
-                value={installmentsCount}
-                onChange={(event) =>
-                  onInstallmentsCountChange(event.target.value)
-                }
-                className="app-input"
-                disabled={isEditing || !isOnline}
-              >
-                {Array.from({ length: 24 }, (_, index) => index + 1).map(
-                  (installment) => (
-                    <option key={installment} value={String(installment)}>
-                      {installment === 1 ? "À vista" : `${installment}x`}
-                    </option>
-                  ),
-                )}
-              </select>
+                    <button
+                      type="button"
+                      onClick={onManageCardsClick}
+                      disabled={!isOnline}
+                      className="touch-button rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 sm:w-auto"
+                    >
+                      {isOnline ? "Cartões" : "Com internet"}
+                    </button>
+                  </div>
+                </FormField>
 
-              {isEditing ? (
-                <p className="mt-1 text-xs font-medium text-stone-500">
-                  Para evitar duplicidade, parcelas só são criadas em novo gasto.
-                </p>
-              ) : null}
-            </FormField>
+                <FormField label="Parcelas">
+                  <select
+                    value={installmentsCount}
+                    onChange={(event) =>
+                      onInstallmentsCountChange(event.target.value)
+                    }
+                    className="app-input"
+                    disabled={isEditing || !isOnline}
+                  >
+                    {Array.from({ length: 24 }, (_, index) => index + 1).map(
+                      (installment) => (
+                        <option key={installment} value={String(installment)}>
+                          {installment === 1 ? "À vista" : `${installment}x`}
+                        </option>
+                      ),
+                    )}
+                  </select>
+
+                  {isEditing ? (
+                    <p className="mt-1 text-xs font-medium text-stone-500">
+                      Para evitar duplicidade, parcelas só são criadas em novo
+                      gasto.
+                    </p>
+                  ) : null}
+                </FormField>
+              </div>
+            )}
           </div>
         ) : null}
       </div>
@@ -259,7 +323,7 @@ export function ExpenseForm({
 
 type FormFieldProps = {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 function FormField({ label, children }: FormFieldProps) {

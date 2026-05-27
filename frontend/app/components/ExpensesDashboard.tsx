@@ -147,6 +147,9 @@ export function ExpensesDashboard({
   const [isFormOpen, setIsFormOpen] = useState(true);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [creditCardFormAutoOpenToken, setCreditCardFormAutoOpenToken] =
+    useState<number | null>(null);
+  const shouldReturnToExpenseAfterCardCreateRef = useRef(false);
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(
     null
   );
@@ -414,6 +417,18 @@ export function ExpensesDashboard({
     }
   }
 
+  function handleManageCardsClick() {
+    setCardManagerError("");
+    setActiveView("credit-cards");
+  }
+
+  function handleRegisterCreditCardFromExpense() {
+    shouldReturnToExpenseAfterCardCreateRef.current = true;
+    setCardManagerError("");
+    setActiveView("credit-cards");
+    setCreditCardFormAutoOpenToken(Date.now());
+  }
+
   function handleInstallmentsCountChange(value: string) {
     setInstallmentsCount(value.replace(/\D/g, "").slice(0, 2) || "1");
   }
@@ -439,10 +454,27 @@ export function ExpensesDashboard({
       setCardManagerError("");
 
       const createdCard = await createCreditCard(cardData);
+      const shouldReturnToExpense =
+        shouldReturnToExpenseAfterCardCreateRef.current;
 
       setCreditCards((currentCards) => [createdCard, ...currentCards]);
       setCreditCardId(createdCard.id);
-      showSuccessToast("Cartão cadastrado com sucesso.");
+
+      if (shouldReturnToExpense) {
+        shouldReturnToExpenseAfterCardCreateRef.current = false;
+        setPaymentMethod("credit_card");
+        setIsFormOpen(true);
+        setActiveView("expenses");
+
+        smartScrollToRef(expenseFormSectionRef, {
+          delayMs: 180,
+          focusFirstField: false,
+        });
+
+        showSuccessToast("Cartão cadastrado. Continue seu gasto no crédito.");
+      } else {
+        showSuccessToast("Cartão cadastrado com sucesso.");
+      }
 
       return true;
     } catch (error) {
@@ -1064,10 +1096,14 @@ export function ExpensesDashboard({
           isSaving={isSavingCard}
           deletingCardId={deletingCardId}
           errorMessage={cardManagerError}
+          autoOpenCreateFormToken={creditCardFormAutoOpenToken}
           onCreateCard={handleCreateCreditCard}
           onUpdateCard={handleUpdateCreditCard}
           onDeleteCard={requestDeleteCreditCard}
           onClearError={() => setCardManagerError("")}
+          onAutoOpenCreateFormHandled={() =>
+            setCreditCardFormAutoOpenToken(null)
+          }
         />
       ) : activeView === "reports" ? (
         <ReportsView
@@ -1100,6 +1136,7 @@ export function ExpensesDashboard({
           creditCards={creditCards}
           isOnline={isOnline}
           isLoadingExpenses={isLoadingExpenses}
+          isLoadingCards={isLoadingCards}
           deletingExpenseId={deletingExpenseId}
           isFormOpen={isFormOpen}
           isFiltersOpen={isFiltersOpen}
@@ -1130,10 +1167,8 @@ export function ExpensesDashboard({
             setCategoryManagerError("");
             setIsCategoryManagerOpen(true);
           }}
-          onManageCardsClick={() => {
-            setCardManagerError("");
-            setActiveView("credit-cards");
-          }}
+          onManageCardsClick={handleManageCardsClick}
+          onRegisterCreditCardClick={handleRegisterCreditCardFromExpense}
           onOpenCreditCards={() => setActiveView("credit-cards")}
           onCancelEdit={resetForm}
           onSubmit={handleSubmit}
@@ -1202,6 +1237,7 @@ type ExpensesViewProps = {
   creditCards: CreditCard[];
   isOnline: boolean;
   isLoadingExpenses: boolean;
+  isLoadingCards: boolean;
   deletingExpenseId: string | null;
   isFormOpen: boolean;
   isFiltersOpen: boolean;
@@ -1230,6 +1266,7 @@ type ExpensesViewProps = {
   onInstallmentsCountChange: (value: string) => void;
   onManageCategoriesClick: () => void;
   onManageCardsClick: () => void;
+  onRegisterCreditCardClick: () => void;
   onOpenCreditCards: () => void;
   onCancelEdit: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -1256,6 +1293,7 @@ function ExpensesView({
   creditCards,
   isOnline,
   isLoadingExpenses,
+  isLoadingCards,
   deletingExpenseId,
   isFormOpen,
   isFiltersOpen,
@@ -1284,6 +1322,7 @@ function ExpensesView({
   onInstallmentsCountChange,
   onManageCategoriesClick,
   onManageCardsClick,
+  onRegisterCreditCardClick,
   onOpenCreditCards,
   onCancelEdit,
   onSubmit,
@@ -1364,6 +1403,7 @@ function ExpensesView({
               categories={categories}
               isSubmitting={isSubmitting}
               isOnline={isOnline}
+              isLoadingCreditCards={isLoadingCards}
               isEditing={isEditing}
               errorMessage={errorMessage}
               onDescriptionChange={onDescriptionChange}
@@ -1375,6 +1415,7 @@ function ExpensesView({
               onInstallmentsCountChange={onInstallmentsCountChange}
               onManageCategoriesClick={onManageCategoriesClick}
               onManageCardsClick={onManageCardsClick}
+              onRegisterCreditCardClick={onRegisterCreditCardClick}
               onCancelEdit={onCancelEdit}
               onSubmit={onSubmit}
             />

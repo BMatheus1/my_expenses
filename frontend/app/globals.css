@@ -585,11 +585,4 @@ html[data-app-mode="dark"] .shadow-xl {
 
 .month-wheel-scroll::-webkit-scrollbar {
   display: none;
-}.month-wheel-scroll {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.month-wheel-scroll::-webkit-scrollbar {
-  display: none;
 }

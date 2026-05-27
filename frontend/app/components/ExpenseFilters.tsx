@@ -7,6 +7,7 @@ type ExpenseFiltersProps = {
   selectedCategory: string;
   searchTerm: string;
   categories: readonly string[];
+  availableMonths: readonly string[];
   isOpen: boolean;
   onToggle: () => void;
   onSelectedMonthChange: (value: string) => void;
@@ -20,6 +21,7 @@ export function ExpenseFilters({
   selectedCategory,
   searchTerm,
   categories,
+  availableMonths,
   isOpen,
   onToggle,
   onSelectedMonthChange,
@@ -65,6 +67,7 @@ export function ExpenseFilters({
               <MonthSelect
                 value={selectedMonth}
                 onChange={onSelectedMonthChange}
+                availableMonths={availableMonths}
                 variant="wheel"
               />
             </FilterField>

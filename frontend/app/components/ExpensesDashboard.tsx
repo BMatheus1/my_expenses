@@ -1333,6 +1333,8 @@ function ExpensesView({
   onEditExpense,
   onDeleteExpense,
 }: ExpensesViewProps) {
+  const availableExpenseMonths = getExistingExpenseMonths(allExpenses);
+
   if (isLoadingExpenses && filteredExpenses.length === 0) {
     return (
       <div className="space-y-5">
@@ -1429,6 +1431,7 @@ function ExpensesView({
               selectedCategory={selectedCategory}
               searchTerm={searchTerm}
               categories={categories}
+              availableMonths={availableExpenseMonths}
               isOpen={isFiltersOpen}
               onToggle={onFiltersToggle}
               onSelectedMonthChange={onSelectedMonthChange}
@@ -1645,6 +1648,34 @@ function markExpensesCreditCardAsDeleted(
       },
     };
   });
+}
+
+function getExistingExpenseMonths(expenses: Expense[]) {
+  const months = new Set<string>();
+
+  for (const expense of expenses) {
+    const month = getMonthFromDateValue(expense.date);
+
+    if (month) {
+      months.add(month);
+    }
+  }
+
+  return Array.from(months).sort((firstMonth, secondMonth) =>
+    secondMonth.localeCompare(firstMonth),
+  );
+}
+
+function getMonthFromDateValue(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  if (/^\d{4}-\d{2}/.test(value)) {
+    return value.slice(0, 7);
+  }
+
+  return "";
 }
 
 function normalizeCategoryKey(value: string) {

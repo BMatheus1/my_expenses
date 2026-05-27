@@ -10,6 +10,7 @@ type MonthSelectProps = {
   className?: string;
   monthsBefore?: number;
   monthsAfter?: number;
+  availableMonths?: readonly string[];
   variant?: MonthSelectVariant;
 };
 
@@ -28,13 +29,20 @@ export function MonthSelect({
   value,
   onChange,
   className = "app-input px-4 py-3 text-sm",
-  monthsBefore = 80,
-  monthsAfter = 40,
+  monthsBefore = 48,
+  monthsAfter = 36,
+  availableMonths = [],
   variant = "select",
 }: MonthSelectProps) {
   const options = useMemo(
-    () => buildMonthOptions(value, monthsBefore, monthsAfter),
-    [value, monthsBefore, monthsAfter],
+    () =>
+      buildMonthOptions({
+        selectedMonth: value,
+        monthsBefore,
+        monthsAfter,
+        availableMonths,
+      }),
+    [value, monthsBefore, monthsAfter, availableMonths],
   );
 
   if (variant === "wheel") {
@@ -208,13 +216,19 @@ function MonthWheel({
   );
 }
 
-function buildMonthOptions(
-  selectedMonth: string,
-  monthsBefore: number,
-  monthsAfter: number,
-): MonthOption[] {
+function buildMonthOptions({
+  selectedMonth,
+  monthsBefore,
+  monthsAfter,
+  availableMonths,
+}: {
+  selectedMonth: string;
+  monthsBefore: number;
+  monthsAfter: number;
+  availableMonths: readonly string[];
+}): MonthOption[] {
   const currentMonth = getCurrentMonthDate();
-  const options: MonthOption[] = [];
+  const monthValues = new Set<string>();
 
   for (let offset = -monthsBefore; offset <= monthsAfter; offset += 1) {
     const date = new Date(
@@ -225,33 +239,57 @@ function buildMonthOptions(
       ),
     );
 
-    options.push({
-      value: toMonthValue(date),
-      label: capitalizeFirstLetter(MONTH_FORMATTER.format(date)),
-    });
+    monthValues.add(toMonthValue(date));
   }
 
-  if (
-    selectedMonth &&
-    !options.some((option) => option.value === selectedMonth)
-  ) {
-    const selectedDate = parseMonthValue(selectedMonth);
+  for (const availableMonth of availableMonths) {
+    const normalizedMonth = normalizeMonthValue(availableMonth);
 
-    options.push({
-      value: selectedMonth,
-      label: capitalizeFirstLetter(MONTH_FORMATTER.format(selectedDate)),
-    });
+    if (normalizedMonth) {
+      monthValues.add(normalizedMonth);
+    }
   }
 
-  return options.sort((firstOption, secondOption) =>
-    secondOption.value.localeCompare(firstOption.value),
-  );
+  const normalizedSelectedMonth = normalizeMonthValue(selectedMonth);
+
+  if (normalizedSelectedMonth) {
+    monthValues.add(normalizedSelectedMonth);
+  }
+
+  return Array.from(monthValues)
+    .sort((firstMonth, secondMonth) => secondMonth.localeCompare(firstMonth))
+    .map((monthValue) => {
+      const date = parseMonthValue(monthValue);
+
+      return {
+        value: monthValue,
+        label: capitalizeFirstLetter(MONTH_FORMATTER.format(date)),
+      };
+    });
 }
 
 function getCurrentMonthDate() {
   const now = new Date();
 
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+}
+
+function normalizeMonthValue(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  const trimmedValue = value.trim();
+
+  if (/^\d{4}-\d{2}$/.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmedValue)) {
+    return trimmedValue.slice(0, 7);
+  }
+
+  return "";
 }
 
 function parseMonthValue(value: string) {

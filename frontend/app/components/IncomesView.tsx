@@ -16,6 +16,8 @@ import {
 } from "../utils/formatters";
 import { smartScrollToRef } from "../utils/smartScroll";
 import { ConfirmModal } from "./ConfirmModal";
+import { WheelSelect } from "./WheelSelect";
+
 
 type IncomesViewProps = {
   incomes: Income[];
@@ -479,17 +481,16 @@ function IncomeForm({
         </FormField>
 
         <FormField label="Fonte">
-          <select
+          <WheelSelect
             value={source}
-            onChange={(event) => onSourceChange(event.target.value)}
-            className="app-input"
-          >
-            {INCOME_SOURCES.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
+            onChange={onSourceChange}
+            options={INCOME_SOURCES.map((item) => ({
+              value: item,
+              label: item,
+            }))}
+            title="Fonte selecionada"
+            size="sm"
+          />
         </FormField>
 
         <FormField label="Data">
@@ -598,21 +599,19 @@ function IncomeFilters({
             </FormField>
 
             <FormField label="Fonte">
-              <select
+              <WheelSelect
                 value={selectedSource}
-                onChange={(event) =>
-                  onSelectedSourceChange(event.target.value)
-                }
-                className="app-input px-4 py-3 text-sm"
-              >
-                <option value="Todas">Todas</option>
-
-                {INCOME_SOURCES.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+                onChange={onSelectedSourceChange}
+                options={[
+                  { value: "Todas", label: "Todas" },
+                  ...INCOME_SOURCES.map((item) => ({
+                    value: item,
+                    label: item,
+                  })),
+                ]}
+                title="Fonte selecionada"
+                size="sm"
+              />
             </FormField>
 
             <FormField label="Buscar">

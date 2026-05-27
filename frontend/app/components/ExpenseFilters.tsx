@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { MonthSelect } from "./MonthSelect";
+import { WheelSelect } from "./WheelSelect";
 
 type ExpenseFiltersProps = {
   selectedMonth: string;
@@ -74,21 +75,19 @@ export function ExpenseFilters({
 
             <div className="grid gap-3 md:grid-cols-2">
               <FilterField label="Categoria">
-                <select
+                <WheelSelect
                   value={selectedCategory}
-                  onChange={(event) =>
-                    onSelectedCategoryChange(event.target.value)
-                  }
-                  className="app-input px-4 py-3 text-sm"
-                >
-                  <option value="Todas">Todas</option>
-
-                  {categories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
+                  onChange={onSelectedCategoryChange}
+                  options={[
+                    { value: "Todas", label: "Todas" },
+                    ...categories.map((category) => ({
+                      value: category,
+                      label: category,
+                    })),
+                  ]}
+                  title="Categoria selecionada"
+                  size="sm"
+                />
               </FilterField>
 
               <FilterField label="Buscar">

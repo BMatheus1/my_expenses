@@ -6,6 +6,7 @@ import type { CreditCard } from "../types/credit-card";
 import type { PaymentMethod } from "../types/expense";
 import { smartScrollToElement } from "../utils/smartScroll";
 import { LoadingButton } from "./AppFeedback";
+import { WheelSelect } from "./WheelSelect";
 
 const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
   { value: "pix", label: "Pix" },
@@ -134,27 +135,26 @@ export function ExpenseForm({
         </FormField>
 
         <FormField label="Categoria">
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-            <select
+          <div className="space-y-3">
+            <WheelSelect
               value={category}
-              onChange={(event) => onCategoryChange(event.target.value)}
-              className="app-input min-w-0 flex-1"
+              onChange={onCategoryChange}
+              options={categories.map((categoryName) => ({
+                value: categoryName,
+                label: categoryName,
+              }))}
+              title="Categoria selecionada"
               disabled={!isOnline}
-            >
-              {categories.map((categoryName) => (
-                <option key={categoryName} value={categoryName}>
-                  {categoryName}
-                </option>
-              ))}
-            </select>
+              size="sm"
+            />
 
             <button
               type="button"
               onClick={onManageCategoriesClick}
               disabled={!isOnline}
-              className="touch-button rounded-2xl border border-stone-200 px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 sm:w-auto"
+              className="touch-button w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 sm:w-auto"
             >
-              {isOnline ? "Categorias" : "Com internet"}
+              {isOnline ? "Gerenciar categorias" : "Com internet"}
             </button>
           </div>
         </FormField>

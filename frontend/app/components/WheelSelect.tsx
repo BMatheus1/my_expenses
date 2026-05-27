@@ -1,95 +1,33 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type SyntheticEvent,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
-type MonthSelectVariant = "select" | "wheel";
-
-type MonthSelectProps = {
-  value: string;
-  onChange: (value: string) => void;
-  className?: string;
-  monthsBefore?: number;
-  monthsAfter?: number;
-  availableMonths?: readonly string[];
-  variant?: MonthSelectVariant;
-  initiallyOpen?: boolean;
-};
-
-type MonthOption = {
+type WheelSelectOption = {
   value: string;
   label: string;
 };
 
-const MONTH_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
+type WheelSelectProps = {
+  value: string;
+  options: readonly WheelSelectOption[];
+  onChange: (value: string) => void;
+  title?: string;
+  emptyMessage?: string;
+  disabled?: boolean;
+  size?: "sm" | "md";
+  initiallyOpen?: boolean;
+};
 
-export function MonthSelect({
-  value,
-  onChange,
-  className = "app-input px-4 py-3 text-sm",
-  monthsBefore = 48,
-  monthsAfter = 36,
-  availableMonths = [],
-  variant = "select",
-  initiallyOpen = false,
-}: MonthSelectProps) {
-  const options = useMemo(
-    () =>
-      buildMonthOptions({
-        selectedMonth: value,
-        monthsBefore,
-        monthsAfter,
-        availableMonths,
-      }),
-    [value, monthsBefore, monthsAfter, availableMonths],
-  );
-
-  if (variant === "wheel") {
-    return (
-      <MonthWheel
-        value={value}
-        options={options}
-        onChange={onChange}
-        initiallyOpen={initiallyOpen}
-      />
-    );
-  }
-
-  return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className={className}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function MonthWheel({
+export function WheelSelect({
   value,
   options,
   onChange,
-  initiallyOpen,
-}: {
-  value: string;
-  options: MonthOption[];
-  onChange: (value: string) => void;
-  initiallyOpen: boolean;
-}) {
+  title = "Selecionado",
+  emptyMessage = "Nenhuma opção disponível",
+  disabled = false,
+  size = "md",
+  initiallyOpen = false,
+}: WheelSelectProps) {
   const [isOpen, setIsOpen] = useState(initiallyOpen);
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -103,6 +41,8 @@ function MonthWheel({
   );
 
   const selectedOption = options[selectedIndex] ?? options[0];
+  const containerHeightClass = size === "sm" ? "h-40" : "h-52";
+  const verticalPaddingClass = size === "sm" ? "py-14" : "py-20";
 
   useEffect(() => {
     if (!isOpen) {
@@ -135,10 +75,18 @@ function MonthWheel({
   }, []);
 
   function handleToggle() {
+    if (disabled || options.length === 0) {
+      return;
+    }
+
     setIsOpen((currentValue) => !currentValue);
   }
 
   function handleSelect(nextValue: string) {
+    if (disabled) {
+      return;
+    }
+
     onChange(nextValue);
 
     if (closeTimeoutRef.current) {
@@ -151,7 +99,7 @@ function MonthWheel({
   }
 
   function handleScroll() {
-    if (options.length === 0) {
+    if (disabled || options.length === 0) {
       return;
     }
 
@@ -195,29 +143,30 @@ function MonthWheel({
     }, 90);
   }
 
-  function selectMonthByOffset(offset: number) {
+  function selectByOffset(offset: number) {
     const nextOption = options[selectedIndex + offset];
 
-    if (!nextOption) {
+    if (!nextOption || disabled) {
       return;
     }
 
     handleSelect(nextOption.value);
   }
 
-  function handleClose(event?: SyntheticEvent) {
+  if (options.length === 0) {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold text-stone-500">
+        {emptyMessage}
+      </div>
+    );
+  }
+  function handleClose(event?: React.SyntheticEvent) {
     event?.preventDefault();
     event?.stopPropagation();
     setIsOpen(false);
   }
 
-  if (options.length === 0) {
-    return (
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold text-stone-500">
-        Nenhum mês disponível
-      </div>
-    );
-  }
+
 
   return (
     <div className="space-y-2">
@@ -225,8 +174,9 @@ function MonthWheel({
         <button
           type="button"
           onClick={handleToggle}
-          className="min-w-0 flex-1 text-left"
-          aria-label={`Mês selecionado: ${selectedOption?.label}`}
+          disabled={disabled}
+          className="min-w-0 flex-1 text-left disabled:cursor-not-allowed"
+          aria-label={`${title}: ${selectedOption?.label}`}
           aria-expanded={isOpen}
         >
           <span className="block truncate text-sm font-black text-stone-950">
@@ -234,14 +184,15 @@ function MonthWheel({
           </span>
 
           <span className="mt-0.5 block text-xs font-semibold text-stone-400">
-            Toque em trocar para selecionar outro mês
+            Toque em trocar para selecionar outra opção
           </span>
         </button>
 
         <button
           type="button"
           onClick={handleToggle}
-          className="shrink-0 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-black text-stone-600 transition hover:bg-stone-100"
+          disabled={disabled}
+          className="shrink-0 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-black text-stone-600 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isOpen ? "Fechar" : "Trocar"}
         </button>
@@ -266,10 +217,10 @@ function MonthWheel({
 
           <button
             type="button"
-            onClick={() => selectMonthByOffset(-1)}
-            disabled={selectedIndex <= 0}
+            onClick={() => selectByOffset(-1)}
+            disabled={disabled || selectedIndex <= 0}
             className="mx-auto mb-2 flex h-8 w-11 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-base font-black text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-35"
-            aria-label="Próximo mês"
+            aria-label="Opção anterior"
           >
             ▲
           </button>
@@ -280,7 +231,7 @@ function MonthWheel({
             <div
               ref={scrollContainerRef}
               onScroll={handleScroll}
-              className="month-wheel-scroll h-52 snap-y snap-mandatory overflow-y-auto scroll-smooth px-3 py-20"
+              className={`option-wheel-scroll ${containerHeightClass} snap-y snap-mandatory overflow-y-auto scroll-smooth px-3 ${verticalPaddingClass}`}
             >
               {options.map((option) => {
                 const isSelected = option.value === value;
@@ -293,7 +244,8 @@ function MonthWheel({
                     }}
                     type="button"
                     onClick={() => handleSelect(option.value)}
-                    className={`relative z-20 mb-2 flex h-12 w-full snap-center items-center justify-center rounded-2xl px-4 text-sm font-black transition ${
+                    disabled={disabled}
+                    className={`relative z-20 mb-2 flex h-12 w-full snap-center items-center justify-center rounded-2xl px-4 text-sm font-black transition disabled:cursor-not-allowed ${
                       isSelected
                         ? "app-brand-soft scale-105 shadow-sm"
                         : "text-stone-400 hover:bg-white hover:text-stone-700"
@@ -308,10 +260,10 @@ function MonthWheel({
 
           <button
             type="button"
-            onClick={() => selectMonthByOffset(1)}
-            disabled={selectedIndex >= options.length - 1}
+            onClick={() => selectByOffset(1)}
+            disabled={disabled || selectedIndex >= options.length - 1}
             className="mx-auto mt-2 flex h-8 w-11 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-base font-black text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-35"
-            aria-label="Mês anterior"
+            aria-label="Próxima opção"
           >
             ▼
           </button>
@@ -319,101 +271,4 @@ function MonthWheel({
       ) : null}
     </div>
   );
-}
-
-function buildMonthOptions({
-  selectedMonth,
-  monthsBefore,
-  monthsAfter,
-  availableMonths,
-}: {
-  selectedMonth: string;
-  monthsBefore: number;
-  monthsAfter: number;
-  availableMonths: readonly string[];
-}): MonthOption[] {
-  const currentMonth = getCurrentMonthDate();
-  const monthValues = new Set<string>();
-
-  for (let offset = -monthsBefore; offset <= monthsAfter; offset += 1) {
-    const date = new Date(
-      Date.UTC(
-        currentMonth.getUTCFullYear(),
-        currentMonth.getUTCMonth() + offset,
-        1,
-      ),
-    );
-
-    monthValues.add(toMonthValue(date));
-  }
-
-  for (const availableMonth of availableMonths) {
-    const normalizedMonth = normalizeMonthValue(availableMonth);
-
-    if (normalizedMonth) {
-      monthValues.add(normalizedMonth);
-    }
-  }
-
-  const normalizedSelectedMonth = normalizeMonthValue(selectedMonth);
-
-  if (normalizedSelectedMonth) {
-    monthValues.add(normalizedSelectedMonth);
-  }
-
-  return Array.from(monthValues)
-    .sort((firstMonth, secondMonth) => secondMonth.localeCompare(firstMonth))
-    .map((monthValue) => {
-      const date = parseMonthValue(monthValue);
-
-      return {
-        value: monthValue,
-        label: capitalizeFirstLetter(MONTH_FORMATTER.format(date)),
-      };
-    });
-}
-
-function getCurrentMonthDate() {
-  const now = new Date();
-
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
-}
-
-function normalizeMonthValue(value: string) {
-  if (!value) {
-    return "";
-  }
-
-  const trimmedValue = value.trim();
-
-  if (/^\d{4}-\d{2}$/.test(trimmedValue)) {
-    return trimmedValue;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}/.test(trimmedValue)) {
-    return trimmedValue.slice(0, 7);
-  }
-
-  return "";
-}
-
-function parseMonthValue(value: string) {
-  const [year, month] = value.split("-").map(Number);
-
-  if (!year || !month) {
-    return getCurrentMonthDate();
-  }
-
-  return new Date(Date.UTC(year, month - 1, 1));
-}
-
-function toMonthValue(date: Date) {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-
-  return `${year}-${month}`;
-}
-
-function capitalizeFirstLetter(value: string) {
-  return value.charAt(0).toLocaleUpperCase("pt-BR") + value.slice(1);
 }

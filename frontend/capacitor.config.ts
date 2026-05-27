@@ -14,6 +14,18 @@ const config: CapacitorConfig = {
   android: {
     webContentsDebuggingEnabled: true,
   },
+
+  plugins: {
+    SocialLogin: {
+      providers: {
+        google: true,
+        apple: true,
+        facebook: false,
+        twitter: false,
+      },
+      logLevel: 1,
+    },
+  },
 };
 
 export default config;

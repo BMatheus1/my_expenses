@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
 
     google_client_id: str = ""
+    google_allowed_client_ids: str = ""
 
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     cors_methods: str = "GET,POST,PUT,DELETE,OPTIONS"
@@ -222,6 +223,15 @@ class Settings(BaseSettings):
     def cors_header_list(self) -> list[str]:
         return self.parse_csv(self.cors_headers)
 
+    @property
+    def google_client_id_list(self) -> list[str]:
+        client_ids = self.parse_csv(self.google_allowed_client_ids)
+
+        if self.google_client_id and self.google_client_id not in client_ids:
+            client_ids.insert(0, self.google_client_id)
+
+        return client_ids    
+    
     @staticmethod
     def parse_csv(value: str) -> list[str]:
         return [item.strip() for item in value.split(",") if item.strip()]

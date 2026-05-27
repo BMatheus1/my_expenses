@@ -1,5 +1,6 @@
 "use client";
 
+import { Capacitor } from "@capacitor/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { loginWithGoogle, setAuthToken } from "../lib/api";
@@ -12,6 +13,19 @@ type GoogleSignInButtonProps = {
 
 type GoogleCredentialResponse = {
   credential?: string;
+};
+
+type NativeGoogleLoginResult = {
+  provider?: string;
+  result?: {
+    idToken?: string | null;
+    responseType?: "online" | "offline";
+    profile?: {
+      email?: string | null;
+      name?: string | null;
+      imageUrl?: string | null;
+    };
+  };
 };
 
 declare global {
@@ -31,7 +45,7 @@ declare global {
               shape: "pill" | "rectangular" | "circle" | "square";
               width?: string;
               text?: "signin_with" | "signup_with" | "continue_with";
-            }
+            },
           ) => void;
         };
       };
@@ -41,15 +55,111 @@ declare global {
 
 const GOOGLE_SCRIPT_ID = "google-identity-services-script";
 
+let nativeGoogleInitializePromise: Promise<void> | null = null;
+
+function isNativeApp() {
+  return Capacitor.isNativePlatform();
+}
+
+function getGoogleWebClientId() {
+  return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || "";
+}
+
+function getGoogleIosClientId() {
+  return process.env.NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() || "";
+}
+
+function getGoogleIosServerClientId() {
+  return (
+    process.env.NEXT_PUBLIC_GOOGLE_IOS_SERVER_CLIENT_ID?.trim() ||
+    getGoogleWebClientId()
+  );
+}
+
+async function initializeNativeGoogle() {
+  if (nativeGoogleInitializePromise) {
+    return nativeGoogleInitializePromise;
+  }
+
+  nativeGoogleInitializePromise = initializeNativeGoogleRequest();
+
+  return nativeGoogleInitializePromise;
+}
+
+async function initializeNativeGoogleRequest() {
+  const webClientId = getGoogleWebClientId();
+  const iOSClientId = getGoogleIosClientId();
+  const iOSServerClientId = getGoogleIosServerClientId();
+
+  if (!webClientId) {
+    throw new Error("NEXT_PUBLIC_GOOGLE_CLIENT_ID não configurado.");
+  }
+
+  const { SocialLogin } = await import("@capgo/capacitor-social-login");
+
+  const googleConfig: {
+    webClientId: string;
+    iOSClientId?: string;
+    iOSServerClientId?: string;
+    mode: "online";
+  } = {
+    webClientId,
+    mode: "online",
+  };
+
+  if (Capacitor.getPlatform() === "ios") {
+    if (!iOSClientId) {
+      throw new Error("NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID não configurado.");
+    }
+
+    googleConfig.iOSClientId = iOSClientId;
+    googleConfig.iOSServerClientId = iOSServerClientId;
+  }
+
+  await SocialLogin.initialize({
+    google: googleConfig,
+  });
+}
+
+function extractNativeGoogleIdToken(response: NativeGoogleLoginResult) {
+  const idToken = response.result?.idToken;
+
+  if (!idToken) {
+    throw new Error("Não foi possível receber o token do Google.");
+  }
+
+  return idToken;
+}
+
 export function GoogleSignInButton({
   onAuthenticated,
   onError,
 }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement | null>(null);
+
+  const [isNativePlatform] = useState(() => isNativeApp());
   const [isScriptReady, setIsScriptReady] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  const googleClientId = getGoogleWebClientId();
+
+  useEffect(() => {
+    if (isNativePlatform) {
+      onError("");
+    }
+  }, [isNativePlatform, onError]);
+
+  const authenticateWithCredential = useCallback(
+    async (credential: string) => {
+      const authResponse = await loginWithGoogle({
+        credential,
+      });
+
+      setAuthToken(authResponse.access_token);
+      onAuthenticated(authResponse.user);
+    },
+    [onAuthenticated],
+  );
 
   const handleGoogleCredential = useCallback(
     async (response: GoogleCredentialResponse) => {
@@ -62,30 +172,59 @@ export function GoogleSignInButton({
 
       try {
         setIsAuthenticating(true);
-
-        const authResponse = await loginWithGoogle({
-          credential: response.credential,
-        });
-
-        setAuthToken(authResponse.access_token);
-        onAuthenticated(authResponse.user);
+        await authenticateWithCredential(response.credential);
       } catch (error) {
-        console.error("Erro no login Google:", error);
+        console.error("Erro no login Google web:", error);
 
         onError(
           error instanceof Error
             ? error.message
-            : "Não foi possível entrar com Google."
+            : "Não foi possível entrar com Google.",
         );
       } finally {
         setIsAuthenticating(false);
       }
     },
-    [onAuthenticated, onError]
+    [authenticateWithCredential, onError],
   );
 
+  const handleNativeGoogleLogin = useCallback(async () => {
+    onError("");
+
+    try {
+      setIsAuthenticating(true);
+
+      await initializeNativeGoogle();
+
+      const { SocialLogin } = await import("@capgo/capacitor-social-login");
+
+      const response = (await SocialLogin.login({
+        provider: "google",
+        options: {
+          scopes: ["email", "profile"],
+          autoSelectEnabled: false,
+          filterByAuthorizedAccounts: false,
+        },
+      })) as NativeGoogleLoginResult;
+
+      const idToken = extractNativeGoogleIdToken(response);
+
+      await authenticateWithCredential(idToken);
+    } catch (error) {
+      console.error("Erro no login Google nativo:", error);
+
+      onError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível entrar com Google.",
+      );
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }, [authenticateWithCredential, onError]);
+
   useEffect(() => {
-    if (!googleClientId) {
+    if (isNativePlatform || !googleClientId) {
       return;
     }
 
@@ -113,10 +252,15 @@ export function GoogleSignInButton({
     };
 
     document.body.appendChild(script);
-  }, [googleClientId, onError]);
+  }, [googleClientId, isNativePlatform, onError]);
 
   useEffect(() => {
-    if (!isScriptReady || !buttonRef.current || !window.google) {
+    if (
+      isNativePlatform ||
+      !isScriptReady ||
+      !buttonRef.current ||
+      !window.google
+    ) {
       return;
     }
 
@@ -134,13 +278,38 @@ export function GoogleSignInButton({
       width: "360",
       text: "continue_with",
     });
-  }, [isScriptReady, googleClientId, handleGoogleCredential]);
+  }, [googleClientId, handleGoogleCredential, isNativePlatform, isScriptReady]);
 
   if (!googleClientId) {
     return (
       <p className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         Configure NEXT_PUBLIC_GOOGLE_CLIENT_ID para ativar login com Google.
       </p>
+    );
+  }
+
+  if (isNativePlatform) {
+    return (
+      <div className="space-y-3">
+        <button
+          type="button"
+          onClick={handleNativeGoogleLogin}
+          disabled={isAuthenticating}
+          className="flex w-full items-center justify-center gap-3 rounded-full border border-stone-200 bg-white px-5 py-3 text-sm font-black text-stone-800 shadow-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-stone-200 bg-white text-sm font-black">
+            G
+          </span>
+
+          <span>
+            {isAuthenticating ? "Entrando com Google..." : "Continuar com Google"}
+          </span>
+        </button>
+
+        <p className="text-center text-xs leading-5 text-stone-500">
+          Login seguro usando a conta Google configurada no dispositivo.
+        </p>
+      </div>
     );
   }
 

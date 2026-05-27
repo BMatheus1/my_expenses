@@ -161,7 +161,9 @@ def get_current_user(
 
 
 def verify_google_credential(credential: str) -> dict:
-    if not settings.google_client_id:
+    allowed_client_ids = settings.google_client_id_list
+
+    if not allowed_client_ids:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="GOOGLE_CLIENT_ID não configurado no backend.",
@@ -171,12 +173,19 @@ def verify_google_credential(credential: str) -> dict:
         token_info = google_id_token.verify_oauth2_token(
             credential,
             google_requests.Request(),
-            settings.google_client_id,
         )
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Login Google inválido.",
+        )
+
+    audience = token_info.get("aud")
+
+    if audience not in allowed_client_ids:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Client ID do Google não autorizado.",
         )
 
     issuer = token_info.get("iss")

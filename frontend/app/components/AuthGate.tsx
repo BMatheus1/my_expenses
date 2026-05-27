@@ -48,6 +48,17 @@ function isBrowserOffline() {
   return typeof navigator !== "undefined" && navigator.onLine === false;
 }
 
+function hasExplicitAuthMode() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const authMode = searchParams.get("auth");
+
+  return authMode === "login" || authMode === "register";
+}
+
 function canOpenOfflineDashboard() {
   const cachedUser = readCachedAuthenticatedUser();
   const cachedDashboard = readDashboardCache();
@@ -77,7 +88,7 @@ export function AuthGate() {
     setSessionError(false);
     setSessionErrorMessage("");
 
-    if (hasAuthActionToken()) {
+    if (hasAuthActionToken() || hasExplicitAuthMode()) {
       setCurrentUser(null);
       setIsCheckingSession(false);
       return;

@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isCapacitorBuild = process.env.CAPACITOR_BUILD === "true";
+
 const securityHeaders = [
   {
     key: "X-Content-Type-Options",
@@ -34,7 +36,16 @@ const serviceWorkerHeaders = [
   },
 ];
 
-const nextConfig: NextConfig = {
+const capacitorConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
+  output: "export",
+  trailingSlash: true,
+  images: {
+    unoptimized: true,
+  },
+};
+
+const webConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
 
   async headers() {
@@ -50,5 +61,7 @@ const nextConfig: NextConfig = {
     ];
   },
 };
+
+const nextConfig = isCapacitorBuild ? capacitorConfig : webConfig;
 
 export default nextConfig;

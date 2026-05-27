@@ -5,19 +5,26 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "build:android": "cross-env CAPACITOR_BUILD=true next build",
+    "sync:android": "npm run build:android && npx cap sync android",
+    "open:android": "npx cap open android",
+    "run:android": "npm run build:android && npx cap sync android && npx cap run android",
     "lint": "eslint"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.5",
+    "@capacitor/core": "^7.6.5",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^7.0.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",

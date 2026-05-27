@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -43,6 +44,7 @@ import type {
   BusinessSale,
   BusinessService,
 } from "@/app/types/business";
+import { smartScrollToRef } from "@/app/utils/smartScroll";
 
 import { BusinessHeader } from "./BusinessHeader";
 import { DeleteBusinessModal, EditBusinessModal } from "./BusinessModals";
@@ -84,10 +86,17 @@ const BUSINESS_OFFLINE_MESSAGE =
 export default function BusinessWorkspace() {
   const isOnline = useOnlineStatus();
 
+  const createBusinessSectionRef = useRef<HTMLDivElement | null>(null);
+  const businessContentSectionRef = useRef<HTMLDivElement | null>(null);
+  const stockSectionRef = useRef<HTMLDivElement | null>(null);
+  const servicesSectionRef = useRef<HTMLDivElement | null>(null);
+  const recipesSectionRef = useRef<HTMLDivElement | null>(null);
+  const salesSectionRef = useRef<HTMLDivElement | null>(null);
+
   const [negocios, setNegocios] = useState<Business[]>([]);
-  const [negocioSelecionadoId, setNegocioSelecionadoId] = useState<string | null>(
-    null,
-  );
+  const [negocioSelecionadoId, setNegocioSelecionadoId] = useState<
+    string | null
+  >(null);
 
   const [dashboard, setDashboard] = useState<BusinessDashboard | null>(null);
   const [materiais, setMateriais] = useState<BusinessMaterial[]>([]);
@@ -191,6 +200,18 @@ export default function BusinessWorkspace() {
     };
   }, [materiais]);
 
+  const openCreateBusinessSection = useCallback(() => {
+    setCriandoNegocio(true);
+    setNegocioSelecionadoId(null);
+    setErro(null);
+    setSucesso(null);
+
+    smartScrollToRef(createBusinessSectionRef, {
+      delayMs: 120,
+      focusFirstField: true,
+    });
+  }, []);
+
   const carregarDadosDoNegocio = useCallback(
     async (businessId: string) => {
       if (!isOnline) {
@@ -238,11 +259,7 @@ export default function BusinessWorkspace() {
   const carregarNegocios = useCallback(async () => {
     if (!isOnline) {
       setCarregando(false);
-
-      if (negocios.length === 0) {
-        setErro(BUSINESS_OFFLINE_MESSAGE);
-      }
-
+      setErro(BUSINESS_OFFLINE_MESSAGE);
       return;
     }
 
@@ -268,7 +285,7 @@ export default function BusinessWorkspace() {
     } finally {
       setCarregando(false);
     }
-  }, [isOnline, negocios.length]);
+  }, [isOnline]);
 
   const atualizarNegocioSelecionado = useCallback(async () => {
     if (!negocioSelecionadoId) {
@@ -309,10 +326,7 @@ export default function BusinessWorkspace() {
           return;
         }
 
-        setCriandoNegocio(true);
-        setNegocioSelecionadoId(null);
-        setErro(null);
-        setSucesso(null);
+        openCreateBusinessSection();
         return;
       }
 
@@ -322,6 +336,10 @@ export default function BusinessWorkspace() {
         setAbaAtiva("resumo");
         setErro(null);
         setSucesso(null);
+
+        smartScrollToRef(businessContentSectionRef, {
+          delayMs: 120,
+        });
       }
     }
 
@@ -340,7 +358,7 @@ export default function BusinessWorkspace() {
         handleBusinessNavigation,
       );
     };
-  }, [isOnline]);
+  }, [isOnline, openCreateBusinessSection]);
 
   function blockOfflineAction(actionDescription: string) {
     if (isOnline) {
@@ -351,6 +369,32 @@ export default function BusinessWorkspace() {
     setSucesso(null);
 
     return true;
+  }
+
+  function getTabSectionRef(tab: BusinessTab) {
+    const refs = {
+      resumo: businessContentSectionRef,
+      estoque: stockSectionRef,
+      servicos: servicesSectionRef,
+      fichas: recipesSectionRef,
+      vendas: salesSectionRef,
+    };
+
+    return refs[tab];
+  }
+
+  function scrollToBusinessSection(tab: BusinessTab, focusFirstField = false) {
+    smartScrollToRef(getTabSectionRef(tab), {
+      delayMs: 120,
+      focusFirstField,
+    });
+  }
+
+  function handleTabChange(tab: BusinessTab) {
+    setAbaAtiva(tab);
+    setErro(null);
+    setSucesso(null);
+    scrollToBusinessSection(tab, tab !== "resumo");
   }
 
   async function handleCriarNegocio(event: FormEvent<HTMLFormElement>) {
@@ -382,6 +426,10 @@ export default function BusinessWorkspace() {
       setAbaAtiva("resumo");
       setSucesso("Negócio criado com sucesso.");
       dispatchBusinessCreated(novoNegocio.id);
+
+      smartScrollToRef(businessContentSectionRef, {
+        delayMs: 160,
+      });
     } catch (error) {
       setErro(getErrorMessage(error));
     } finally {
@@ -819,6 +867,7 @@ export default function BusinessWorkspace() {
     setAbaAtiva("estoque");
     setErro(null);
     setSucesso(null);
+    scrollToBusinessSection("estoque", true);
   }
 
   function iniciarEdicaoServico(service: BusinessService) {
@@ -839,6 +888,7 @@ export default function BusinessWorkspace() {
     setAbaAtiva("servicos");
     setErro(null);
     setSucesso(null);
+    scrollToBusinessSection("servicos", true);
   }
 
   function iniciarEdicaoItemFicha(
@@ -858,6 +908,7 @@ export default function BusinessWorkspace() {
     setAbaAtiva("fichas");
     setErro(null);
     setSucesso(null);
+    scrollToBusinessSection("fichas", true);
   }
 
   function abrirFichaDoServico(service: BusinessService) {
@@ -869,6 +920,7 @@ export default function BusinessWorkspace() {
     setAbaAtiva("fichas");
     setErro(null);
     setSucesso(null);
+    scrollToBusinessSection("fichas", true);
   }
 
   function limparFormularioMaterial() {
@@ -915,12 +967,14 @@ export default function BusinessWorkspace() {
       ) : null}
 
       {criandoNegocio ? (
-        <CreateBusinessCard
-          form={negocioForm}
-          saving={salvando}
-          onChange={setNegocioForm}
-          onSubmit={handleCriarNegocio}
-        />
+        <div ref={createBusinessSectionRef} className="scroll-mt-5">
+          <CreateBusinessCard
+            form={negocioForm}
+            saving={salvando}
+            onChange={setNegocioForm}
+            onSubmit={handleCriarNegocio}
+          />
+        </div>
       ) : null}
 
       {!criandoNegocio && negocioSelecionado ? (
@@ -936,84 +990,94 @@ export default function BusinessWorkspace() {
             onDelete={abrirExclusaoNegocio}
           />
 
-          <TabNavigation activeTab={abaAtiva} onChange={setAbaAtiva} />
+          <TabNavigation activeTab={abaAtiva} onChange={handleTabChange} />
 
           {abaAtiva === "resumo" ? (
-            <ResumoTab
-              dashboard={dashboard}
-              materiais={materiais}
-              servicos={servicos}
-              vendas={vendas}
-              estatisticasEstoque={estatisticasEstoque}
-              onGoToStock={() => setAbaAtiva("estoque")}
-              onGoToRecipes={() => setAbaAtiva("fichas")}
-            />
+            <div ref={businessContentSectionRef} className="scroll-mt-5">
+              <ResumoTab
+                dashboard={dashboard}
+                materiais={materiais}
+                servicos={servicos}
+                vendas={vendas}
+                estatisticasEstoque={estatisticasEstoque}
+                onGoToStock={() => handleTabChange("estoque")}
+                onGoToRecipes={() => handleTabChange("fichas")}
+              />
+            </div>
           ) : null}
 
           {abaAtiva === "estoque" ? (
-            <EstoqueTab
-              materiais={materiaisFiltrados}
-              totalMateriais={materiais.length}
-              categorias={categoriasEstoque}
-              busca={buscaEstoque}
-              categoria={categoriaEstoque}
-              estatisticas={estatisticasEstoque}
-              form={materialForm}
-              materialEmEdicaoId={materialEmEdicaoId}
-              saving={salvando}
-              onBuscaChange={setBuscaEstoque}
-              onCategoriaChange={setCategoriaEstoque}
-              onChange={setMaterialForm}
-              onSubmit={handleSalvarMaterial}
-              onCancelEdit={limparFormularioMaterial}
-              onEdit={iniciarEdicaoMaterial}
-              onDelete={handleExcluirMaterial}
-            />
+            <div ref={stockSectionRef} className="scroll-mt-5">
+              <EstoqueTab
+                materiais={materiaisFiltrados}
+                totalMateriais={materiais.length}
+                categorias={categoriasEstoque}
+                busca={buscaEstoque}
+                categoria={categoriaEstoque}
+                estatisticas={estatisticasEstoque}
+                form={materialForm}
+                materialEmEdicaoId={materialEmEdicaoId}
+                saving={salvando}
+                onBuscaChange={setBuscaEstoque}
+                onCategoriaChange={setCategoriaEstoque}
+                onChange={setMaterialForm}
+                onSubmit={handleSalvarMaterial}
+                onCancelEdit={limparFormularioMaterial}
+                onEdit={iniciarEdicaoMaterial}
+                onDelete={handleExcluirMaterial}
+              />
+            </div>
           ) : null}
 
           {abaAtiva === "servicos" ? (
-            <ServicosTab
-              servicos={servicos}
-              servicoForm={servicoForm}
-              servicoEmEdicaoId={servicoEmEdicaoId}
-              saving={salvando}
-              onServiceChange={setServicoForm}
-              onServiceSubmit={handleSalvarServico}
-              onCancelServiceEdit={limparFormularioServico}
-              onEditService={iniciarEdicaoServico}
-              onDeleteService={handleExcluirServico}
-              onManageRecipe={abrirFichaDoServico}
-            />
+            <div ref={servicesSectionRef} className="scroll-mt-5">
+              <ServicosTab
+                servicos={servicos}
+                servicoForm={servicoForm}
+                servicoEmEdicaoId={servicoEmEdicaoId}
+                saving={salvando}
+                onServiceChange={setServicoForm}
+                onServiceSubmit={handleSalvarServico}
+                onCancelServiceEdit={limparFormularioServico}
+                onEditService={iniciarEdicaoServico}
+                onDeleteService={handleExcluirServico}
+                onManageRecipe={abrirFichaDoServico}
+              />
+            </div>
           ) : null}
 
           {abaAtiva === "fichas" ? (
-            <FichasTab
-              materiais={materiais}
-              servicos={servicos}
-              fichaForm={fichaForm}
-              itemFichaEmEdicaoId={itemFichaEmEdicaoId}
-              servicoSelecionadoParaFicha={servicoSelecionadoParaFicha}
-              saving={salvando}
-              onRecipeChange={setFichaForm}
-              onRecipeSubmit={handleSalvarItemFicha}
-              onCancelRecipeEdit={limparFormularioFicha}
-              onEditRecipeItem={iniciarEdicaoItemFicha}
-              onDeleteRecipeItem={handleExcluirItemFicha}
-              onGoToServices={() => setAbaAtiva("servicos")}
-              onGoToStock={() => setAbaAtiva("estoque")}
-            />
+            <div ref={recipesSectionRef} className="scroll-mt-5">
+              <FichasTab
+                materiais={materiais}
+                servicos={servicos}
+                fichaForm={fichaForm}
+                itemFichaEmEdicaoId={itemFichaEmEdicaoId}
+                servicoSelecionadoParaFicha={servicoSelecionadoParaFicha}
+                saving={salvando}
+                onRecipeChange={setFichaForm}
+                onRecipeSubmit={handleSalvarItemFicha}
+                onCancelRecipeEdit={limparFormularioFicha}
+                onEditRecipeItem={iniciarEdicaoItemFicha}
+                onDeleteRecipeItem={handleExcluirItemFicha}
+                onGoToServices={() => handleTabChange("servicos")}
+                onGoToStock={() => handleTabChange("estoque")}
+              />
+            </div>
           ) : null}
 
           {abaAtiva === "vendas" ? (
-            <VendasTab
-              vendas={vendas}
-              servicos={servicos}
-              form={vendaForm}
-              servicoSelecionadoParaVenda={servicoSelecionadoParaVenda}
-              saving={salvando}
-              onChange={setVendaForm}
-              onSubmit={handleRegistrarVenda}
-            />
+            <div ref={salesSectionRef} className="scroll-mt-5">
+              <VendasTab
+                vendas={vendas}
+                servicos={servicos}
+                form={vendaForm}
+                servicoSelecionadoParaVenda={servicoSelecionadoParaVenda}
+                saving={salvando}
+                onChange={setVendaForm}
+                onSubmit={handleRegistrarVenda}
+              />
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -1025,7 +1089,7 @@ export default function BusinessWorkspace() {
               return;
             }
 
-            setCriandoNegocio(true);
+            openCreateBusinessSection();
           }}
         />
       ) : null}

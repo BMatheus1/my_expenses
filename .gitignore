@@ -56,3 +56,13 @@ Thumbs.db
 .idea/
 .vercel
 .env*.local
+
+# Capacitor / Android
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/build/
+frontend/android/.idea/
+frontend/android/local.properties
+
+# Next static export
+frontend/out/

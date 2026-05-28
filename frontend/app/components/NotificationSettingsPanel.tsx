@@ -321,39 +321,52 @@ function NotificationSwitch({
   disabled: boolean;
   onChange: (checked: boolean) => void;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      disabled={disabled}
-      className="group flex shrink-0 items-center gap-3 rounded-full border px-3 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55"
-      style={{
-        backgroundColor: checked ? "rgba(16, 185, 129, 0.14)" : "var(--app-surface)",
-        borderColor: checked ? "rgba(16, 185, 129, 0.45)" : "var(--app-border)",
-        color: checked ? "rgb(5, 150, 105)" : "var(--app-text-soft)",
-      }}
-      aria-pressed={checked}
-      aria-label={checked ? "Desativar notificações" : "Ativar notificações"}
-    >
-      <span>{checked ? "Ligado" : "Desligado"}</span>
+  const label = checked ? "Ativado" : "Desativado";
 
-      <span
-        className={`relative h-8 w-16 rounded-full border transition ${
-          checked ? "app-brand-gradient shadow-lg" : ""
-        }`}
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-2">
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        disabled={disabled}
+        className="relative inline-flex h-9 w-16 items-center rounded-full p-1 outline-none transition duration-300 ease-out focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-55"
         style={{
-          backgroundColor: checked ? undefined : "var(--app-surface-muted)",
-          borderColor: checked ? "transparent" : "var(--app-border)",
-          boxShadow: checked ? "0 12px 30px rgba(16, 185, 129, 0.35)" : undefined,
+          background: checked
+            ? "linear-gradient(135deg, var(--app-brand), var(--app-brand-strong))"
+            : "var(--app-surface-muted)",
+          border: checked
+            ? "1px solid rgba(255, 255, 255, 0.22)"
+            : "1px solid var(--app-border)",
+          boxShadow: checked
+            ? "0 14px 32px rgba(16, 185, 129, 0.32), inset 0 1px 1px rgba(255, 255, 255, 0.28)"
+            : "inset 0 1px 2px rgba(15, 23, 42, 0.12)",
         }}
-        aria-hidden="true"
+        aria-pressed={checked}
+        aria-label={checked ? "Desativar notificações" : "Ativar notificações"}
       >
         <span
-          className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md transition-transform duration-200 ${
-            checked ? "translate-x-9" : "translate-x-1"
-          }`}
+          className="absolute left-1 top-1 h-7 w-7 rounded-full bg-white shadow-lg transition-transform duration-300 ease-out"
+          style={{
+            transform: checked ? "translateX(28px)" : "translateX(0)",
+            boxShadow: checked
+              ? "0 8px 18px rgba(5, 150, 105, 0.32)"
+              : "0 7px 16px rgba(15, 23, 42, 0.18)",
+          }}
+          aria-hidden="true"
         />
+      </button>
+
+      <span
+        className="rounded-full px-3 py-1 text-[0.68rem] font-black uppercase tracking-[0.16em]"
+        style={{
+          backgroundColor: checked
+            ? "rgba(16, 185, 129, 0.12)"
+            : "var(--app-surface-muted)",
+          color: checked ? "var(--app-brand-strong)" : "var(--app-text-soft)",
+        }}
+      >
+        {label}
       </span>
-    </button>
+    </div>
   );
 }

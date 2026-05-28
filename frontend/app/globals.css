@@ -778,13 +778,48 @@ html[data-app-mode="dark"] .wheel-select-panel {
   color: var(--app-muted-soft);
 }
 
+.native-safe-field-trigger-focused {
+  border-color: var(--brand-primary);
+  background: var(--app-surface-raised);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-accent) 16%, transparent);
+}
+
 .native-safe-field-value {
-  display: block;
+  display: flex;
   width: 100%;
   min-width: 0;
+  align-items: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.native-safe-field-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: inherit;
+}
+
+.native-safe-fake-caret {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 2px;
+  height: 1.25em;
+  margin-left: 3px;
+  border-radius: 999px;
+  background: var(--brand-primary);
+  animation: native-safe-caret-blink 1s steps(1, end) infinite;
+}
+
+@keyframes native-safe-caret-blink {
+  0%, 48% {
+    opacity: 1;
+  }
+
+  49%, 100% {
+    opacity: 0;
+  }
 }
 
 .native-safe-textarea-trigger {
@@ -796,7 +831,13 @@ html[data-app-mode="dark"] .wheel-select-panel {
 
 .native-safe-textarea-trigger .native-safe-field-value {
   max-height: 8rem;
+  align-items: flex-start;
   overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.native-safe-textarea-trigger .native-safe-field-text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

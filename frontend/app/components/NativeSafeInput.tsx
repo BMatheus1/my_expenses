@@ -2,6 +2,7 @@
 
 import {
   useRef,
+  useState,
   type ChangeEvent,
   type InputHTMLAttributes,
   type KeyboardEvent,
@@ -33,6 +34,14 @@ type NativeSafeTextareaProps = {
   rows?: number;
 };
 
+function getDisplayValue(value: string, type?: InputHTMLAttributes<HTMLInputElement>["type"]) {
+  if (type === "password" && value) {
+    return "•".repeat(value.length);
+  }
+
+  return value;
+}
+
 export function NativeSafeInput({
   value,
   onChange,
@@ -48,6 +57,7 @@ export function NativeSafeInput({
   enterKeyHint = "done",
 }: NativeSafeInputProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   function focusHiddenInput() {
     if (disabled) {
@@ -83,25 +93,31 @@ export function NativeSafeInput({
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.currentTarget.blur();
+      setIsFocused(false);
     }
   }
 
   const safeType = type === "number" ? "text" : type;
-  const displayValue = type === "password" && value ? "•".repeat(value.length) : value;
+  const displayValue = getDisplayValue(value, type);
+  const showPlaceholder = !displayValue;
 
   return (
     <span className="native-safe-field-shell">
       <button
         type="button"
         className={`${className} native-safe-field-trigger ${
-          value ? "" : "native-safe-field-trigger-empty"
-        }`}
+          showPlaceholder ? "native-safe-field-trigger-empty" : ""
+        } ${isFocused ? "native-safe-field-trigger-focused" : ""}`}
         onClick={focusHiddenInput}
         disabled={disabled}
         aria-label={ariaLabel || placeholder || "Campo de texto"}
+        aria-pressed={isFocused}
       >
-        <span className="native-safe-field-value">
-          {displayValue || placeholder || "\u00A0"}
+        <span className="native-safe-field-value" aria-hidden="true">
+          <span className="native-safe-field-text">
+            {displayValue || (isFocused ? "" : placeholder) || " "}
+          </span>
+          {isFocused ? <span className="native-safe-fake-caret" /> : null}
         </span>
       </button>
 
@@ -109,6 +125,8 @@ export function NativeSafeInput({
         ref={inputRef}
         value={value}
         onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         onKeyDown={handleKeyDown}
         inputMode={inputMode}
         type={safeType}
@@ -138,6 +156,7 @@ export function NativeSafeTextarea({
   rows = 3,
 }: NativeSafeTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   function focusHiddenTextarea() {
     if (disabled) {
@@ -172,13 +191,17 @@ export function NativeSafeTextarea({
         type="button"
         className={`${className} native-safe-field-trigger native-safe-textarea-trigger ${
           value ? "" : "native-safe-field-trigger-empty"
-        }`}
+        } ${isFocused ? "native-safe-field-trigger-focused" : ""}`}
         onClick={focusHiddenTextarea}
         disabled={disabled}
         aria-label={ariaLabel || placeholder || "Campo de texto"}
+        aria-pressed={isFocused}
       >
-        <span className="native-safe-field-value">
-          {value || placeholder || "\u00A0"}
+        <span className="native-safe-field-value" aria-hidden="true">
+          <span className="native-safe-field-text">
+            {value || (isFocused ? "" : placeholder) || " "}
+          </span>
+          {isFocused ? <span className="native-safe-fake-caret" /> : null}
         </span>
       </button>
 
@@ -186,6 +209,8 @@ export function NativeSafeTextarea({
         ref={textareaRef}
         value={value}
         onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         rows={rows}
         disabled={disabled}
         required={required}

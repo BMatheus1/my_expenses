@@ -199,14 +199,25 @@ function DeleteModeButton({
   description: string;
   onClick: () => void;
 }) {
+  const buttonStyle = isActive
+    ? {
+        borderColor: "var(--app-brand)",
+        backgroundColor: "var(--app-brand)",
+        color: "#ffffff",
+      }
+    : {
+        borderColor: "var(--app-border)",
+        backgroundColor: "var(--app-surface-soft)",
+        color: "var(--app-text)",
+      };
+
   return (
     <button
       type="button"
       onClick={onClick}
+      style={buttonStyle}
       className={`rounded-2xl border px-4 py-3 text-left transition active:scale-[0.99] ${
-        isActive
-          ? "border-[var(--app-brand)] bg-[var(--app-brand)] text-white shadow-lg shadow-black/10"
-          : "border-[var(--app-border)] bg-[var(--app-surface-soft)] text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]"
+        isActive ? "shadow-lg shadow-black/10" : "hover:opacity-90"
       }`}
     >
       <span className="block text-sm font-black">{title}</span>
@@ -291,7 +302,12 @@ function NativeGoogleDeleteButton({
         type="button"
         onClick={handleConfirmWithGoogle}
         disabled={isButtonDisabled}
-        className="touch-button flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-sm font-black text-[var(--app-text)] shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        style={{
+          borderColor: "var(--app-border)",
+          backgroundColor: "var(--app-surface)",
+          color: "var(--app-text)",
+        }}
+        className="touch-button flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border px-4 py-3 text-sm font-black shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-base shadow-sm">
           G

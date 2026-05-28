@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { NativeSafeInput, NativeSafeTextarea } from "../NativeSafeInput";
 import { WheelSelect } from "../WheelSelect";
 
 export function InputField({
@@ -24,14 +25,15 @@ export function InputField({
       <span className="mb-1.5 block truncate text-sm font-bold app-text-soft">
         {label}
       </span>
-      <input
+      <NativeSafeInput
         type={type}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={onChange}
         placeholder={placeholder}
         inputMode={inputMode}
         required={required}
         className="app-input text-sm"
+        ariaLabel={label}
       />
     </label>
   );
@@ -53,12 +55,13 @@ export function TextareaField({
       <span className="mb-1.5 block truncate text-sm font-bold app-text-soft">
         {label}
       </span>
-      <textarea
+      <NativeSafeTextarea
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={onChange}
         placeholder={placeholder}
         rows={3}
         className="app-input min-h-28 resize-none text-sm"
+        ariaLabel={label}
       />
     </label>
   );

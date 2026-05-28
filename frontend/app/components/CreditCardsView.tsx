@@ -25,6 +25,7 @@ import {
 } from "../utils/formatters";
 import { smartScrollToRef } from "../utils/smartScroll";
 import { EmptyState, LoadingButton } from "./AppFeedback";
+import { NativeSafeInput } from "./NativeSafeInput";
 import { WheelSelect } from "./WheelSelect";
 
 const CARD_BRANDS = [
@@ -57,6 +58,9 @@ const DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => {
     label: `Dia ${day.padStart(2, "0")}`,
   };
 });
+
+const CARD_INPUT_CLASS_NAME = "app-input";
+const CARD_SELECT_CLASS_NAME = "app-input";
 
 const EMPTY_FORM = {
   name: "",
@@ -159,11 +163,11 @@ export function CreditCardsView({
     .filter((summary) => summary.invoiceTotal > 0)
     .sort((first, second) => first.dueInfo.priority - second.dueInfo.priority)[0];
 
-  const scrollToCardForm = useCallback((shouldFocusFirstField = true) => {
+  const scrollToCardForm = useCallback(() => {
     window.setTimeout(() => {
       smartScrollToRef(formSectionRef, {
         delayMs: 0,
-        focusFirstField: shouldFocusFirstField,
+        focusFirstField: false,
         block: "start",
       });
     }, 120);
@@ -179,7 +183,7 @@ export function CreditCardsView({
     setEditingCard(null);
     setForm(EMPTY_FORM);
     setIsFormOpen(true);
-    scrollToCardForm(true);
+    scrollToCardForm();
   }, [isOnline, onClearError, scrollToCardForm]);
 
   useEffect(() => {
@@ -216,15 +220,8 @@ export function CreditCardsView({
       color: card.color,
     });
     setIsFormOpen(true);
-    scrollToCardForm(false);
-
-    window.setTimeout(() => {
-      const activeElement = document.activeElement;
-
-      if (activeElement instanceof HTMLElement) {
-        activeElement.blur();
-      }
-    }, 180);
+    scrollToCardForm();
+    clearNativeFieldFocus();
   }
 
   function closeForm() {
@@ -244,6 +241,7 @@ export function CreditCardsView({
       [field]: value,
     }));
   }
+
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -364,11 +362,12 @@ export function CreditCardsView({
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
               <FormField label="Apelido do cartão">
-                <input
+                <NativeSafeInput
                   value={form.name}
-                  onChange={(event) => updateForm("name", event.target.value)}
-                  className="app-input card-form-input"
+                  onChange={(value) => updateForm("name", value)}
+                  className={CARD_INPUT_CLASS_NAME}
                   placeholder="Ex: Nubank Roxinho"
+                  ariaLabel="Apelido do cartão"
                   disabled={!isOnline}
                 />
               </FormField>
@@ -377,7 +376,7 @@ export function CreditCardsView({
                 <select
                   value={form.brand}
                   onChange={(event) => updateForm("brand", event.target.value)}
-                  className="app-input card-form-input"
+                  className={CARD_SELECT_CLASS_NAME}
                   disabled={!isOnline}
                 >
                   {CARD_BRANDS.map((brand) => (
@@ -389,34 +388,28 @@ export function CreditCardsView({
               </FormField>
 
               <FormField label="Final do cartão">
-                <input
+                <NativeSafeInput
                   value={form.lastFourDigits}
-                  onChange={(event) =>
-                    updateForm(
-                      "lastFourDigits",
-                      event.target.value.replace(/\D/g, "").slice(0, 4),
-                    )
-                  }
+                  onChange={(value) => updateForm("lastFourDigits", value)}
+                  sanitize={(value) => value.replace(/\D/g, "").slice(0, 4)}
                   inputMode="numeric"
                   maxLength={4}
-                  className="app-input card-form-input"
+                  className={CARD_INPUT_CLASS_NAME}
                   placeholder="Ex: 1234"
+                  ariaLabel="Final do cartão"
                   disabled={!isOnline}
                 />
               </FormField>
 
               <FormField label="Limite opcional">
-                <input
+                <NativeSafeInput
                   value={form.limitAmount}
-                  onChange={(event) =>
-                    updateForm(
-                      "limitAmount",
-                      sanitizeMoneyInput(event.target.value),
-                    )
-                  }
+                  onChange={(value) => updateForm("limitAmount", value)}
+                  sanitize={sanitizeMoneyInput}
                   inputMode="decimal"
-                  className="app-input card-form-input"
+                  className={CARD_INPUT_CLASS_NAME}
                   placeholder="Ex: 2500,00"
+                  ariaLabel="Limite opcional"
                   disabled={!isOnline}
                 />
               </FormField>
@@ -527,6 +520,30 @@ export function CreditCardsView({
       )}
     </div>
   );
+}
+
+function clearNativeFieldFocus() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const clearFocus = () => {
+    window.getSelection()?.removeAllRanges();
+
+    const activeElement = document.activeElement;
+
+    if (
+      activeElement instanceof HTMLInputElement ||
+      activeElement instanceof HTMLTextAreaElement ||
+      activeElement instanceof HTMLSelectElement
+    ) {
+      activeElement.blur();
+    }
+  };
+
+  window.requestAnimationFrame(clearFocus);
+  window.setTimeout(clearFocus, 180);
+  window.setTimeout(clearFocus, 420);
 }
 
 type CreditCardPanelProps = {

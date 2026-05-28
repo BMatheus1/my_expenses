@@ -41,7 +41,7 @@ export function smartScrollToElement(
         inline: "nearest",
       });
 
-      if (options.focusFirstField) {
+      if (options.focusFirstField && !shouldAvoidProgrammaticFieldFocus()) {
         focusFirstFieldInside(element);
       }
     });
@@ -73,4 +73,14 @@ function focusFirstFieldInside(element: HTMLElement) {
       preventScroll: true,
     });
   }, 250);
+}
+function shouldAvoidProgrammaticFieldFocus() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return false;
+  }
+
+  const isTouchDevice = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  const isAndroid = navigator.userAgent.toLowerCase().includes("android");
+
+  return isTouchDevice && isAndroid;
 }

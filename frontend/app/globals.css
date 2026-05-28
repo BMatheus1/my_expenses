@@ -709,14 +709,120 @@ html[data-app-mode="dark"] .wheel-select-panel {
   }
 }
 
-.card-form-input {
-  caret-color: transparent;
-  -webkit-user-select: none;
-  user-select: none;
+
+/* Android WebView caret/selection guard
+   Prevents the black native text-selection handle from appearing over short
+   operational fields after animated scrolls and edit-form openings. */
+@media (pointer: coarse) {
+  .native-caret-guard-field {
+    caret-color: transparent !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    cursor: default;
+  }
+
+  .native-caret-guard-field:focus,
+  .native-caret-guard-field:active {
+    caret-color: transparent !important;
+  }
+
+  .native-caret-guard-field::selection {
+    background: transparent !important;
+    color: inherit !important;
+  }
+
+  .native-caret-guard-select {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    cursor: default;
+  }
+}
+
+/* Patch 07: fields that avoid the Android WebView selection handle.
+   The visible control is a button-like field. Text is captured by a fixed,
+   off-screen input, so Android cannot draw the black native caret over the UI. */
+.native-safe-field-shell {
+  display: block;
+  min-width: 0;
+  width: 100%;
+}
+
+.native-safe-field-trigger {
+  display: flex;
+  min-height: 3rem;
+  cursor: text;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  line-height: 1.35;
+  -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
 }
 
-.card-form-input::selection {
-  background: transparent;
-  color: inherit;
+.native-safe-field-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.native-safe-field-trigger:focus-visible {
+  border-color: var(--brand-primary);
+  background: var(--app-surface-raised);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-accent) 18%, transparent);
+}
+
+.native-safe-field-trigger-empty {
+  color: var(--app-muted-soft);
+}
+
+.native-safe-field-value {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.native-safe-textarea-trigger {
+  min-height: 7rem;
+  align-items: flex-start;
+  overflow: hidden;
+  white-space: normal;
+}
+
+.native-safe-textarea-trigger .native-safe-field-value {
+  max-height: 8rem;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.native-safe-field-control {
+  position: fixed !important;
+  top: 0 !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  caret-color: transparent !important;
+  color: transparent !important;
+  background: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.native-safe-field-control::selection {
+  background: transparent !important;
+  color: transparent !important;
 }

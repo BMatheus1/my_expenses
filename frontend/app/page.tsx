@@ -26,17 +26,50 @@ const SECURITY_ITEMS = [
   "Exclusão de conta",
 ];
 
+
+type CapacitorRuntime = {
+  isNativePlatform?: () => boolean;
+  getPlatform?: () => string;
+};
+
+declare global {
+  interface Window {
+    Capacitor?: CapacitorRuntime;
+  }
+}
+
+function isNativeAppRuntime() {
+  const capacitor = window.Capacitor;
+
+  if (!capacitor) {
+    return false;
+  }
+
+  if (typeof capacitor.isNativePlatform === "function") {
+    return capacitor.isNativePlatform();
+  }
+
+  if (typeof capacitor.getPlatform === "function") {
+    return ["android", "ios"].includes(capacitor.getPlatform());
+  }
+
+  return false;
+}
+
 export default function LandingPage() {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const hasAuthActionToken =
       searchParams.has("verify_email_token") || searchParams.has("reset_token");
 
-    if (!hasAuthActionToken) {
+    if (!hasAuthActionToken && !isNativeAppRuntime()) {
       return;
     }
 
-    window.location.replace(`/app?${searchParams.toString()}`);
+    const queryString = searchParams.toString();
+    const destination = queryString ? `/app?${queryString}` : "/app/";
+
+    window.location.replace(destination);
   }, []);
 
   return (

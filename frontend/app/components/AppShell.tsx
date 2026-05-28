@@ -38,7 +38,7 @@ export function AppShell({
           onLogout={onLogout}
         />
 
-        <section className="min-w-0 flex-1 px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-5">
+        <section className="mobile-shell-content min-w-0 flex-1 px-4 pb-8 sm:px-6 lg:px-8 lg:pb-5 lg:pt-5">
           <div className="mx-auto max-w-6xl">{children}</div>
         </section>
       </div>

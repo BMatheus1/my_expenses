@@ -25,6 +25,7 @@ import {
 } from "../utils/formatters";
 import { smartScrollToRef } from "../utils/smartScroll";
 import { EmptyState, LoadingButton } from "./AppFeedback";
+import { WheelSelect } from "./WheelSelect";
 
 const CARD_BRANDS = [
   "Visa",
@@ -47,6 +48,15 @@ const CARD_COLORS: {
   { value: "black", label: "Preto" },
   { value: "slate", label: "Cinza" },
 ];
+
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => {
+  const day = String(index + 1);
+
+  return {
+    value: day,
+    label: `Dia ${day.padStart(2, "0")}`,
+  };
+});
 
 const EMPTY_FORM = {
   name: "",
@@ -99,6 +109,7 @@ export function CreditCardsView({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
   const [form, setForm] = useState<CardFormState>(EMPTY_FORM);
+  const [formError, setFormError] = useState("");
 
   const currentInvoiceMonth = getCurrentMonth();
 
@@ -163,6 +174,7 @@ export function CreditCardsView({
     }
 
     onClearError();
+    setFormError("");
     setEditingCard(null);
     setForm(EMPTY_FORM);
     setIsFormOpen(true);
@@ -188,6 +200,7 @@ export function CreditCardsView({
     }
 
     onClearError();
+    setFormError("");
     setEditingCard(card);
     setForm({
       name: card.name,
@@ -207,6 +220,7 @@ export function CreditCardsView({
 
   function closeForm() {
     onClearError();
+    setFormError("");
     setIsFormOpen(false);
     setEditingCard(null);
     setForm(EMPTY_FORM);
@@ -229,15 +243,18 @@ export function CreditCardsView({
       return;
     }
 
-    const requestData = buildCreditCardRequest(form);
+    setFormError("");
 
-    if (!requestData) {
+    const validation = buildCreditCardRequest(form);
+
+    if (!validation.data) {
+      setFormError(validation.error);
       return;
     }
 
     const saved = editingCard
-      ? await onUpdateCard(editingCard.id, requestData)
-      : await onCreateCard(requestData);
+      ? await onUpdateCard(editingCard.id, validation.data)
+      : await onCreateCard(validation.data);
 
     if (saved) {
       closeForm();
@@ -396,34 +413,24 @@ export function CreditCardsView({
               </FormField>
 
               <FormField label="Dia de fechamento">
-                <input
+                <WheelSelect
                   value={form.closingDay}
-                  onChange={(event) =>
-                    updateForm(
-                      "closingDay",
-                      event.target.value.replace(/\D/g, "").slice(0, 2),
-                    )
-                  }
-                  inputMode="numeric"
-                  className="app-input"
-                  placeholder="Ex: 28"
+                  onChange={(value) => updateForm("closingDay", value)}
+                  options={DAY_OPTIONS}
+                  title="Dia de fechamento"
                   disabled={!isOnline}
+                  size="sm"
                 />
               </FormField>
 
               <FormField label="Dia de vencimento">
-                <input
+                <WheelSelect
                   value={form.dueDay}
-                  onChange={(event) =>
-                    updateForm(
-                      "dueDay",
-                      event.target.value.replace(/\D/g, "").slice(0, 2),
-                    )
-                  }
-                  inputMode="numeric"
-                  className="app-input"
-                  placeholder="Ex: 10"
+                  onChange={(value) => updateForm("dueDay", value)}
+                  options={DAY_OPTIONS}
+                  title="Dia de vencimento"
                   disabled={!isOnline}
+                  size="sm"
                 />
               </FormField>
             </div>
@@ -452,9 +459,9 @@ export function CreditCardsView({
               </div>
             </div>
 
-            {errorMessage ? (
+            {formError || errorMessage ? (
               <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                {errorMessage}
+                {formError || errorMessage}
               </p>
             ) : null}
 
@@ -684,7 +691,7 @@ function FormField({
   children: ReactNode;
 }) {
   return (
-    <label className="space-y-1.5 text-xs font-bold text-stone-600">
+    <label className="space-y-1.5 text-xs font-bold" style={{ color: "var(--app-text-soft)" }}>
       <span>{label}</span>
       {children}
     </label>
@@ -694,15 +701,16 @@ function FormField({
 function CardsLoadingState() {
   return (
     <section className="grid gap-5 xl:grid-cols-2">
-      <div className="h-96 animate-pulse rounded-3xl border border-stone-100 bg-stone-100" />
-      <div className="h-96 animate-pulse rounded-3xl border border-stone-100 bg-stone-100" />
+      <div className="app-card-soft h-96 animate-pulse rounded-3xl" />
+      <div className="app-card-soft h-96 animate-pulse rounded-3xl" />
     </section>
   );
 }
 
-function buildCreditCardRequest(
-  form: CardFormState,
-): CreateCreditCardRequest | null {
+function buildCreditCardRequest(form: CardFormState): {
+  data: CreateCreditCardRequest | null;
+  error: string;
+} {
   const closingDay = Number(form.closingDay);
   const dueDay = Number(form.dueDay);
   const limitAmount = form.limitAmount.trim()
@@ -710,29 +718,44 @@ function buildCreditCardRequest(
     : null;
 
   if (form.name.trim().length < 2) {
-    return null;
+    return {
+      data: null,
+      error: "Informe um apelido com pelo menos 2 caracteres.",
+    };
   }
 
   if (form.lastFourDigits.length !== 4) {
-    return null;
+    return {
+      data: null,
+      error: "Informe exatamente os 4 últimos números do cartão.",
+    };
   }
 
   if (!isValidCardDay(closingDay) || !isValidCardDay(dueDay)) {
-    return null;
+    return {
+      data: null,
+      error: "Dia de fechamento e vencimento precisam estar entre 1 e 31.",
+    };
   }
 
-  if (limitAmount !== null && (Number.isNaN(limitAmount) || limitAmount < 0)) {
-    return null;
+  if (limitAmount !== null && (Number.isNaN(limitAmount) || limitAmount <= 0)) {
+    return {
+      data: null,
+      error: "Informe um limite maior que zero ou deixe o campo vazio.",
+    };
   }
 
   return {
-    name: form.name.trim(),
-    brand: form.brand.trim(),
-    last_four_digits: form.lastFourDigits,
-    closing_day: closingDay,
-    due_day: dueDay,
-    limit_amount: limitAmount,
-    color: form.color,
+    data: {
+      name: form.name.trim(),
+      brand: form.brand.trim(),
+      last_four_digits: form.lastFourDigits,
+      closing_day: closingDay,
+      due_day: dueDay,
+      limit_amount: limitAmount,
+      color: form.color,
+    },
+    error: "",
   };
 }
 

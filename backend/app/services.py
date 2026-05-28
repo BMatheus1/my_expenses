@@ -366,6 +366,16 @@ def create_expense(
         total_amount=float(expense_data.amount),
         installments_count=installments_count,
     )
+
+    if credit_card is not None:
+        validate_credit_card_limit(
+            user_id=user_id,
+            credit_card=credit_card,
+            total_amount=float(expense_data.amount),
+            first_expense_date=expense_data.date,
+            installment_amounts=installment_amounts,
+        )
+
     created_at = datetime.now(timezone.utc)
     created_expenses: list[ExpenseRecord] = []
 
@@ -431,6 +441,16 @@ def update_expense(
         credit_card_id=expense_data.credit_card_id,
         user_id=user_id,
     )
+
+    if credit_card is not None:
+        validate_credit_card_limit(
+            user_id=user_id,
+            credit_card=credit_card,
+            total_amount=float(expense_data.amount),
+            first_expense_date=expense_data.date,
+            installment_amounts=[round(float(expense_data.amount), 2)],
+            ignored_expense_id=current_expense.id,
+        )
 
     updated_expense = ExpenseRecord(
         id=current_expense.id,
@@ -537,6 +557,95 @@ def normalize_payment_method(payment_method: str) -> str:
         )
 
     return normalized_payment_method
+
+
+def validate_credit_card_limit(
+    user_id: str,
+    credit_card: CreditCardRecord,
+    total_amount: float,
+    first_expense_date: date,
+    installment_amounts: list[float],
+    ignored_expense_id: str | None = None,
+) -> None:
+    if credit_card.limit_amount is None or credit_card.limit_amount <= 0:
+        return
+
+    limit_amount = round(float(credit_card.limit_amount), 2)
+    purchase_amount = round(float(total_amount), 2)
+
+    if purchase_amount > limit_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Essa compra não pode ser lançada: R$ {purchase_amount:.2f} "
+                f"ultrapassa o limite de R$ {limit_amount:.2f} do cartão {credit_card.name}."
+            ),
+        )
+
+    for installment_index, installment_amount in enumerate(
+        installment_amounts,
+        start=1,
+    ):
+        installment_date = add_months(first_expense_date, installment_index - 1)
+        invoice_month = calculate_invoice_month(
+            expense_date=installment_date,
+            closing_day=credit_card.closing_day,
+        )
+
+        if invoice_month is None:
+            continue
+
+        current_invoice_total = get_credit_card_invoice_total(
+            user_id=user_id,
+            card_id=credit_card.id,
+            invoice_month=invoice_month,
+            ignored_expense_id=ignored_expense_id,
+        )
+        next_invoice_total = round(
+            current_invoice_total + float(installment_amount),
+            2,
+        )
+
+        if next_invoice_total > limit_amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Essa compra passaria o limite do cartão {credit_card.name}. "
+                    f"Limite: R$ {limit_amount:.2f}. "
+                    f"Fatura após o lançamento: R$ {next_invoice_total:.2f}."
+                ),
+            )
+
+
+def get_credit_card_invoice_total(
+    user_id: str,
+    card_id: str,
+    invoice_month: str,
+    ignored_expense_id: str | None = None,
+) -> float:
+    total = 0.0
+
+    for expense in list_expense_records(user_id):
+        if ignored_expense_id and expense.id == ignored_expense_id:
+            continue
+
+        if expense.payment_method != "credit_card":
+            continue
+
+        if expense.credit_card_id != card_id:
+            continue
+
+        expense_invoice_month = expense.invoice_month
+
+        if expense_invoice_month is None:
+            expense_invoice_month = f"{expense.date.year:04d}-{expense.date.month:02d}"
+
+        if expense_invoice_month != invoice_month:
+            continue
+
+        total += float(expense.amount)
+
+    return round(total, 2)
 
 
 def get_expense_credit_card(

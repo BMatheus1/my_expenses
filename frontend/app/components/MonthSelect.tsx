@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type SyntheticEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type MonthSelectVariant = "select" | "wheel";
 
@@ -91,212 +85,82 @@ function MonthWheel({
   initiallyOpen: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(initiallyOpen);
+  const selectedButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const scrollTimeoutRef = useRef<number | null>(null);
-  const closeTimeoutRef = useRef<number | null>(null);
-
-  const selectedIndex = Math.max(
-    0,
-    options.findIndex((option) => option.value === value),
-  );
-
-  const selectedOption = options[selectedIndex] ?? options[0];
+  const selectedOption =
+    options.find((option) => option.value === value) ?? options[0];
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
 
-    const selectedButton = buttonRefs.current[value];
-
-    if (!selectedButton) {
-      return;
-    }
-
-    selectedButton.scrollIntoView({
+    selectedButtonRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "center",
       inline: "nearest",
     });
   }, [isOpen, value]);
 
-  useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current) {
-        window.clearTimeout(scrollTimeoutRef.current);
-      }
-
-      if (closeTimeoutRef.current) {
-        window.clearTimeout(closeTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  function handleToggle() {
-    setIsOpen((currentValue) => !currentValue);
-  }
-
   function handleSelect(nextValue: string) {
     onChange(nextValue);
-
-    if (closeTimeoutRef.current) {
-      window.clearTimeout(closeTimeoutRef.current);
-    }
-
-    closeTimeoutRef.current = window.setTimeout(() => {
-      setIsOpen(false);
-    }, 140);
-  }
-
-  function handleScroll() {
-    if (options.length === 0) {
-      return;
-    }
-
-    if (scrollTimeoutRef.current) {
-      window.clearTimeout(scrollTimeoutRef.current);
-    }
-
-    scrollTimeoutRef.current = window.setTimeout(() => {
-      const container = scrollContainerRef.current;
-
-      if (!container) {
-        return;
-      }
-
-      const containerRect = container.getBoundingClientRect();
-      const centerY = containerRect.top + containerRect.height / 2;
-
-      let closestOption = selectedOption;
-      let closestDistance = Number.POSITIVE_INFINITY;
-
-      for (const option of options) {
-        const button = buttonRefs.current[option.value];
-
-        if (!button) {
-          continue;
-        }
-
-        const buttonRect = button.getBoundingClientRect();
-        const buttonCenterY = buttonRect.top + buttonRect.height / 2;
-        const distance = Math.abs(centerY - buttonCenterY);
-
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestOption = option;
-        }
-      }
-
-      if (closestOption && closestOption.value !== value) {
-        onChange(closestOption.value);
-      }
-    }, 90);
-  }
-
-  function selectMonthByOffset(offset: number) {
-    const nextOption = options[selectedIndex + offset];
-
-    if (!nextOption) {
-      return;
-    }
-
-    handleSelect(nextOption.value);
-  }
-
-  function handleClose(event?: SyntheticEvent) {
-    event?.preventDefault();
-    event?.stopPropagation();
     setIsOpen(false);
-  }
-
-  if (options.length === 0) {
-    return (
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold text-stone-500">
-        Nenhum mês disponível
-      </div>
-    );
   }
 
   return (
     <div className="space-y-2">
-      <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
-        <button
-          type="button"
-          onClick={handleToggle}
-          className="min-w-0 flex-1 text-left"
-          aria-label={`Mês selecionado: ${selectedOption?.label}`}
-          aria-expanded={isOpen}
-        >
-          <span className="block truncate text-sm font-black text-stone-950">
+      <button
+        type="button"
+        onClick={() => setIsOpen((currentValue) => !currentValue)}
+        className="wheel-select-trigger touch-button flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left shadow-sm transition"
+        aria-label={`Mês selecionado: ${selectedOption?.label}`}
+        aria-expanded={isOpen}
+      >
+        <span className="min-w-0">
+          <span className="app-title block truncate text-sm font-black">
             {selectedOption?.label}
           </span>
 
-          <span className="mt-0.5 block text-xs font-semibold text-stone-400">
-            Toque em trocar para selecionar outro mês
+          <span className="app-muted mt-0.5 block text-xs font-semibold">
+            Toque para trocar o mês
           </span>
-        </button>
+        </span>
 
-        <button
-          type="button"
-          onClick={handleToggle}
-          className="shrink-0 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-black text-stone-600 transition hover:bg-stone-100"
+        <span
+          className="shrink-0 rounded-full px-3 py-1.5 text-xs font-black"
+          style={{
+            backgroundColor: "var(--app-surface-soft)",
+            color: "var(--app-text-soft)",
+          }}
         >
           {isOpen ? "Fechar" : "Trocar"}
-        </button>
-      </div>
+        </span>
+      </button>
 
       {isOpen ? (
-        <div className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-xs font-black uppercase tracking-widest text-stone-400">
-              Role para escolher
-            </p>
+        <div className="wheel-select-panel rounded-3xl border p-3 shadow-sm">
+          <p className="app-muted mb-3 px-2 text-xs font-black uppercase tracking-widest">
+            Toque no mês desejado
+          </p>
 
-            <button
-              type="button"
-              onPointerDown={handleClose}
-              onClick={handleClose}
-              className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-black text-stone-600 transition hover:bg-stone-200"
-            >
-              Concluir
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => selectMonthByOffset(-1)}
-            disabled={selectedIndex <= 0}
-            className="mx-auto mb-2 flex h-8 w-11 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-base font-black text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-35"
-            aria-label="Próximo mês"
+          <div
+            className="month-wheel-scroll max-h-64 overflow-y-auto overscroll-contain rounded-3xl p-2"
+            style={{ backgroundColor: "var(--app-surface-soft)" }}
           >
-            ▲
-          </button>
-
-          <div className="relative mx-auto max-w-sm overflow-hidden rounded-3xl border border-stone-100 bg-stone-50">
-            <div className="pointer-events-none absolute left-3 right-3 top-1/2 z-10 h-12 -translate-y-1/2 rounded-2xl border border-stone-200 bg-white shadow-sm" />
-
-            <div
-              ref={scrollContainerRef}
-              onScroll={handleScroll}
-              className="month-wheel-scroll h-52 snap-y snap-mandatory overflow-y-auto scroll-smooth px-3 py-20"
-            >
+            <div className="grid gap-2">
               {options.map((option) => {
                 const isSelected = option.value === value;
 
                 return (
                   <button
                     key={option.value}
-                    ref={(element) => {
-                      buttonRefs.current[option.value] = element;
-                    }}
+                    ref={isSelected ? selectedButtonRef : undefined}
                     type="button"
                     onClick={() => handleSelect(option.value)}
-                    className={`relative z-20 mb-2 flex h-12 w-full snap-center items-center justify-center rounded-2xl px-4 text-sm font-black transition ${
+                    className={`touch-button flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-black transition ${
                       isSelected
-                        ? "app-brand-soft scale-105 shadow-sm"
-                        : "text-stone-400 hover:bg-white hover:text-stone-700"
+                        ? "app-brand-soft shadow-sm"
+                        : "app-wheel-option app-muted hover:shadow-sm"
                     }`}
                   >
                     {option.label}
@@ -305,16 +169,6 @@ function MonthWheel({
               })}
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => selectMonthByOffset(1)}
-            disabled={selectedIndex >= options.length - 1}
-            className="mx-auto mt-2 flex h-8 w-11 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-base font-black text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-35"
-            aria-label="Mês anterior"
-          >
-            ▼
-          </button>
         </div>
       ) : null}
     </div>

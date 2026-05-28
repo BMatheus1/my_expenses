@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { WheelSelect } from "../WheelSelect";
+
 export function InputField({
   label,
   value,
@@ -19,7 +21,7 @@ export function InputField({
 }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-1 block truncate text-sm font-bold text-stone-700">
+      <span className="mb-1.5 block truncate text-sm font-bold app-text-soft">
         {label}
       </span>
       <input
@@ -29,7 +31,7 @@ export function InputField({
         placeholder={placeholder}
         inputMode={inputMode}
         required={required}
-        className="w-full min-w-0 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-stone-300 focus:border-emerald-600"
+        className="app-input text-sm"
       />
     </label>
   );
@@ -48,7 +50,7 @@ export function TextareaField({
 }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-1 block truncate text-sm font-bold text-stone-700">
+      <span className="mb-1.5 block truncate text-sm font-bold app-text-soft">
         {label}
       </span>
       <textarea
@@ -56,7 +58,7 @@ export function TextareaField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={3}
-        className="w-full min-w-0 resize-none rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-stone-300 focus:border-emerald-600"
+        className="app-input min-h-28 resize-none text-sm"
       />
     </label>
   );
@@ -75,32 +77,28 @@ export function SelectField({
   options: Array<string | { label: string; value: string }>;
   placeholder?: string;
 }) {
+  const normalizedOptions = options.map((option) =>
+    typeof option === "string" ? { label: option, value: option } : option,
+  );
+
+  const wheelOptions = placeholder
+    ? [{ label: placeholder, value: "" }, ...normalizedOptions]
+    : normalizedOptions;
+
   return (
-    <label className="block min-w-0">
-      <span className="mb-1 block truncate text-sm font-bold text-stone-700">
+    <div className="block min-w-0">
+      <span className="mb-1.5 block truncate text-sm font-bold app-text-soft">
         {label}
       </span>
-      <select
+
+      <WheelSelect
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full min-w-0 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-600"
-      >
-        {placeholder ? <option value="">{placeholder}</option> : null}
-
-        {options.map((option) => {
-          const normalizedOption =
-            typeof option === "string"
-              ? { label: option, value: option }
-              : option;
-
-          return (
-            <option key={normalizedOption.value} value={normalizedOption.value}>
-              {normalizedOption.label}
-            </option>
-          );
-        })}
-      </select>
-    </label>
+        onChange={onChange}
+        options={wheelOptions}
+        title={label}
+        size="sm"
+      />
+    </div>
   );
 }
 
@@ -115,7 +113,7 @@ export function PrimaryButton({
     <button
       type="submit"
       disabled={disabled}
-      className="w-full rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+      className="app-button-primary touch-button w-full rounded-2xl px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </button>
@@ -135,7 +133,7 @@ export function SecondaryButton({
     <button
       type={type}
       onClick={onClick}
-      className="w-full rounded-2xl border border-stone-200 px-5 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50"
+      className="app-button-secondary touch-button w-full rounded-2xl px-5 py-3 text-sm"
     >
       {children}
     </button>
@@ -158,7 +156,7 @@ export function DangerButton({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className="w-full rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+      className="touch-button w-full rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </button>
@@ -178,12 +176,12 @@ export function AlertMessage({
     <div
       className={`mb-4 flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-sm font-bold ${
         type === "success"
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          ? "app-brand-soft"
           : "border-red-200 bg-red-50 text-red-700"
       }`}
     >
       <span className="texto-quebra">{message}</span>
-      <button type="button" onClick={onClose} className="shrink-0">
+      <button type="button" onClick={onClose} className="shrink-0 font-black">
         Fechar
       </button>
     </div>
@@ -192,7 +190,7 @@ export function AlertMessage({
 
 export function EmptyList({ message }: { message: string }) {
   return (
-    <div className="rounded-2xl bg-stone-50 p-4 text-sm text-stone-500">
+    <div className="rounded-2xl p-4 text-sm app-card-soft app-muted">
       {message}
     </div>
   );
@@ -202,20 +200,18 @@ export function EmptyBusinessState({ onCreate }: { onCreate: () => void }) {
   return (
     <SectionCard>
       <div className="text-center">
-        <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
-          Meus Negócios
-        </p>
-        <h1 className="mt-2 text-2xl font-black tracking-tight text-stone-950">
+        <p className="app-kicker">Meus Negócios</p>
+        <h1 className="app-title mt-2 text-2xl font-black tracking-tight">
           Crie seu primeiro negócio
         </h1>
-        <p className="mx-auto mt-2 max-w-xl text-sm text-stone-500">
+        <p className="app-muted mx-auto mt-2 max-w-xl text-sm leading-6">
           Controle materiais, fichas de custo, vendas, lucro bruto e capacidade
           de produção por serviço ou produto.
         </p>
         <button
           type="button"
           onClick={onCreate}
-          className="mt-6 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
+          className="app-button-primary touch-button mt-6 rounded-2xl px-5 py-3 text-sm"
         >
           Criar novo negócio
         </button>
@@ -225,11 +221,7 @@ export function EmptyBusinessState({ onCreate }: { onCreate: () => void }) {
 }
 
 export function SectionCard({ children }: { children: ReactNode }) {
-  return (
-    <section className="min-w-0 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-      {children}
-    </section>
-  );
+  return <section className="app-card min-w-0 rounded-3xl p-6">{children}</section>;
 }
 
 export function Modal({
@@ -242,17 +234,15 @@ export function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950 bg-opacity-40 p-4">
-      <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-sm">
+      <div className="app-card max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between gap-4">
-          <h2 className="texto-quebra text-xl font-black text-stone-950">
-            {title}
-          </h2>
+          <h2 className="texto-quebra text-xl font-black app-title">{title}</h2>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-stone-200 px-3 py-2 text-sm font-black text-stone-600 transition hover:bg-stone-50"
+            className="app-btn app-btn-soft rounded-full px-3 py-2 text-sm"
           >
             Fechar
           </button>
@@ -272,9 +262,9 @@ export function Badge({
   tone: "success" | "danger" | "neutral";
 }) {
   const classNameByTone = {
-    success: "bg-emerald-100 text-emerald-800",
+    success: "app-brand-soft",
     danger: "bg-red-100 text-red-700",
-    neutral: "bg-stone-100 text-stone-700",
+    neutral: "app-card-soft app-muted",
   };
 
   return (
@@ -294,11 +284,11 @@ export function InfoLine({
   value: string;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl bg-stone-50 px-3 py-2">
-      <p className="texto-quebra text-xs font-black uppercase text-stone-400">
+    <div className="min-w-0 rounded-2xl px-3 py-2 app-card-soft">
+      <p className="texto-quebra text-xs font-black uppercase app-muted">
         {label}
       </p>
-      <p className="mt-1 texto-quebra text-sm font-bold text-stone-800">
+      <p className="mt-1 texto-quebra text-sm font-bold app-text-soft">
         {value}
       </p>
     </div>
@@ -315,13 +305,13 @@ export function MetricCard({
   hint?: string;
 }) {
   return (
-    <article className="min-w-0 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-      <p className="truncate text-sm font-bold text-stone-500">{label}</p>
-      <p className="mt-2 texto-quebra text-2xl font-black tracking-tight text-stone-950">
+    <article className="app-card min-w-0 rounded-3xl p-5">
+      <p className="truncate text-sm font-bold app-muted">{label}</p>
+      <p className="mt-2 texto-quebra text-2xl font-black tracking-tight app-title">
         {value}
       </p>
       {hint ? (
-        <p className="mt-1 texto-quebra text-xs font-semibold text-stone-400">
+        <p className="mt-1 texto-quebra text-xs font-semibold app-muted">
           {hint}
         </p>
       ) : null}
@@ -343,18 +333,18 @@ export function HealthCard({
   onAction?: () => void;
 }) {
   return (
-    <article className="min-w-0 rounded-3xl border border-stone-200 bg-white p-4">
-      <p className="truncate text-sm font-bold text-stone-500">{title}</p>
-      <p className="mt-2 texto-quebra text-2xl font-black text-stone-950">
+    <article className="app-card min-w-0 rounded-3xl p-4">
+      <p className="truncate text-sm font-bold app-muted">{title}</p>
+      <p className="mt-2 texto-quebra text-2xl font-black app-title">
         {value}
       </p>
-      <p className="mt-1 texto-quebra text-xs text-stone-500">{description}</p>
+      <p className="mt-1 texto-quebra text-xs app-muted">{description}</p>
 
       {actionLabel && onAction ? (
         <button
           type="button"
           onClick={onAction}
-          className="mt-4 rounded-full bg-stone-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-stone-700"
+          className="app-btn app-btn-soft mt-4 rounded-full px-4 py-2 text-xs"
         >
           {actionLabel}
         </button>

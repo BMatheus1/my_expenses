@@ -917,6 +917,24 @@ export function ExpensesDashboard({
       return;
     }
 
+    const creditLimitError =
+      paymentMethod === "credit_card"
+        ? getCreditCardLimitError({
+            cards: creditCards,
+            expenses,
+            creditCardId,
+            amount: parsedAmount,
+            expenseDate: date,
+            installmentsCount: parsedInstallmentsCount,
+            ignoredExpenseId: editingExpenseId,
+          })
+        : "";
+
+    if (creditLimitError) {
+      setErrorMessage(creditLimitError);
+      return;
+    }
+
     const successMessage = editingExpenseId
       ? "Gasto atualizado com sucesso."
       : paymentMethod === "credit_card" && parsedInstallmentsCount > 1
@@ -1471,25 +1489,17 @@ function PageHeader({
   onNewExpenseClick,
 }: PageHeaderProps) {
   return (
-    <header className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
-      <div
-        className="p-5 sm:p-6"
-        style={{
-          background:
-            "linear-gradient(135deg, #ffffff 0%, #fafaf9 55%, #ecfdf5 100%)",
-        }}
-      >
+    <header className="app-card overflow-hidden rounded-3xl">
+      <div className="soft-header-gradient p-5 sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
-              My Expenses
-            </p>
+            <p className="app-kicker">My Expenses</p>
 
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-950 sm:text-4xl">
+            <h1 className="app-title mt-2 text-3xl font-black tracking-tight sm:text-4xl">
               Gastos
             </h1>
 
-            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-stone-600">
+            <p className="app-muted mt-2 max-w-2xl text-sm font-medium leading-6">
               Cadastre, filtre e acompanhe suas despesas mensais de forma
               simples.
             </p>
@@ -1520,7 +1530,7 @@ function PageHeader({
           type="button"
           onClick={onNewExpenseClick}
           disabled={!isOnline}
-          className="touch-button mt-5 flex w-full items-center justify-center rounded-2xl bg-stone-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 sm:w-auto"
+          className="app-button-primary touch-button mt-5 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           {isOnline ? "+ Novo gasto" : "Novo gasto disponível com internet"}
         </button>
@@ -1545,8 +1555,8 @@ function HeaderMetric({ label, value, variant }: HeaderMetricProps) {
     variant === "positive" ? "text-emerald-700" : "text-red-700";
 
   return (
-    <article className="rounded-3xl border border-white bg-white p-4 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-widest text-stone-500">
+    <article className="app-card-soft rounded-3xl p-4 shadow-sm">
+      <p className="app-muted text-xs font-black uppercase tracking-widest">
         {label}
       </p>
 
@@ -1557,6 +1567,188 @@ function HeaderMetric({ label, value, variant }: HeaderMetricProps) {
       </strong>
     </article>
   );
+}
+
+function getCreditCardLimitError({
+  cards,
+  expenses,
+  creditCardId,
+  amount,
+  expenseDate,
+  installmentsCount,
+  ignoredExpenseId,
+}: {
+  cards: CreditCard[];
+  expenses: Expense[];
+  creditCardId: string;
+  amount: number;
+  expenseDate: string;
+  installmentsCount: number;
+  ignoredExpenseId: string | null;
+}) {
+  const card = cards.find((currentCard) => currentCard.id === creditCardId);
+
+  if (!card || card.limit_amount === null || card.limit_amount <= 0) {
+    return "";
+  }
+
+  const limitAmount = roundCurrency(card.limit_amount);
+  const purchaseAmount = roundCurrency(amount);
+
+  if (purchaseAmount > limitAmount) {
+    return `Essa compra não pode ser lançada: ${formatCurrency(
+      purchaseAmount,
+    )} ultrapassa o limite de ${formatCurrency(limitAmount)} do cartão ${
+      card.name
+    }.`;
+  }
+
+  const installmentAmounts = splitExpenseInstallmentAmounts(
+    purchaseAmount,
+    installmentsCount,
+  );
+
+  for (let index = 0; index < installmentAmounts.length; index += 1) {
+    const installmentDate = addMonthsToDateValue(expenseDate, index);
+    const invoiceMonth = calculateCreditCardInvoiceMonth(
+      installmentDate,
+      card.closing_day,
+    );
+    const currentInvoiceTotal = getCreditCardInvoiceTotal({
+      expenses,
+      cardId: card.id,
+      invoiceMonth,
+      ignoredExpenseId,
+    });
+    const nextInvoiceTotal = roundCurrency(
+      currentInvoiceTotal + installmentAmounts[index],
+    );
+
+    if (nextInvoiceTotal > limitAmount) {
+      return `Essa compra passaria o limite do cartão ${card.name}. Limite: ${formatCurrency(
+        limitAmount,
+      )}. Fatura após o lançamento: ${formatCurrency(nextInvoiceTotal)}.`;
+    }
+  }
+
+  return "";
+}
+
+function getCreditCardInvoiceTotal({
+  expenses,
+  cardId,
+  invoiceMonth,
+  ignoredExpenseId,
+}: {
+  expenses: Expense[];
+  cardId: string;
+  invoiceMonth: string;
+  ignoredExpenseId: string | null;
+}) {
+  return expenses.reduce((total, expense) => {
+    if (expense.id === ignoredExpenseId) {
+      return total;
+    }
+
+    if (expense.payment_method !== "credit_card") {
+      return total;
+    }
+
+    if (expense.credit_card_id !== cardId) {
+      return total;
+    }
+
+    const expenseInvoiceMonth = expense.invoice_month || getMonthFromDateValue(expense.date);
+
+    if (expenseInvoiceMonth !== invoiceMonth) {
+      return total;
+    }
+
+    return total + expense.amount;
+  }, 0);
+}
+
+function splitExpenseInstallmentAmounts(
+  totalAmount: number,
+  installmentsCount: number,
+) {
+  const safeInstallmentsCount = Math.max(1, installmentsCount);
+
+  if (safeInstallmentsCount <= 1) {
+    return [roundCurrency(totalAmount)];
+  }
+
+  const baseAmount = roundCurrency(totalAmount / safeInstallmentsCount);
+  const amounts = Array.from({ length: safeInstallmentsCount }, () => baseAmount);
+  const difference = roundCurrency(totalAmount - amounts.reduce((total, value) => total + value, 0));
+  amounts[amounts.length - 1] = roundCurrency(amounts[amounts.length - 1] + difference);
+
+  return amounts;
+}
+
+function calculateCreditCardInvoiceMonth(
+  expenseDateValue: string,
+  closingDay: number,
+) {
+  const expenseDate = parseDateValue(expenseDateValue);
+  const effectiveClosingDay = Math.min(
+    closingDay,
+    getLastDayOfMonth(expenseDate.getFullYear(), expenseDate.getMonth()),
+  );
+
+  if (expenseDate.getDate() > effectiveClosingDay) {
+    return getMonthFromDate(addMonthsToDate(expenseDate, 1));
+  }
+
+  return getMonthFromDate(expenseDate);
+}
+
+function addMonthsToDateValue(value: string, monthsToAdd: number) {
+  return toDateValue(addMonthsToDate(parseDateValue(value), monthsToAdd));
+}
+
+function addMonthsToDate(dateValue: Date, monthsToAdd: number) {
+  const targetYear = dateValue.getFullYear();
+  const targetMonth = dateValue.getMonth() + monthsToAdd;
+  const targetDate = new Date(targetYear, targetMonth, 1);
+  const lastDay = getLastDayOfMonth(targetDate.getFullYear(), targetDate.getMonth());
+
+  targetDate.setDate(Math.min(dateValue.getDate(), lastDay));
+
+  return targetDate;
+}
+
+function parseDateValue(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return new Date(`${getCurrentDate()}T00:00:00`);
+  }
+
+  return new Date(year, month - 1, day);
+}
+
+function getLastDayOfMonth(year: number, zeroBasedMonth: number) {
+  return new Date(year, zeroBasedMonth + 1, 0).getDate();
+}
+
+function getMonthFromDate(dateValue: Date) {
+  const year = dateValue.getFullYear();
+  const month = String(dateValue.getMonth() + 1).padStart(2, "0");
+
+  return `${year}-${month}`;
+}
+
+function toDateValue(dateValue: Date) {
+  const year = dateValue.getFullYear();
+  const month = String(dateValue.getMonth() + 1).padStart(2, "0");
+  const day = String(dateValue.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function roundCurrency(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function createLocalDefaultCategories(): ExpenseCategory[] {

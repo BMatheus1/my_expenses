@@ -11,7 +11,6 @@ import {
   LogoutIcon,
   PaletteIcon,
   ReportsIcon,
-  SettingsIcon,
   ShieldIcon,
   type AppIcon,
 } from "./AppIcons";
@@ -27,38 +26,64 @@ type MobileBottomNavProps = {
 type MobileNavItem = {
   view: AppView;
   label: string;
+  description: string;
   icon: AppIcon;
 };
 
-const MAIN_NAV_ITEMS: MobileNavItem[] = [
+const NAV_ITEMS: MobileNavItem[] = [
   {
     view: "expenses",
     label: "Gastos",
+    description: "Cadastrar, filtrar e acompanhar despesas",
     icon: ExpenseIcon,
   },
   {
     view: "incomes",
     label: "Ganhos",
+    description: "Entradas, salário e outras receitas",
     icon: IncomeIcon,
   },
   {
     view: "credit-cards",
     label: "Cartões",
+    description: "Limites, faturas e vencimentos",
     icon: CreditCardIcon,
   },
   {
     view: "reports",
-    label: "Relat.",
+    label: "Relatórios",
+    description: "Resumo mensal e leitura visual",
     icon: ReportsIcon,
   },
   {
     view: "businesses",
     label: "Negócios",
+    description: "Controle separado para business",
     icon: BusinessIcon,
+  },
+  {
+    view: "appearance-settings",
+    label: "Aparência",
+    description: "Tema claro, escuro e cores",
+    icon: PaletteIcon,
+  },
+  {
+    view: "security-settings",
+    label: "Segurança",
+    description: "Sessão, proteção e conta",
+    icon: ShieldIcon,
   },
 ];
 
-const ACCOUNT_VIEWS: AppView[] = ["appearance-settings", "security-settings"];
+const VIEW_TITLES: Record<AppView, string> = {
+  expenses: "Gastos",
+  incomes: "Ganhos",
+  reports: "Relatórios",
+  "credit-cards": "Cartões",
+  businesses: "Negócios",
+  "appearance-settings": "Aparência",
+  "security-settings": "Segurança",
+};
 
 export function MobileBottomNav({
   activeView,
@@ -66,46 +91,60 @@ export function MobileBottomNav({
   onActiveViewChange,
   onLogout,
 }: MobileBottomNavProps) {
-  const shouldShowMobileNav = useMobileBottomNavVisibility();
-  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const shouldShowMobileNav = useMobileNavigationVisibility();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const isAccountView = useMemo(() => {
-    return ACCOUNT_VIEWS.includes(activeView);
-  }, [activeView]);
+  const activeTitle = VIEW_TITLES[activeView];
+
+  const userInitials = useMemo(() => {
+    const normalizedName = currentUser.name.trim();
+
+    if (!normalizedName) {
+      return "ME";
+    }
+
+    return normalizedName
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((namePart) => namePart[0]?.toUpperCase())
+      .join("");
+  }, [currentUser.name]);
 
   useEffect(() => {
     if (shouldShowMobileNav) {
       return;
     }
 
-    setIsAccountMenuOpen(false);
+    setIsMenuOpen(false);
   }, [shouldShowMobileNav]);
 
   useEffect(() => {
-    if (!isAccountMenuOpen) {
+    if (!isMenuOpen) {
       return;
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsAccountMenuOpen(false);
+        setIsMenuOpen(false);
       }
     }
 
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      document.body.style.overflow = "";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isAccountMenuOpen]);
+  }, [isMenuOpen]);
 
   function handleViewChange(view: AppView) {
     onActiveViewChange(view);
-    setIsAccountMenuOpen(false);
+    setIsMenuOpen(false);
   }
 
   function handleLogoutClick() {
-    setIsAccountMenuOpen(false);
+    setIsMenuOpen(false);
     onLogout();
   }
 
@@ -115,100 +154,100 @@ export function MobileBottomNav({
 
   return (
     <>
-      {isAccountMenuOpen ? (
-        <div
-          className="fixed inset-0 bg-black/35 backdrop-blur-[3px]"
-          style={{ zIndex: 70 }}
-        >
+      <header className="mobile-appbar fixed inset-x-0 top-0 lg:hidden">
+        <div className="grid min-h-16 grid-cols-[3.25rem_1fr_3.25rem] items-center gap-2 px-3 pb-2">
           <button
             type="button"
-            className="absolute inset-0 h-full w-full cursor-default"
-            aria-label="Fechar menu da conta"
-            onClick={() => setIsAccountMenuOpen(false)}
+            onClick={() => setIsMenuOpen(true)}
+            className="mobile-menu-button touch-button flex h-12 w-12 items-center justify-center rounded-2xl border shadow-sm"
+            aria-label="Abrir menu"
+            aria-expanded={isMenuOpen}
+          >
+            <span className="flex flex-col gap-1.5" aria-hidden="true">
+              <span className="mobile-menu-line" />
+              <span className="mobile-menu-line" />
+              <span className="mobile-menu-line" />
+            </span>
+          </button>
+
+          <div className="min-w-0 text-center">
+            <p className="app-muted text-[0.68rem] font-black uppercase tracking-[0.22em]">
+              My Expenses
+            </p>
+
+            <h1 className="app-title mt-0.5 truncate text-base font-black tracking-tight">
+              {activeTitle}
+            </h1>
+          </div>
+
+          <div className="ml-auto flex h-12 w-12 items-center justify-center rounded-2xl border text-xs font-black shadow-sm mobile-user-chip">
+            {userInitials}
+          </div>
+        </div>
+      </header>
+
+      {isMenuOpen ? (
+        <div className="fixed inset-0 lg:hidden" style={{ zIndex: 95 }}>
+          <button
+            type="button"
+            className="absolute inset-0 h-full w-full bg-black/45 backdrop-blur-[3px]"
+            aria-label="Fechar menu"
+            onClick={() => setIsMenuOpen(false)}
           />
 
-          <section
-            className="absolute inset-x-3 bottom-24 rounded-3xl border p-4 shadow-2xl"
-            style={{
-              backgroundColor: "var(--app-surface)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-text)",
-            }}
-          >
-            <div className="app-card-soft rounded-3xl p-4">
-              <p className="app-title truncate text-sm font-black">
-                {currentUser.name}
-              </p>
+          <aside className="mobile-drawer absolute bottom-0 left-0 top-0 flex w-[86vw] max-w-sm flex-col border-r shadow-2xl">
+            <div className="border-b p-4 pt-[max(1rem,env(safe-area-inset-top))] mobile-drawer-border">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="app-kicker">Menu</p>
+                  <h2 className="app-title mt-1 text-2xl font-black tracking-tight">
+                    My Expenses
+                  </h2>
+                  <p className="app-muted mt-1 truncate text-sm font-semibold">
+                    {currentUser.email}
+                  </p>
+                </div>
 
-              <p className="app-muted mt-1 truncate text-xs font-semibold">
-                {currentUser.email}
-              </p>
+                <button
+                  type="button"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="app-button-secondary touch-button h-11 w-11 rounded-2xl p-0"
+                  aria-label="Fechar menu"
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
-            <div className="mt-3 grid gap-2">
-              <AccountMenuButton
-                icon={PaletteIcon}
-                title="Aparência e tema"
-                description="Cores, modo claro e modo escuro"
-                isActive={activeView === "appearance-settings"}
-                onClick={() => handleViewChange("appearance-settings")}
-              />
+            <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+              {NAV_ITEMS.map((item) => (
+                <MobileDrawerItem
+                  key={item.view}
+                  item={item}
+                  isActive={activeView === item.view}
+                  onClick={() => handleViewChange(item.view)}
+                />
+              ))}
+            </nav>
 
-              <AccountMenuButton
-                icon={ShieldIcon}
-                title="Segurança"
-                description="Sessão, proteção e exclusão da conta"
-                isActive={activeView === "security-settings"}
-                onClick={() => handleViewChange("security-settings")}
-              />
-
+            <div className="border-t p-4 mobile-drawer-border">
               <button
                 type="button"
                 onClick={handleLogoutClick}
-                className="app-btn app-btn-soft min-h-12 w-full rounded-2xl px-4 text-sm"
+                className="app-button-secondary touch-button w-full justify-center rounded-2xl text-sm"
               >
                 <LogoutIcon className="h-4 w-4" />
                 <span>Sair da conta</span>
               </button>
             </div>
-          </section>
+          </aside>
         </div>
       ) : null}
-
-      <nav
-        className="fixed inset-x-0 bottom-0 border-t px-3 pt-2 shadow-2xl"
-        style={{
-          zIndex: 80,
-          backgroundColor:
-            "color-mix(in srgb, var(--app-surface) 96%, transparent)",
-          borderColor: "var(--app-border)",
-          paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
-          backdropFilter: "blur(18px)",
-        }}
-        aria-label="Navegação principal mobile"
-      >
-        <div className="mx-auto grid max-w-xl grid-cols-6 gap-1">
-          {MAIN_NAV_ITEMS.map((item) => (
-            <MobileNavButton
-              key={item.view}
-              item={item}
-              isActive={activeView === item.view}
-              onClick={() => handleViewChange(item.view)}
-            />
-          ))}
-
-          <MobileAccountButton
-            isActive={isAccountView || isAccountMenuOpen}
-            isOpen={isAccountMenuOpen}
-            onClick={() => setIsAccountMenuOpen((currentValue) => !currentValue)}
-          />
-        </div>
-      </nav>
     </>
   );
 }
 
-function MobileNavButton({
+function MobileDrawerItem({
   item,
   isActive,
   onClick,
@@ -223,7 +262,7 @@ function MobileNavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex min-h-16 flex-col items-center justify-center gap-1 rounded-3xl px-1.5 text-[0.7rem] font-black transition ${
+      className={`flex w-full items-center gap-3 rounded-3xl px-3 py-3 text-left transition ${
         isActive ? "app-sidebar-item-active" : "app-sidebar-item"
       }`}
       aria-current={isActive ? "page" : undefined}
@@ -232,35 +271,16 @@ function MobileNavButton({
         <Icon className="h-5 w-5" />
       </MobileIconFrame>
 
-      <span className="max-w-full truncate leading-none">{item.label}</span>
-    </button>
-  );
-}
-
-function MobileAccountButton({
-  isActive,
-  isOpen,
-  onClick,
-}: {
-  isActive: boolean;
-  isOpen: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group flex min-h-16 flex-col items-center justify-center gap-1 rounded-3xl px-1.5 text-[0.7rem] font-black transition ${
-        isActive ? "app-sidebar-item-active" : "app-sidebar-item"
-      }`}
-      aria-label="Abrir menu da conta"
-      aria-expanded={isOpen}
-    >
-      <MobileIconFrame isActive={isActive}>
-        <SettingsIcon className="h-5 w-5" />
-      </MobileIconFrame>
-
-      <span className="max-w-full truncate leading-none">Conta</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-black">{item.label}</span>
+        <span
+          className={`mt-0.5 block truncate text-xs font-semibold ${
+            isActive ? "text-white/80" : "app-muted"
+          }`}
+        >
+          {item.description}
+        </span>
+      </span>
     </button>
   );
 }
@@ -274,14 +294,13 @@ function MobileIconFrame({
 }) {
   return (
     <span
-      className={`flex h-8 w-8 items-center justify-center rounded-2xl border transition ${
-        isActive ? "bg-white shadow-sm" : "app-brand-soft"
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition ${
+        isActive ? "bg-white text-[var(--brand-primary)]" : "app-brand-soft"
       }`}
       style={{
-        color: isActive ? "var(--brand-primary)" : undefined,
         borderColor: isActive
           ? "color-mix(in srgb, var(--brand-primary) 18%, transparent)"
-          : "transparent",
+          : "var(--brand-border)",
       }}
     >
       {children}
@@ -289,71 +308,23 @@ function MobileIconFrame({
   );
 }
 
-function AccountMenuButton({
-  icon,
-  title,
-  description,
-  isActive,
-  onClick,
-}: {
-  icon: AppIcon;
-  title: string;
-  description: string;
-  isActive: boolean;
-  onClick: () => void;
-}) {
-  const Icon = icon;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
-        isActive ? "app-sidebar-item-active" : "app-sidebar-item"
-      }`}
-    >
-      <MobileIconFrame isActive={isActive}>
-        <Icon className="h-5 w-5" />
-      </MobileIconFrame>
-
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-black">{title}</span>
-
-        <span className="mt-0.5 block truncate text-xs opacity-75">
-          {description}
-        </span>
-      </span>
-    </button>
-  );
-}
-
-function useMobileBottomNavVisibility() {
-  const [shouldShowMobileNav, setShouldShowMobileNav] = useState(false);
+function useMobileNavigationVisibility() {
+  const [shouldShow, setShouldShow] = useState(false);
 
   useEffect(() => {
-    function updateVisibility() {
-      const viewportWidth = Math.min(
-        window.innerWidth,
-        document.documentElement.clientWidth,
-      );
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
 
-      const isSmallScreen = viewportWidth < 1024;
-      const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-      const isTabletLikeTouchDevice = isTouchDevice && viewportWidth < 1280;
-
-      setShouldShowMobileNav(isSmallScreen || isTabletLikeTouchDevice);
+    function syncVisibility() {
+      setShouldShow(mediaQuery.matches);
     }
 
-    updateVisibility();
-
-    window.addEventListener("resize", updateVisibility);
-    window.addEventListener("orientationchange", updateVisibility);
+    syncVisibility();
+    mediaQuery.addEventListener("change", syncVisibility);
 
     return () => {
-      window.removeEventListener("resize", updateVisibility);
-      window.removeEventListener("orientationchange", updateVisibility);
+      mediaQuery.removeEventListener("change", syncVisibility);
     };
   }, []);
 
-  return shouldShowMobileNav;
+  return shouldShow;
 }

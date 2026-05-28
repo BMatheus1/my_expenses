@@ -595,3 +595,116 @@ html[data-app-mode="dark"] .shadow-xl {
 .option-wheel-scroll::-webkit-scrollbar {
   display: none;
 }
+/* Mobile native polish: remove WebView visual noise and improve drawer/header UX. */
+input,
+textarea,
+select,
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+[role="button"],
+.wheel-select-trigger,
+.wheel-select-panel button {
+  caret-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea {
+  caret-color: var(--brand-primary);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+input[type="number"] {
+  appearance: textfield;
+}
+
+.wheel-select-trigger,
+.wheel-select-panel {
+  border-color: var(--app-border);
+  background: color-mix(in srgb, var(--app-surface) 96%, transparent);
+  color: var(--app-text);
+}
+
+.app-wheel-option {
+  background: color-mix(in srgb, var(--app-surface) 82%, transparent);
+  border: 1px solid transparent;
+}
+
+.app-wheel-option:hover {
+  border-color: var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+.mobile-shell-content {
+  padding-top: calc(env(safe-area-inset-top) + 5.35rem);
+}
+
+.mobile-appbar {
+  z-index: 88;
+  padding-top: max(0.7rem, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--app-border);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 98%, transparent), color-mix(in srgb, var(--app-surface) 92%, transparent));
+  color: var(--app-text);
+  box-shadow: 0 14px 32px rgb(15 23 42 / 8%);
+  backdrop-filter: blur(18px);
+}
+
+.mobile-menu-button,
+.mobile-user-chip {
+  border-color: var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+.mobile-menu-line {
+  display: block;
+  height: 2px;
+  width: 1.15rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.mobile-drawer {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+  color: var(--app-text);
+}
+
+.mobile-drawer-border {
+  border-color: var(--app-border);
+}
+
+html[data-app-mode="dark"] .soft-header-gradient {
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--brand-surface) 54%, transparent), transparent 22rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--app-surface-raised) 92%, transparent), var(--app-surface)) !important;
+}
+
+html[data-app-mode="dark"] .mobile-appbar {
+  box-shadow: 0 18px 42px rgb(0 0 0 / 28%);
+}
+
+html[data-app-mode="dark"] .wheel-select-trigger,
+html[data-app-mode="dark"] .wheel-select-panel {
+  background: color-mix(in srgb, var(--app-surface-raised) 92%, transparent);
+}
+
+@media (min-width: 1024px) {
+  .mobile-shell-content {
+    padding-top: 1.25rem;
+  }
+}

@@ -275,33 +275,33 @@ export function IncomesView({
       <div className="grid gap-5 xl:grid-cols-2">
         <section
           ref={incomeFormSectionRef}
-          className="scroll-mt-5 rounded-3xl border border-stone-200 bg-white shadow-sm"
+          className="app-card scroll-mt-5 rounded-3xl"
         >
           <button
             type="button"
             onClick={handleFormToggle}
-            className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-stone-50"
+            className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-[var(--app-surface-soft)]"
             aria-expanded={isFormOpen}
           >
             <div>
-              <h2 className="text-lg font-semibold text-stone-950">
+              <h2 className="text-lg font-semibold app-title">
                 {isEditing ? "Editar ganho" : "Novo ganho"}
               </h2>
 
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-1 text-sm app-muted">
                 {isEditing
                   ? "Ajuste as informações da entrada."
                   : "Cadastre uma nova entrada."}
               </p>
             </div>
 
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-lg font-bold text-stone-700">
+            <span className="app-btn app-btn-soft flex h-10 w-10 shrink-0 rounded-full text-lg font-bold">
               {isFormOpen ? "−" : "+"}
             </span>
           </button>
 
           {isFormOpen && (
-            <div className="border-t border-stone-100 px-5 py-5">
+            <div className="border-t px-5 py-5" style={{ borderColor: "var(--app-border)" }}>
               <IncomeForm
                 description={description}
                 amount={amount}
@@ -365,26 +365,26 @@ type IncomeHeaderProps = {
 
 function IncomeHeader({ monthlyTotal, onNewIncomeClick }: IncomeHeaderProps) {
   return (
-    <header className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+    <header className="app-card rounded-3xl p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700">
+          <p className="app-kicker">
             My Expenses
           </p>
 
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-stone-950">
+          <h1 className="app-title mt-2 text-3xl font-bold tracking-tight">
             Ganhos
           </h1>
 
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
+          <p className="app-muted mt-2 max-w-2xl text-sm leading-6">
             Cadastre e acompanhe suas entradas mensais.
           </p>
         </div>
 
-        <div className="rounded-3xl border border-stone-200 bg-stone-50 p-4 sm:w-72">
-          <p className="text-sm font-medium text-stone-500">Ganhos filtrados</p>
+        <div className="app-card-soft rounded-3xl p-4 sm:w-72">
+          <p className="text-sm font-medium app-muted">Ganhos filtrados</p>
 
-          <strong className="mt-2 block text-2xl font-bold text-emerald-700">
+          <strong className="app-brand-text mt-2 block text-2xl font-bold">
             {formatCurrency(monthlyTotal)}
           </strong>
 
@@ -413,14 +413,14 @@ function IncomeSummaryCard({
   description,
 }: IncomeSummaryCardProps) {
   return (
-    <article className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-stone-500">{label}</p>
+    <article className="app-card rounded-3xl p-5">
+      <p className="text-sm font-medium app-muted">{label}</p>
 
-      <strong className="mt-2 block truncate text-2xl font-bold text-stone-950">
+      <strong className="app-title mt-2 block truncate text-2xl font-bold">
         {value}
       </strong>
 
-      <p className="mt-2 text-sm text-stone-500">{description}</p>
+      <p className="mt-2 text-sm app-muted">{description}</p>
     </article>
   );
 }
@@ -560,16 +560,16 @@ function IncomeFilters({
   const hasActiveFilters = selectedSource !== "Todas" || searchTerm.trim();
 
   return (
-    <section className="rounded-3xl border border-stone-200 bg-white shadow-sm">
+    <section className="app-card rounded-3xl">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition hover:bg-stone-50"
+        className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition hover:bg-[var(--app-surface-soft)]"
         aria-expanded={isOpen}
       >
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-stone-950">Filtros</h2>
+            <h2 className="text-sm font-bold app-title">Filtros</h2>
 
             {hasActiveFilters && (
               <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
@@ -578,23 +578,24 @@ function IncomeFilters({
             )}
           </div>
 
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs app-muted">
             Filtre por mês, fonte ou descrição.
           </p>
         </div>
 
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-base font-bold text-stone-700">
+        <span className="app-btn app-btn-soft flex h-9 w-9 shrink-0 rounded-full text-base font-bold">
           {isOpen ? "−" : "+"}
         </span>
       </button>
 
       {isOpen && (
-        <div className="border-t border-stone-100 p-4">
+        <div className="border-t p-4" style={{ borderColor: "var(--app-border)" }}>
           <div className="grid gap-3 md:grid-cols-3">
             <FormField label="Mês">
               <MonthSelect
                 value={selectedMonth}
                 onChange={onSelectedMonthChange}
+                variant="wheel"
               />
             </FormField>
 
@@ -629,7 +630,7 @@ function IncomeFilters({
             <button
               type="button"
               onClick={onClearFilters}
-              className="rounded-full border border-stone-200 px-4 py-2 text-xs font-bold text-stone-600 transition hover:bg-stone-50"
+              className="app-btn app-btn-soft rounded-full px-4 py-2 text-xs"
             >
               Limpar filtros
             </button>
@@ -649,24 +650,24 @@ type IncomeListProps = {
 
 function IncomeList({ incomes, isLoading, onEdit, onDelete }: IncomeListProps) {
   return (
-    <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-2 border-b border-stone-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+    <section className="app-card overflow-hidden rounded-3xl">
+      <div className="flex flex-col gap-2 border-b px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6" style={{ borderColor: "var(--app-border)" }}>
         <div>
-          <h2 className="text-lg font-semibold text-stone-950">
+          <h2 className="text-lg font-semibold app-title">
             Ganhos encontrados
           </h2>
 
-          <p className="mt-1 text-sm text-stone-500">
+          <p className="mt-1 text-sm app-muted">
             Edite ou remova entradas cadastradas.
           </p>
         </div>
 
-        <span className="w-fit rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-semibold text-stone-600">
+        <span className="app-card-soft w-fit rounded-full px-3 py-1 text-xs font-semibold">
           {incomes.length} item{incomes.length === 1 ? "" : "s"}
         </span>
       </div>
 
-      <div className="divide-y divide-stone-100">
+      <div className="divide-y" style={{ borderColor: "var(--app-border)" }}>
         {isLoading ? (
           <div className="p-5">
             <LoadingCard
@@ -685,27 +686,27 @@ function IncomeList({ incomes, isLoading, onEdit, onDelete }: IncomeListProps) {
           incomes.map((income) => (
             <article
               key={income.id}
-              className="flex flex-col gap-4 px-5 py-4 transition hover:bg-stone-50 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+              className="flex flex-col gap-4 px-5 py-4 transition hover:bg-[var(--app-surface-soft)] sm:flex-row sm:items-center sm:justify-between sm:px-6"
             >
               <div className="min-w-0">
-                <h3 className="truncate font-semibold text-stone-950">
+                <h3 className="truncate font-semibold app-title">
                   {income.description}
                 </h3>
 
-                <p className="mt-1 text-sm text-stone-500">
+                <p className="mt-1 text-sm app-muted">
                   {income.source} • {formatDate(income.date)}
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <strong className="mr-2 whitespace-nowrap text-base text-emerald-700">
+                <strong className="app-brand-text mr-2 whitespace-nowrap text-base">
                   {formatCurrency(income.amount)}
                 </strong>
 
                 <button
                   type="button"
                   onClick={() => onEdit(income)}
-                  className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+                  className="app-btn app-btn-soft rounded-full px-4 py-2 text-sm font-semibold"
                 >
                   Editar
                 </button>
@@ -733,7 +734,7 @@ type FormFieldProps = {
 
 function FormField({ label, children }: FormFieldProps) {
   return (
-    <label className="space-y-1.5 text-xs font-bold text-stone-600">
+    <label className="space-y-1.5 text-xs font-bold app-text-soft">
       <span>{label}</span>
       {children}
     </label>

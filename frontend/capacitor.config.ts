@@ -1,9 +1,13 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
+const isNativeRelease = process.env.CAPACITOR_NATIVE_RELEASE === "true";
+
 const config: CapacitorConfig = {
   appId: "com.myexpensesfinance.app",
   appName: "My Expenses",
   webDir: "out",
+  backgroundColor: "#0c0a09",
+  loggingBehavior: isNativeRelease ? "none" : "debug",
 
   server: {
     hostname: "localhost",
@@ -12,7 +16,8 @@ const config: CapacitorConfig = {
   },
 
   android: {
-    webContentsDebuggingEnabled: true,
+    backgroundColor: "#0c0a09",
+    webContentsDebuggingEnabled: !isNativeRelease,
   },
 
   plugins: {
@@ -23,7 +28,7 @@ const config: CapacitorConfig = {
         facebook: false,
         twitter: false,
       },
-      logLevel: 1,
+      logLevel: isNativeRelease ? 0 : 1,
     },
   },
 };

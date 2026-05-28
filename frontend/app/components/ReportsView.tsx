@@ -95,7 +95,7 @@ export function ReportsView({
             <MonthSelect
               value={selectedMonth}
               onChange={onSelectedMonthChange}
-              className="app-input max-w-xs px-4 py-3 text-sm"
+              variant="wheel"
             />
           </label>
         </div>

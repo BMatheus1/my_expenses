@@ -152,7 +152,7 @@ export function ExpenseForm({
               type="button"
               onClick={onManageCategoriesClick}
               disabled={!isOnline}
-              className="touch-button w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 sm:w-auto"
+              className="app-button-secondary touch-button w-full rounded-2xl px-4 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {isOnline ? "Gerenciar categorias" : "Com internet"}
             </button>
@@ -227,21 +227,22 @@ export function ExpenseForm({
               <div className="grid gap-4 md:grid-cols-2">
                 <FormField label="Cartão usado">
                   <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-                    <select
-                      value={creditCardId}
-                      onChange={(event) =>
-                        onCreditCardChange(event.target.value)
-                      }
-                      className="app-input min-w-0 flex-1"
-                      disabled={!isOnline}
-                    >
-                      <option value="">Selecione um cartão</option>
-                      {creditCards.map((card) => (
-                        <option key={card.id} value={card.id}>
-                          {card.name} •••• {card.last_four_digits}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="min-w-0 flex-1">
+                      <WheelSelect
+                        value={creditCardId}
+                        onChange={onCreditCardChange}
+                        disabled={!isOnline}
+                        title="Cartão usado"
+                        size="sm"
+                        options={[
+                          { value: "", label: "Selecione um cartão" },
+                          ...creditCards.map((card) => ({
+                            value: card.id,
+                            label: `${card.name} •••• ${card.last_four_digits}`,
+                          })),
+                        ]}
+                      />
+                    </div>
 
                     <button
                       type="button"
@@ -255,22 +256,20 @@ export function ExpenseForm({
                 </FormField>
 
                 <FormField label="Parcelas">
-                  <select
+                  <WheelSelect
                     value={installmentsCount}
-                    onChange={(event) =>
-                      onInstallmentsCountChange(event.target.value)
-                    }
-                    className="app-input"
+                    onChange={onInstallmentsCountChange}
                     disabled={isEditing || !isOnline}
-                  >
-                    {Array.from({ length: 24 }, (_, index) => index + 1).map(
-                      (installment) => (
-                        <option key={installment} value={String(installment)}>
-                          {installment === 1 ? "À vista" : `${installment}x`}
-                        </option>
-                      ),
-                    )}
-                  </select>
+                    title="Parcelas"
+                    size="sm"
+                    options={Array.from(
+                      { length: 24 },
+                      (_, index) => index + 1,
+                    ).map((installment) => ({
+                      value: String(installment),
+                      label: installment === 1 ? "À vista" : `${installment}x`,
+                    }))}
+                  />
 
                   {isEditing ? (
                     <p className="mt-1 text-xs font-medium text-stone-500">

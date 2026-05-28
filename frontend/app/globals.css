@@ -708,3 +708,15 @@ html[data-app-mode="dark"] .wheel-select-panel {
     padding-top: 1.25rem;
   }
 }
+
+.card-form-input {
+  caret-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.card-form-input::selection {
+  background: transparent;
+  color: inherit;
+}

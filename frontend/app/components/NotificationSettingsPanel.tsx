@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   disableSmartNotificationsForUser,
@@ -72,10 +72,15 @@ export function NotificationSettingsPanel({
     };
   }, [isNativeRuntime, notificationsAreActive, permissionStatus]);
 
+  const refreshStatus = useCallback(async () => {
+    const nextPermissionStatus = await getSmartNotificationPermissionStatus();
+    setPermissionStatus(nextPermissionStatus);
+  }, []);
+
   useEffect(() => {
     setPreferences(readSmartNotificationPreferences(currentUser.id));
     void refreshStatus();
-  }, [currentUser.id]);
+  }, [currentUser.id, refreshStatus]);
 
   useEffect(() => {
     function handleNotificationSettingsChange() {
@@ -94,12 +99,7 @@ export function NotificationSettingsPanel({
         handleNotificationSettingsChange,
       );
     };
-  }, [currentUser.id]);
-
-  async function refreshStatus() {
-    const nextPermissionStatus = await getSmartNotificationPermissionStatus();
-    setPermissionStatus(nextPermissionStatus);
-  }
+  }, [currentUser.id, refreshStatus]);
 
   async function handleEnableNotifications() {
     setIsProcessing(true);

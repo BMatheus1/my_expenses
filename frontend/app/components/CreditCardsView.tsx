@@ -159,11 +159,12 @@ export function CreditCardsView({
     .filter((summary) => summary.invoiceTotal > 0)
     .sort((first, second) => first.dueInfo.priority - second.dueInfo.priority)[0];
 
-  const scrollToCardForm = useCallback(() => {
+  const scrollToCardForm = useCallback((shouldFocusFirstField = true) => {
     window.setTimeout(() => {
       smartScrollToRef(formSectionRef, {
         delayMs: 0,
-        focusFirstField: true,
+        focusFirstField: shouldFocusFirstField,
+        block: "start",
       });
     }, 120);
   }, []);
@@ -178,7 +179,7 @@ export function CreditCardsView({
     setEditingCard(null);
     setForm(EMPTY_FORM);
     setIsFormOpen(true);
-    scrollToCardForm();
+    scrollToCardForm(true);
   }, [isOnline, onClearError, scrollToCardForm]);
 
   useEffect(() => {
@@ -215,7 +216,15 @@ export function CreditCardsView({
       color: card.color,
     });
     setIsFormOpen(true);
-    scrollToCardForm();
+    scrollToCardForm(false);
+
+    window.setTimeout(() => {
+      const activeElement = document.activeElement;
+
+      if (activeElement instanceof HTMLElement) {
+        activeElement.blur();
+      }
+    }, 180);
   }
 
   function closeForm() {
@@ -358,7 +367,7 @@ export function CreditCardsView({
                 <input
                   value={form.name}
                   onChange={(event) => updateForm("name", event.target.value)}
-                  className="app-input"
+                  className="app-input card-form-input"
                   placeholder="Ex: Nubank Roxinho"
                   disabled={!isOnline}
                 />
@@ -368,7 +377,7 @@ export function CreditCardsView({
                 <select
                   value={form.brand}
                   onChange={(event) => updateForm("brand", event.target.value)}
-                  className="app-input"
+                  className="app-input card-form-input"
                   disabled={!isOnline}
                 >
                   {CARD_BRANDS.map((brand) => (
@@ -390,7 +399,7 @@ export function CreditCardsView({
                   }
                   inputMode="numeric"
                   maxLength={4}
-                  className="app-input"
+                  className="app-input card-form-input"
                   placeholder="Ex: 1234"
                   disabled={!isOnline}
                 />
@@ -406,7 +415,7 @@ export function CreditCardsView({
                     )
                   }
                   inputMode="decimal"
-                  className="app-input"
+                  className="app-input card-form-input"
                   placeholder="Ex: 2500,00"
                   disabled={!isOnline}
                 />

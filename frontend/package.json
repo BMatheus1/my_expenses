@@ -5,10 +5,14 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:android": "cross-env NEXT_PUBLIC_CAPACITOR_BUILD=true CAPACITOR_BUILD=true next build",
-    "sync:android": "npm run build:android && npx cap sync android",
+    "build:native": "cross-env NEXT_PUBLIC_CAPACITOR_BUILD=true CAPACITOR_BUILD=true next build",
+    "build:android": "npm run build:native",
+    "sync:android": "npm run build:native && npx cap sync android",
+    "sync:ios": "npm run build:native && npx cap sync ios",
+    "add:ios": "npx cap add ios",
     "open:android": "npx cap open android",
-    "run:android": "npm run build:android && npx cap sync android && npx cap run android",
+    "open:ios": "npx cap open ios",
+    "run:android": "npm run build:native && npx cap sync android && npx cap run android",
     "lint": "eslint"
   },
   "dependencies": {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AccountDeletionSection } from "../AccountDeletionSection";
+import { NotificationSettingsPanel } from "../NotificationSettingsPanel";
 import {
   APP_THEMES,
   type AppColorMode,
@@ -122,6 +123,8 @@ export default function SettingsPage({
           title="Segurança da conta"
           description="Configure proteções importantes para a sessão do usuário e reduza riscos em computadores compartilhados."
         />
+
+        <NotificationSettingsPanel currentUser={currentUser} />
 
         <section className="app-card rounded-3xl p-6">
           <SectionHeader

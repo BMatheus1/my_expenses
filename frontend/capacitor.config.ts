@@ -21,6 +21,11 @@ const config: CapacitorConfig = {
   },
 
   plugins: {
+    LocalNotifications: {
+      smallIcon: "ic_stat_my_expenses",
+      iconColor: "#0c0a09",
+    },
+
     SocialLogin: {
       providers: {
         google: true,

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect } from "react";
 
+import { AuthGate } from "./components/AuthGate";
+
 const BENEFITS = [
   {
     title: "Anote rápido",
@@ -26,6 +28,8 @@ const SECURITY_ITEMS = [
   "Exclusão de conta",
 ];
 
+const IS_CAPACITOR_NATIVE_BUILD =
+  process.env.NEXT_PUBLIC_CAPACITOR_BUILD === "true";
 
 type CapacitorRuntime = {
   isNativePlatform?: () => boolean;
@@ -57,6 +61,14 @@ function isNativeAppRuntime() {
 }
 
 export default function LandingPage() {
+  if (IS_CAPACITOR_NATIVE_BUILD) {
+    return <AuthGate />;
+  }
+
+  return <WebLandingPage />;
+}
+
+function WebLandingPage() {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const hasAuthActionToken =

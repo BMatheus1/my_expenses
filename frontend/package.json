@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:android": "cross-env CAPACITOR_BUILD=true next build",
+    "build:android": "cross-env NEXT_PUBLIC_CAPACITOR_BUILD=true CAPACITOR_BUILD=true next build",
     "sync:android": "npm run build:android && npx cap sync android",
     "open:android": "npx cap open android",
     "run:android": "npm run build:android && npx cap sync android && npx cap run android",
@@ -14,13 +14,13 @@
   "dependencies": {
     "@capacitor/android": "^7.6.5",
     "@capacitor/core": "^7.6.5",
+    "@capacitor/local-notifications": "^7.0.0",
     "@capgo/capacitor-social-login": "^7.20.0",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.6.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

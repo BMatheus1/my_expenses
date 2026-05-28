@@ -17,6 +17,7 @@ import {
   saveCachedAuthenticatedUser,
 } from "../lib/auth-session-cache";
 import { readDashboardCache } from "../lib/dashboard-cache";
+import { requestInstallNotificationPermissionOnce } from "../lib/notification-service";
 import {
   getAutoLogoutEnabled,
   getAutoLogoutMilliseconds,
@@ -183,6 +184,10 @@ export function AuthGate() {
   useEffect(() => {
     void checkSession();
   }, [checkSession]);
+
+  useEffect(() => {
+    void requestInstallNotificationPermissionOnce();
+  }, []);
 
   useEffect(() => {
     function handleSecuritySettingsChange() {

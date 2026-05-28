@@ -5,6 +5,9 @@ import type { Income } from "../types/income";
 
 const DASHBOARD_CACHE_KEY = "my-expenses:dashboard-cache:v1";
 
+export const DASHBOARD_CACHE_UPDATED_EVENT =
+  "my-expenses:dashboard-cache-updated";
+
 export type DashboardCache = {
   expenses: Expense[];
   incomes: Income[];
@@ -76,6 +79,7 @@ export function saveDashboardCache({
 
   try {
     window.localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(cache));
+    window.dispatchEvent(new CustomEvent(DASHBOARD_CACHE_UPDATED_EVENT));
   } catch {
     // Se o navegador bloquear ou o armazenamento estiver cheio,
     // o app continua funcionando normalmente sem cache local.
@@ -89,6 +93,7 @@ export function clearDashboardCache() {
 
   try {
     window.localStorage.removeItem(DASHBOARD_CACHE_KEY);
+    window.dispatchEvent(new CustomEvent(DASHBOARD_CACHE_UPDATED_EVENT));
   } catch {
     // Falha silenciosa para não impactar a experiência do usuário.
   }

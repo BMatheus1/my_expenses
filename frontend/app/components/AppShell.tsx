@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import type { User } from "../types/auth";
 import { scrollToPageTop } from "../utils/smartScroll";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { SmartNotificationsBridge } from "./SmartNotificationsBridge";
 import type { AppView } from "./Sidebar";
 import { Sidebar } from "./Sidebar";
 
@@ -30,6 +31,10 @@ export function AppShell({
 
   return (
     <main className="app-shell min-h-screen">
+      <SmartNotificationsBridge
+        currentUser={currentUser}
+        onActiveViewChange={handleActiveViewChange}
+      />
       <div className="flex min-h-screen">
         <Sidebar
           activeView={activeView}

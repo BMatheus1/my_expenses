@@ -9,8 +9,12 @@ import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import {
   dismissDailyReviewCard,
   getDailyReviewEnabled,
+  markDailyReviewClosed,
+  markPurposeOnboardingAsSeen,
   shouldShowDailyReviewCard,
+  shouldShowPurposeOnboarding,
   subscribeToDailyReviewSettings,
+  wasDailyReviewClosed,
   wasDailyReviewCardDismissed,
 } from "../lib/daily-review";
 
@@ -51,6 +55,8 @@ import {
   buildDailyReviewExpensePayload,
   buildQuickExpensePayload,
   calculateTodayExpenseTotal,
+  getMonthlyInsightMessage,
+  getTopExpenseCategories,
 } from "../utils/dailyReview";
 import {
   formatCurrency,
@@ -72,6 +78,13 @@ import { DailyReviewSheet } from "./DailyReviewSheet";
 import { ExpenseFilters } from "./ExpenseFilters";
 import { ExpenseForm } from "./ExpenseForm";
 import { ExpenseList } from "./ExpenseList";
+import {
+  MoneyDestinationCard,
+  MonthlyPurposeSummary,
+  PurposeOnboarding,
+  QuickActionsCard,
+  TodayStatusCard,
+} from "./FinancePurposeCards";
 import { IncomesView } from "./IncomesView";
 import {
   CachedDataNotice,
@@ -178,6 +191,11 @@ export function ExpensesDashboard({
   const [dailyReviewDismissedDate, setDailyReviewDismissedDate] = useState<
     string | null
   >(null);
+  const [dailyReviewClosedDate, setDailyReviewClosedDate] = useState<
+    string | null
+  >(null);
+  const [isPurposeOnboardingVisible, setIsPurposeOnboardingVisible] =
+    useState(false);
   const [creditCardFormAutoOpenToken, setCreditCardFormAutoOpenToken] =
     useState<number | null>(null);
   const shouldReturnToExpenseAfterCardCreateRef = useRef(false);
@@ -201,6 +219,8 @@ export function ExpensesDashboard({
     return calculateTodayExpenseTotal(expenses, todayDate);
   }, [expenses, todayDate]);
 
+  const isTodayClosed = dailyReviewClosedDate === todayDate;
+
   const shouldDisplayDailyReviewCard = useMemo(() => {
     return shouldShowDailyReviewCard({
       expenses,
@@ -208,6 +228,7 @@ export function ExpensesDashboard({
       currentHour: new Date().getHours(),
       isEnabled: isDailyReviewEnabled,
       isDismissed:
+        isTodayClosed ||
         dailyReviewDismissedDate === todayDate ||
         wasDailyReviewCardDismissed(currentUser.id, todayDate),
     });
@@ -216,6 +237,7 @@ export function ExpensesDashboard({
     dailyReviewDismissedDate,
     expenses,
     isDailyReviewEnabled,
+    isTodayClosed,
     todayDate,
   ]);
 
@@ -236,6 +258,10 @@ export function ExpensesDashboard({
     setDailyReviewDismissedDate(
       wasDailyReviewCardDismissed(currentUser.id, todayDate) ? todayDate : null
     );
+    setDailyReviewClosedDate(
+      wasDailyReviewClosed(currentUser.id, todayDate) ? todayDate : null
+    );
+    setIsPurposeOnboardingVisible(shouldShowPurposeOnboarding(currentUser.id));
 
     return subscribeToDailyReviewSettings(() => {
       setIsDailyReviewEnabled(getDailyReviewEnabled(currentUser.id));
@@ -411,6 +437,14 @@ export function ExpensesDashboard({
 
   const monthlyBalance = monthlyIncomeTotal - monthlyExpenseTotal;
 
+  const topMonthlyCategories = useMemo(() => {
+    return getTopExpenseCategories(monthlyExpenses, 3);
+  }, [monthlyExpenses]);
+
+  const monthlyInsightMessage = useMemo(() => {
+    return getMonthlyInsightMessage(monthlyExpenses);
+  }, [monthlyExpenses]);
+
   const filteredExpenseTotal = useMemo(() => {
     return filteredExpenses.reduce(
       (total, expense) => total + expense.amount,
@@ -517,20 +551,37 @@ export function ExpensesDashboard({
     setIsAddActionSheetOpen(false);
 
     if (action === "quick") {
-      setQuickExpenseError("");
-      setDidSaveQuickExpense(false);
-      setIsQuickExpenseSheetOpen(true);
+      openQuickExpenseSheet();
       return;
     }
 
     if (action === "daily-review") {
-      setDailyReviewError("");
-      setDidSaveDailyReview(false);
-      setIsDailyReviewSheetOpen(true);
+      openDailyReviewSheet();
       return;
     }
 
     handleFullExpenseClick();
+  }
+
+  function openQuickExpenseSheet() {
+    setQuickExpenseError("");
+    setDidSaveQuickExpense(false);
+    setIsQuickExpenseSheetOpen(true);
+  }
+
+  function openDailyReviewSheet() {
+    setDailyReviewError("");
+    setDidSaveDailyReview(false);
+    setIsDailyReviewSheetOpen(true);
+  }
+
+  function handleViewMonthlySummary() {
+    setActiveView("reports");
+  }
+
+  function handleDismissPurposeOnboarding() {
+    markPurposeOnboardingAsSeen(currentUser.id);
+    setIsPurposeOnboardingVisible(false);
   }
 
   async function handleCreateCreditCard(cardData: CreateCreditCardRequest) {
@@ -1028,7 +1079,7 @@ export function ExpensesDashboard({
       ? "Gasto atualizado com sucesso."
       : paymentMethod === "credit_card" && parsedInstallmentsCount > 1
         ? "Compra parcelada cadastrada com sucesso."
-        : "Gasto cadastrado com sucesso.";
+        : "Gasto registrado com sucesso.";
 
     const expenseData: CreateExpenseRequest = {
       description: trimmedDescription,
@@ -1113,7 +1164,7 @@ export function ExpensesDashboard({
       setExpenses((currentExpenses) => [createdExpense, ...currentExpenses]);
       setDidSaveQuickExpense(true);
       void loadCategories();
-      showSuccessToast("Gasto rápido salvo.");
+      showSuccessToast("Gasto salvo em segundos.");
     } catch (error) {
       console.error(error);
       setQuickExpenseError(
@@ -1154,9 +1205,14 @@ export function ExpensesDashboard({
 
       setExpenses((currentExpenses) => [createdExpense, ...currentExpenses]);
       setDidSaveDailyReview(true);
+      handleMarkDailyReviewClosed();
       handleDismissDailyReviewCard();
       void loadCategories();
-      showSuccessToast("Fechamento do dia salvo.");
+      showSuccessToast(
+        data.category === "Miudezas"
+          ? "Melhor aproximado do que esquecido."
+          : "Dia organizado."
+      );
     } catch (error) {
       console.error(error);
       setDailyReviewError(
@@ -1173,6 +1229,11 @@ export function ExpensesDashboard({
   function handleDismissDailyReviewCard() {
     dismissDailyReviewCard(currentUser.id, todayDate);
     setDailyReviewDismissedDate(todayDate);
+  }
+
+  function handleMarkDailyReviewClosed() {
+    markDailyReviewClosed(currentUser.id, todayDate);
+    setDailyReviewClosedDate(todayDate);
   }
 
   function handleCloseQuickExpenseSheet() {
@@ -1198,6 +1259,14 @@ export function ExpensesDashboard({
   function handleDismissDailyReviewFlow() {
     handleDismissDailyReviewCard();
     handleCloseDailyReviewSheet();
+    showSuccessToast("Tudo bem. Você pode revisar depois.");
+  }
+
+  function handleCompleteDailyReviewFlow() {
+    handleMarkDailyReviewClosed();
+    handleDismissDailyReviewCard();
+    handleCloseDailyReviewSheet();
+    showSuccessToast("Dia organizado.");
   }
 
   async function handleConfirmAction() {
@@ -1344,12 +1413,17 @@ export function ExpensesDashboard({
         />
       ) : (
         <ExpensesView
+          currentUserName={currentUser.name}
           formSectionRef={expenseFormSectionRef}
           filtersSectionRef={expenseFiltersSectionRef}
           monthlyExpenseTotal={monthlyExpenseTotal}
           monthlyIncomeTotal={monthlyIncomeTotal}
           monthlyBalance={monthlyBalance}
           todayExpenseTotal={todayExpenseTotal}
+          isTodayClosed={isTodayClosed}
+          isPurposeOnboardingVisible={isPurposeOnboardingVisible}
+          monthlyInsightMessage={monthlyInsightMessage}
+          topMonthlyCategories={topMonthlyCategories}
           filteredExpenseTotal={filteredExpenseTotal}
           filteredExpenses={filteredExpenses}
           allExpenses={expenses}
@@ -1380,12 +1454,11 @@ export function ExpensesDashboard({
           onFormToggle={handleFormToggle}
           onFiltersToggle={handleFiltersToggle}
           onNewExpenseClick={handleNewExpenseClick}
-          onOpenDailyReview={() => {
-            setDailyReviewError("");
-            setDidSaveDailyReview(false);
-            setIsDailyReviewSheetOpen(true);
-          }}
+          onQuickExpense={openQuickExpenseSheet}
+          onOpenDailyReview={openDailyReviewSheet}
+          onViewMonthlySummary={handleViewMonthlySummary}
           onDismissDailyReview={handleDismissDailyReviewCard}
+          onDismissPurposeOnboarding={handleDismissPurposeOnboarding}
           onDescriptionChange={setDescription}
           onAmountChange={handleAmountChange}
           onCategoryChange={setCategory}
@@ -1438,6 +1511,7 @@ export function ExpensesDashboard({
         errorMessage={dailyReviewError}
         didSave={didSaveDailyReview}
         onClose={handleCloseDailyReviewSheet}
+        onCompleteToday={handleCompleteDailyReviewFlow}
         onDismissToday={handleDismissDailyReviewFlow}
         onSubmitDifference={handleSaveDailyReviewDifference}
         onResetSuccess={() => {
@@ -1487,12 +1561,20 @@ export function ExpensesDashboard({
 }
 
 type ExpensesViewProps = {
+  currentUserName: string;
   formSectionRef: RefObject<HTMLDivElement | null>;
   filtersSectionRef: RefObject<HTMLDivElement | null>;
   monthlyExpenseTotal: number;
   monthlyIncomeTotal: number;
   monthlyBalance: number;
   todayExpenseTotal: number;
+  isTodayClosed: boolean;
+  isPurposeOnboardingVisible: boolean;
+  monthlyInsightMessage: string;
+  topMonthlyCategories: Array<{
+    category: string;
+    total: number;
+  }>;
   filteredExpenseTotal: number;
   filteredExpenses: Expense[];
   allExpenses: Expense[];
@@ -1523,8 +1605,11 @@ type ExpensesViewProps = {
   onFormToggle: () => void;
   onFiltersToggle: () => void;
   onNewExpenseClick: () => void;
+  onQuickExpense: () => void;
   onOpenDailyReview: () => void;
+  onViewMonthlySummary: () => void;
   onDismissDailyReview: () => void;
+  onDismissPurposeOnboarding: () => void;
   onDescriptionChange: (value: string) => void;
   onAmountChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
@@ -1547,12 +1632,17 @@ type ExpensesViewProps = {
 };
 
 function ExpensesView({
+  currentUserName,
   formSectionRef,
   filtersSectionRef,
   monthlyExpenseTotal,
   monthlyIncomeTotal,
   monthlyBalance,
   todayExpenseTotal,
+  isTodayClosed,
+  isPurposeOnboardingVisible,
+  monthlyInsightMessage,
+  topMonthlyCategories,
   filteredExpenseTotal,
   filteredExpenses,
   allExpenses,
@@ -1583,8 +1673,11 @@ function ExpensesView({
   onFormToggle,
   onFiltersToggle,
   onNewExpenseClick,
+  onQuickExpense,
   onOpenDailyReview,
+  onViewMonthlySummary,
   onDismissDailyReview,
+  onDismissPurposeOnboarding,
   onDescriptionChange,
   onAmountChange,
   onCategoryChange,
@@ -1613,12 +1706,25 @@ function ExpensesView({
         <OfflineStatusBanner />
         <CachedDataNotice savedAt={cachedDashboardSavedAt} />
 
-        <PageHeader
-          monthlyExpenseTotal={monthlyExpenseTotal}
-          monthlyIncomeTotal={monthlyIncomeTotal}
-          monthlyBalance={monthlyBalance}
+        <PurposeOnboarding
+          isVisible={isPurposeOnboardingVisible}
+          onDismiss={onDismissPurposeOnboarding}
+        />
+
+        <TodayStatusCard
+          userName={currentUserName}
+          todayTotal={todayExpenseTotal}
+          isDayClosed={isTodayClosed}
           isOnline={isOnline}
-          onNewExpenseClick={onNewExpenseClick}
+          onAddExpense={onNewExpenseClick}
+          onOpenDailyReview={onOpenDailyReview}
+        />
+
+        <QuickActionsCard
+          isOnline={isOnline}
+          onQuickExpense={onQuickExpense}
+          onDailyReview={onOpenDailyReview}
+          onViewSummary={onViewMonthlySummary}
         />
 
         {shouldShowDailyReviewCard ? (
@@ -1639,12 +1745,25 @@ function ExpensesView({
       <OfflineStatusBanner />
       <CachedDataNotice savedAt={cachedDashboardSavedAt} />
 
-      <PageHeader
-        monthlyExpenseTotal={monthlyExpenseTotal}
-        monthlyIncomeTotal={monthlyIncomeTotal}
-        monthlyBalance={monthlyBalance}
+      <PurposeOnboarding
+        isVisible={isPurposeOnboardingVisible}
+        onDismiss={onDismissPurposeOnboarding}
+      />
+
+      <TodayStatusCard
+        userName={currentUserName}
+        todayTotal={todayExpenseTotal}
+        isDayClosed={isTodayClosed}
         isOnline={isOnline}
-        onNewExpenseClick={onNewExpenseClick}
+        onAddExpense={onNewExpenseClick}
+        onOpenDailyReview={onOpenDailyReview}
+      />
+
+      <QuickActionsCard
+        isOnline={isOnline}
+        onQuickExpense={onQuickExpense}
+        onDailyReview={onOpenDailyReview}
+        onViewSummary={onViewMonthlySummary}
       />
 
       {shouldShowDailyReviewCard ? (
@@ -1660,6 +1779,17 @@ function ExpensesView({
         expenses={allExpenses}
         onOpenCards={onOpenCreditCards}
       />
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <MonthlyPurposeSummary
+          monthlyExpenseTotal={monthlyExpenseTotal}
+          monthlyIncomeTotal={monthlyIncomeTotal}
+          monthlyBalance={monthlyBalance}
+          monthlyInsightMessage={monthlyInsightMessage}
+        />
+
+        <MoneyDestinationCard topCategories={topMonthlyCategories} />
+      </div>
 
       <SummaryCards
         monthlyTotal={monthlyExpenseTotal}
@@ -1743,101 +1873,10 @@ function ExpensesView({
   );
 }
 
-type PageHeaderProps = {
-  monthlyExpenseTotal: number;
-  monthlyIncomeTotal: number;
-  monthlyBalance: number;
-  isOnline: boolean;
-  onNewExpenseClick: () => void;
-};
-
-function PageHeader({
-  monthlyExpenseTotal,
-  monthlyIncomeTotal,
-  monthlyBalance,
-  isOnline,
-  onNewExpenseClick,
-}: PageHeaderProps) {
-  return (
-    <header className="app-card overflow-hidden rounded-3xl">
-      <div className="soft-header-gradient p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="app-kicker">My Expenses</p>
-
-            <h1 className="app-title mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-              Gastos
-            </h1>
-
-            <p className="app-muted mt-2 max-w-2xl text-sm font-medium leading-6">
-              Cadastre, filtre e acompanhe suas despesas mensais de forma
-              simples.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 lg:w-full lg:max-w-xl">
-            <HeaderMetric
-              label="Ganhos"
-              value={formatCurrency(monthlyIncomeTotal)}
-              variant="positive"
-            />
-
-            <HeaderMetric
-              label="Gastos"
-              value={formatCurrency(monthlyExpenseTotal)}
-              variant="negative"
-            />
-
-            <HeaderMetric
-              label="Saldo"
-              value={formatCurrency(monthlyBalance)}
-              variant={monthlyBalance >= 0 ? "positive" : "negative"}
-            />
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onNewExpenseClick}
-          disabled={!isOnline}
-          className="app-button-primary touch-button mt-5 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-        >
-          {isOnline ? "+ Adicionar" : "Adicionar disponível com internet"}
-        </button>
-      </div>
-    </header>
-  );
-}
-
 type CreditCardDeletionState = {
   card: CreditCard;
   linkedExpensesCount: number;
 };
-
-type HeaderMetricProps = {
-  label: string;
-  value: string;
-  variant: "positive" | "negative";
-};
-
-function HeaderMetric({ label, value, variant }: HeaderMetricProps) {
-  const valueClassName =
-    variant === "positive" ? "text-emerald-700" : "text-red-700";
-
-  return (
-    <article className="app-card-soft rounded-3xl p-4 shadow-sm">
-      <p className="app-muted text-xs font-black uppercase tracking-widest">
-        {label}
-      </p>
-
-      <strong
-        className={`mt-2 block truncate text-lg font-black tracking-tight ${valueClassName}`}
-      >
-        {value}
-      </strong>
-    </article>
-  );
-}
 
 function getCreditCardLimitError({
   cards,

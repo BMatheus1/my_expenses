@@ -18,6 +18,7 @@ type DailyReviewSheetProps = {
   errorMessage: string;
   didSave: boolean;
   onClose: () => void;
+  onCompleteToday: () => void;
   onDismissToday: () => void;
   onSubmitDifference: (data: { amount: number; category: string }) => Promise<void>;
   onResetSuccess: () => void;
@@ -33,6 +34,7 @@ export function DailyReviewSheet({
   errorMessage,
   didSave,
   onClose,
+  onCompleteToday,
   onDismissToday,
   onSubmitDifference,
   onResetSuccess,
@@ -194,7 +196,8 @@ export function DailyReviewSheet({
 
                 <p className="app-muted mt-4 text-sm leading-6">
                   Parece que ficaram {formatCurrencyBRL(missingAmount)} sem
-                  categoria. Quer organizar agora?
+                  categoria. Quer organizar agora? Se não lembrar exatamente,
+                  Miudezas resolve sem complicar.
                 </p>
 
                 {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
@@ -240,7 +243,7 @@ export function DailyReviewSheet({
 
                 <button
                   type="button"
-                  onClick={onDismissToday}
+                  onClick={onCompleteToday}
                   className="app-button-primary touch-button mt-5 w-full justify-center"
                 >
                   Fechar
@@ -303,7 +306,7 @@ export function DailyReviewSheet({
           <div className="mt-5 rounded-3xl border border-[var(--brand-border)] bg-[var(--brand-soft)] p-5 text-[var(--brand-text)]">
             <h3 className="text-lg font-black">Fechamento salvo.</h3>
             <p className="mt-1 text-sm leading-6">
-              A diferença foi registrada como gasto normal.
+              Dia organizado. Você ainda pode adicionar novos gastos se precisar.
             </p>
 
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">

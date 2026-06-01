@@ -8,15 +8,15 @@ import { AuthGate } from "./components/AuthGate";
 const BENEFITS = [
   {
     title: "Anote rápido",
-    description: "Registre gastos e ganhos em poucos segundos pelo celular.",
+    description: "Registre pequenos gastos em poucos segundos pelo celular.",
   },
   {
-    title: "Veja para onde o dinheiro vai",
-    description: "Organize por categorias e acompanhe seu resumo financeiro.",
+    title: "Feche o dia",
+    description: "Recupere o que ficou faltando sem formulário longo.",
   },
   {
-    title: "Sem anúncios",
-    description: "Uma experiência limpa, direta e focada em praticidade.",
+    title: "Entenda seu mês",
+    description: "Veja para onde seu dinheiro está indo com clareza.",
   },
 ];
 
@@ -118,17 +118,17 @@ function WebLandingPage() {
       <section className="mx-auto grid max-w-6xl gap-10 px-4 py-12 lg:grid-cols-2 lg:items-center lg:py-20">
         <div>
           <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
-            Controle financeiro simples
+            Controle financeiro para a vida real
           </p>
 
           <h1 className="mt-4 text-4xl font-black tracking-tight text-stone-950 sm:text-5xl lg:text-6xl">
-            Controle seus gastos sem complicação.
+            Anote rápido. Feche o dia. Entenda seu mês.
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-8 text-stone-600 sm:text-lg">
-            O My Expenses foi criado para quem quer praticidade: lançar gastos,
-            acompanhar ganhos e entender melhor para onde o dinheiro está indo,
-            direto pelo celular.
+            O My Expenses ajuda você a manter controle mesmo quando o dia está
+            corrido: registre gastos em segundos, revise o que esqueceu e veja
+            para onde seu dinheiro foi.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -158,34 +158,34 @@ function WebLandingPage() {
               <p className="text-sm font-black">Minha carteira</p>
 
               <p className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-200">
-                Maio
+                Hoje
               </p>
             </div>
 
             <div className="mt-6 rounded-3xl bg-white/10 p-5">
-              <p className="text-sm text-stone-300">Saldo estimado</p>
-              <p className="mt-2 text-3xl font-black">R$ 2.480,00</p>
+              <p className="text-sm text-stone-300">Registrado hoje</p>
+              <p className="mt-2 text-3xl font-black">R$ 48,00</p>
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-3xl bg-emerald-500/15 p-4">
-                <p className="text-xs font-bold text-emerald-200">Ganhos</p>
-                <p className="mt-1 text-xl font-black">R$ 3.200</p>
+                <p className="text-xs font-bold text-emerald-200">Gasto rápido</p>
+                <p className="mt-1 text-xl font-black">R$ 10</p>
               </div>
 
               <div className="rounded-3xl bg-red-500/15 p-4">
-                <p className="text-xs font-bold text-red-200">Gastos</p>
-                <p className="mt-1 text-xl font-black">R$ 720</p>
+                <p className="text-xs font-bold text-red-200">Miudezas</p>
+                <p className="mt-1 text-xl font-black">R$ 18</p>
               </div>
             </div>
 
             <div className="mt-4 rounded-3xl bg-white p-4 text-stone-950">
-              <p className="text-sm font-black">Últimos registros</p>
+              <p className="text-sm font-black">Para onde foi meu dinheiro?</p>
 
               <div className="mt-3 space-y-3">
-                <FakeTransaction title="Mercado" value="- R$ 85,40" />
-                <FakeTransaction title="Salário" value="+ R$ 3.200,00" />
-                <FakeTransaction title="Transporte" value="- R$ 18,00" />
+                <FakeTransaction title="Alimentação" value="- R$ 120,40" />
+                <FakeTransaction title="Transporte" value="- R$ 58,00" />
+                <FakeTransaction title="Miudezas" value="- R$ 32,00" />
               </div>
             </div>
           </div>
@@ -200,7 +200,7 @@ function WebLandingPage() {
             </p>
 
             <h2 className="mt-3 text-3xl font-black tracking-tight">
-              Feito para ser simples no dia a dia.
+              Feito para o jeito real como o dia acontece.
             </h2>
           </div>
 
@@ -255,12 +255,12 @@ function WebLandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
           <div>
             <h2 className="text-3xl font-black tracking-tight">
-              Comece a organizar seus gastos hoje.
+              Controle financeiro sem cobrança e sem complicação.
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-stone-300">
-              Crie sua conta, confirme seu e-mail e comece a registrar seus
-              gastos em poucos segundos.
+              Comece registrando um gasto rápido. No fim do dia, revise o que
+              ficou faltando.
             </p>
           </div>
 

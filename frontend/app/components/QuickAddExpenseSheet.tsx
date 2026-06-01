@@ -199,6 +199,10 @@ export function QuickAddExpenseSheet({
               <p className="app-muted text-xs font-black uppercase tracking-widest">
                 Categoria
               </p>
+              <p className="app-muted mt-2 text-sm leading-6">
+                Miudezas é para pequenos gastos que você não lembra exatamente,
+                mas não quer deixar fora do controle.
+              </p>
 
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {categoryOptions.map((categoryName) => (

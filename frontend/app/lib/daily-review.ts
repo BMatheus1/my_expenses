@@ -4,6 +4,8 @@ import type { Expense } from "../types/expense";
 
 const DAILY_REVIEW_ENABLED_KEY = "my-expenses:daily-review:enabled";
 const DAILY_REVIEW_DISMISSED_PREFIX = "my-expenses:daily-review:dismissed";
+const DAILY_REVIEW_CLOSED_PREFIX = "my-expenses:daily-review:closed";
+const PURPOSE_ONBOARDING_PREFIX = "my-expenses:purpose-onboarding:seen";
 const DAILY_REVIEW_SETTINGS_EVENT = "my-expenses:daily-review-settings-changed";
 
 export function getDailyReviewEnabled(userId: string): boolean {
@@ -62,6 +64,41 @@ export function wasDailyReviewCardDismissed(
   return window.localStorage.getItem(getDailyReviewDismissedKey(userId)) === dateValue;
 }
 
+export function markDailyReviewClosed(userId: string, dateValue: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(getDailyReviewClosedKey(userId), dateValue);
+}
+
+export function wasDailyReviewClosed(
+  userId: string,
+  dateValue: string,
+): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(getDailyReviewClosedKey(userId)) === dateValue;
+}
+
+export function shouldShowPurposeOnboarding(userId: string): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(getPurposeOnboardingKey(userId)) !== "true";
+}
+
+export function markPurposeOnboardingAsSeen(userId: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(getPurposeOnboardingKey(userId), "true");
+}
+
 export function shouldShowDailyReviewCard({
   expenses,
   today,
@@ -90,4 +127,12 @@ function getDailyReviewEnabledKey(userId: string) {
 
 function getDailyReviewDismissedKey(userId: string) {
   return `${DAILY_REVIEW_DISMISSED_PREFIX}:${userId}`;
+}
+
+function getDailyReviewClosedKey(userId: string) {
+  return `${DAILY_REVIEW_CLOSED_PREFIX}:${userId}`;
+}
+
+function getPurposeOnboardingKey(userId: string) {
+  return `${PURPOSE_ONBOARDING_PREFIX}:${userId}`;
 }

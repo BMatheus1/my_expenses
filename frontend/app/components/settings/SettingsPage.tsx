@@ -25,6 +25,10 @@ import {
   saveRememberSession,
 } from "@/app/lib/security";
 import type { User } from "@/app/types/auth";
+import {
+  getDailyReviewEnabled,
+  saveDailyReviewEnabled,
+} from "@/app/lib/daily-review";
 
 const DISPLAY_MODES: Array<{
   value: AppColorMode;
@@ -70,6 +74,7 @@ export default function SettingsPage({
   const [rememberSession, setRememberSession] = useState(true);
   const [autoLogoutEnabled, setAutoLogoutEnabled] = useState(true);
   const [autoLogoutMinutes, setAutoLogoutMinutes] = useState(15);
+  const [dailyReviewEnabled, setDailyReviewEnabled] = useState(true);
   const [, refreshSessionInfo] = useState(0);
 
   const sessionInfo = getSessionSecurityInfo();
@@ -81,6 +86,7 @@ export default function SettingsPage({
     setRememberSession(getRememberSession());
     setAutoLogoutEnabled(getAutoLogoutEnabled());
     setAutoLogoutMinutes(getAutoLogoutMinutes());
+    setDailyReviewEnabled(getDailyReviewEnabled(currentUser.id));
     refreshSessionInfo((currentValue) => currentValue + 1);
   }, [currentUser.id]);
 
@@ -108,6 +114,11 @@ export default function SettingsPage({
   function handleAutoLogoutMinutesChange(value: number) {
     setAutoLogoutMinutes(value);
     saveAutoLogoutMinutes(value);
+  }
+
+  function handleDailyReviewEnabledChange(value: boolean) {
+    setDailyReviewEnabled(value);
+    saveDailyReviewEnabled(currentUser.id, value);
   }
 
   function handleClearSessionAndLogout() {
@@ -290,6 +301,20 @@ export default function SettingsPage({
             />
           ))}
         </div>
+      </section>
+
+      <section className="app-card rounded-3xl p-6">
+        <SectionHeader
+          title="Rotina diária"
+          description="Controle lembretes leves que ajudam a revisar o dia sem preencher formulário longo."
+        />
+
+        <SecurityToggle
+          title="Revisão diária"
+          description="Mostra um card discreto no fim do dia para organizar miudezas em menos de 1 minuto."
+          isEnabled={dailyReviewEnabled}
+          onChange={handleDailyReviewEnabledChange}
+        />
       </section>
 
       <ThemePreview />

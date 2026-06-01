@@ -59,6 +59,7 @@ DEFAULT_EXPENSE_CATEGORIES = [
     "Moradia",
     "Saúde",
     "Lazer",
+    "Miudezas",
     "Educação",
     "Outros",
 ]

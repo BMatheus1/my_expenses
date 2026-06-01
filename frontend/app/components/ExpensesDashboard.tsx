@@ -6,6 +6,13 @@ import { CreditCardDeleteModal } from "./CreditCardDeleteModal";
 
 import { EXPENSE_CATEGORIES } from "../constants/categories";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import {
+  dismissDailyReviewCard,
+  getDailyReviewEnabled,
+  shouldShowDailyReviewCard,
+  subscribeToDailyReviewSettings,
+  wasDailyReviewCardDismissed,
+} from "../lib/daily-review";
 
 import {
   readDashboardCache,
@@ -41,6 +48,11 @@ import type {
 import type { CreateIncomeRequest, Income } from "../types/income";
 import type { CategoryTotal } from "../types/summary";
 import {
+  buildDailyReviewExpensePayload,
+  buildQuickExpensePayload,
+  calculateTodayExpenseTotal,
+} from "../utils/dailyReview";
+import {
   formatCurrency,
   getCurrentDate,
   getCurrentMonth,
@@ -49,11 +61,14 @@ import {
 } from "../utils/formatters";
 import { smartScrollToRef } from "../utils/smartScroll";
 import { AppShell } from "./AppShell";
+import { AddActionSheet } from "./AddActionSheet";
 import BusinessWorkspace from "./BusinessWorkspace";
 import { CategoryManagerModal } from "./CategoryManagerModal";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ConfirmModal } from "./ConfirmModal";
 import { CreditCardsView } from "./CreditCardsView";
+import { DailyReviewCard } from "./DailyReviewCard";
+import { DailyReviewSheet } from "./DailyReviewSheet";
 import { ExpenseFilters } from "./ExpenseFilters";
 import { ExpenseForm } from "./ExpenseForm";
 import { ExpenseList } from "./ExpenseList";
@@ -64,6 +79,7 @@ import {
   OfflineStatusBanner,
   UpcomingInvoicesStrip,
 } from "./MobileReadyPolish";
+import { QuickAddExpenseSheet } from "./QuickAddExpenseSheet";
 import { ReportsView } from "./ReportsView";
 import SettingsPage from "./settings/SettingsPage";
 import type { AppView } from "./Sidebar";
@@ -147,6 +163,21 @@ export function ExpensesDashboard({
   const [isFormOpen, setIsFormOpen] = useState(true);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [isAddActionSheetOpen, setIsAddActionSheetOpen] = useState(false);
+  const [isQuickExpenseSheetOpen, setIsQuickExpenseSheetOpen] = useState(false);
+  const [isDailyReviewSheetOpen, setIsDailyReviewSheetOpen] = useState(false);
+  const [quickExpenseError, setQuickExpenseError] = useState("");
+  const [dailyReviewError, setDailyReviewError] = useState("");
+  const [isSavingQuickExpense, setIsSavingQuickExpense] = useState(false);
+  const [isSavingDailyReview, setIsSavingDailyReview] = useState(false);
+  const [didSaveQuickExpense, setDidSaveQuickExpense] = useState(false);
+  const [didSaveDailyReview, setDidSaveDailyReview] = useState(false);
+  const [isDailyReviewEnabled, setIsDailyReviewEnabled] = useState(() =>
+    getDailyReviewEnabled(currentUser.id)
+  );
+  const [dailyReviewDismissedDate, setDailyReviewDismissedDate] = useState<
+    string | null
+  >(null);
   const [creditCardFormAutoOpenToken, setCreditCardFormAutoOpenToken] =
     useState<number | null>(null);
   const shouldReturnToExpenseAfterCardCreateRef = useRef(false);
@@ -160,10 +191,33 @@ export function ExpensesDashboard({
   const [hasHydratedDashboardCache, setHasHydratedDashboardCache] =
     useState(false);
   const isEditing = editingExpenseId !== null;
+  const todayDate = getCurrentDate();
 
   const categoryNames = useMemo(() => {
     return mergeCategoryNames(categoryRecords.map((item) => item.name));
   }, [categoryRecords]);
+
+  const todayExpenseTotal = useMemo(() => {
+    return calculateTodayExpenseTotal(expenses, todayDate);
+  }, [expenses, todayDate]);
+
+  const shouldDisplayDailyReviewCard = useMemo(() => {
+    return shouldShowDailyReviewCard({
+      expenses,
+      today: todayDate,
+      currentHour: new Date().getHours(),
+      isEnabled: isDailyReviewEnabled,
+      isDismissed:
+        dailyReviewDismissedDate === todayDate ||
+        wasDailyReviewCardDismissed(currentUser.id, todayDate),
+    });
+  }, [
+    currentUser.id,
+    dailyReviewDismissedDate,
+    expenses,
+    isDailyReviewEnabled,
+    todayDate,
+  ]);
 
   useEffect(() => {
     if (!toast) {
@@ -176,6 +230,17 @@ export function ExpensesDashboard({
 
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
+
+  useEffect(() => {
+    setIsDailyReviewEnabled(getDailyReviewEnabled(currentUser.id));
+    setDailyReviewDismissedDate(
+      wasDailyReviewCardDismissed(currentUser.id, todayDate) ? todayDate : null
+    );
+
+    return subscribeToDailyReviewSettings(() => {
+      setIsDailyReviewEnabled(getDailyReviewEnabled(currentUser.id));
+    });
+  }, [currentUser.id, todayDate]);
 
   useEffect(() => {
     if (categoryNames.length > 0 && !categoryNames.includes(category)) {
@@ -434,6 +499,10 @@ export function ExpensesDashboard({
   }
 
   function handleNewExpenseClick() {
+    setIsAddActionSheetOpen(true);
+  }
+
+  function handleFullExpenseClick() {
     resetForm();
     setIsFormOpen(true);
     setActiveView("expenses");
@@ -442,6 +511,26 @@ export function ExpensesDashboard({
       delayMs: 120,
       focusFirstField: true,
     });
+  }
+
+  function handleAddActionSelect(action: "quick" | "full" | "daily-review") {
+    setIsAddActionSheetOpen(false);
+
+    if (action === "quick") {
+      setQuickExpenseError("");
+      setDidSaveQuickExpense(false);
+      setIsQuickExpenseSheetOpen(true);
+      return;
+    }
+
+    if (action === "daily-review") {
+      setDailyReviewError("");
+      setDidSaveDailyReview(false);
+      setIsDailyReviewSheetOpen(true);
+      return;
+    }
+
+    handleFullExpenseClick();
   }
 
   async function handleCreateCreditCard(cardData: CreateCreditCardRequest) {
@@ -996,6 +1085,121 @@ export function ExpensesDashboard({
     }
   }
 
+  async function handleSaveQuickExpense(data: {
+    amount: number;
+    category: string;
+  }) {
+    if (isSavingQuickExpense) {
+      return;
+    }
+
+    if (blockOfflineAction("salvar este gasto")) {
+      setQuickExpenseError("Conecte-se para salvar o gasto rápido.");
+      return;
+    }
+
+    try {
+      setIsSavingQuickExpense(true);
+      setQuickExpenseError("");
+
+      const createdExpense = await createExpense(
+        buildQuickExpensePayload({
+          amount: data.amount,
+          category: data.category,
+          date: todayDate,
+        })
+      );
+
+      setExpenses((currentExpenses) => [createdExpense, ...currentExpenses]);
+      setDidSaveQuickExpense(true);
+      void loadCategories();
+      showSuccessToast("Gasto rápido salvo.");
+    } catch (error) {
+      console.error(error);
+      setQuickExpenseError(
+        getDashboardErrorMessage(
+          error,
+          "Não conseguimos salvar agora. Tente novamente."
+        )
+      );
+    } finally {
+      setIsSavingQuickExpense(false);
+    }
+  }
+
+  async function handleSaveDailyReviewDifference(data: {
+    amount: number;
+    category: string;
+  }) {
+    if (isSavingDailyReview || data.amount <= 0) {
+      return;
+    }
+
+    if (blockOfflineAction("salvar esta diferença")) {
+      setDailyReviewError("Conecte-se para salvar o fechamento do dia.");
+      return;
+    }
+
+    try {
+      setIsSavingDailyReview(true);
+      setDailyReviewError("");
+
+      const createdExpense = await createExpense(
+        buildDailyReviewExpensePayload({
+          amount: data.amount,
+          category: data.category,
+          date: todayDate,
+        })
+      );
+
+      setExpenses((currentExpenses) => [createdExpense, ...currentExpenses]);
+      setDidSaveDailyReview(true);
+      handleDismissDailyReviewCard();
+      void loadCategories();
+      showSuccessToast("Fechamento do dia salvo.");
+    } catch (error) {
+      console.error(error);
+      setDailyReviewError(
+        getDashboardErrorMessage(
+          error,
+          "Não conseguimos salvar agora. Tente novamente."
+        )
+      );
+    } finally {
+      setIsSavingDailyReview(false);
+    }
+  }
+
+  function handleDismissDailyReviewCard() {
+    dismissDailyReviewCard(currentUser.id, todayDate);
+    setDailyReviewDismissedDate(todayDate);
+  }
+
+  function handleCloseQuickExpenseSheet() {
+    if (isSavingQuickExpense) {
+      return;
+    }
+
+    setIsQuickExpenseSheetOpen(false);
+    setQuickExpenseError("");
+    setDidSaveQuickExpense(false);
+  }
+
+  function handleCloseDailyReviewSheet() {
+    if (isSavingDailyReview) {
+      return;
+    }
+
+    setIsDailyReviewSheetOpen(false);
+    setDailyReviewError("");
+    setDidSaveDailyReview(false);
+  }
+
+  function handleDismissDailyReviewFlow() {
+    handleDismissDailyReviewCard();
+    handleCloseDailyReviewSheet();
+  }
+
   async function handleConfirmAction() {
     if (!confirmation) {
       return;
@@ -1145,6 +1349,7 @@ export function ExpensesDashboard({
           monthlyExpenseTotal={monthlyExpenseTotal}
           monthlyIncomeTotal={monthlyIncomeTotal}
           monthlyBalance={monthlyBalance}
+          todayExpenseTotal={todayExpenseTotal}
           filteredExpenseTotal={filteredExpenseTotal}
           filteredExpenses={filteredExpenses}
           allExpenses={expenses}
@@ -1160,6 +1365,7 @@ export function ExpensesDashboard({
           isFiltersOpen={isFiltersOpen}
           isEditing={isEditing}
           isSubmitting={isSubmitting}
+          shouldShowDailyReviewCard={shouldDisplayDailyReviewCard}
           errorMessage={errorMessage}
           description={description}
           amount={amount}
@@ -1174,6 +1380,12 @@ export function ExpensesDashboard({
           onFormToggle={handleFormToggle}
           onFiltersToggle={handleFiltersToggle}
           onNewExpenseClick={handleNewExpenseClick}
+          onOpenDailyReview={() => {
+            setDailyReviewError("");
+            setDidSaveDailyReview(false);
+            setIsDailyReviewSheetOpen(true);
+          }}
+          onDismissDailyReview={handleDismissDailyReviewCard}
           onDescriptionChange={setDescription}
           onAmountChange={handleAmountChange}
           onCategoryChange={setCategory}
@@ -1199,6 +1411,40 @@ export function ExpensesDashboard({
         />
       )}
 
+      <AddActionSheet
+        isOpen={isAddActionSheetOpen}
+        isOnline={isOnline}
+        onClose={() => setIsAddActionSheetOpen(false)}
+        onSelect={handleAddActionSelect}
+      />
+      <QuickAddExpenseSheet
+        isOpen={isQuickExpenseSheetOpen}
+        categories={categoryNames}
+        isSaving={isSavingQuickExpense}
+        errorMessage={quickExpenseError}
+        didSave={didSaveQuickExpense}
+        onClose={handleCloseQuickExpenseSheet}
+        onSubmit={handleSaveQuickExpense}
+        onResetSuccess={() => {
+          setDidSaveQuickExpense(false);
+          setQuickExpenseError("");
+        }}
+      />
+      <DailyReviewSheet
+        isOpen={isDailyReviewSheetOpen}
+        todayTotal={todayExpenseTotal}
+        categories={categoryNames}
+        isSaving={isSavingDailyReview}
+        errorMessage={dailyReviewError}
+        didSave={didSaveDailyReview}
+        onClose={handleCloseDailyReviewSheet}
+        onDismissToday={handleDismissDailyReviewFlow}
+        onSubmitDifference={handleSaveDailyReviewDifference}
+        onResetSuccess={() => {
+          setDidSaveDailyReview(false);
+          setDailyReviewError("");
+        }}
+      />
       <CategoryManagerModal
         isOpen={isCategoryManagerOpen}
         categories={categoryRecords}
@@ -1246,6 +1492,7 @@ type ExpensesViewProps = {
   monthlyExpenseTotal: number;
   monthlyIncomeTotal: number;
   monthlyBalance: number;
+  todayExpenseTotal: number;
   filteredExpenseTotal: number;
   filteredExpenses: Expense[];
   allExpenses: Expense[];
@@ -1261,6 +1508,7 @@ type ExpensesViewProps = {
   isFiltersOpen: boolean;
   isEditing: boolean;
   isSubmitting: boolean;
+  shouldShowDailyReviewCard: boolean;
   errorMessage: string;
   description: string;
   amount: string;
@@ -1275,6 +1523,8 @@ type ExpensesViewProps = {
   onFormToggle: () => void;
   onFiltersToggle: () => void;
   onNewExpenseClick: () => void;
+  onOpenDailyReview: () => void;
+  onDismissDailyReview: () => void;
   onDescriptionChange: (value: string) => void;
   onAmountChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
@@ -1302,6 +1552,7 @@ function ExpensesView({
   monthlyExpenseTotal,
   monthlyIncomeTotal,
   monthlyBalance,
+  todayExpenseTotal,
   filteredExpenseTotal,
   filteredExpenses,
   allExpenses,
@@ -1317,6 +1568,7 @@ function ExpensesView({
   isFiltersOpen,
   isEditing,
   isSubmitting,
+  shouldShowDailyReviewCard,
   errorMessage,
   description,
   amount,
@@ -1331,6 +1583,8 @@ function ExpensesView({
   onFormToggle,
   onFiltersToggle,
   onNewExpenseClick,
+  onOpenDailyReview,
+  onDismissDailyReview,
   onDescriptionChange,
   onAmountChange,
   onCategoryChange,
@@ -1367,6 +1621,14 @@ function ExpensesView({
           onNewExpenseClick={onNewExpenseClick}
         />
 
+        {shouldShowDailyReviewCard ? (
+          <DailyReviewCard
+            todayTotalLabel={formatCurrency(todayExpenseTotal)}
+            onOpen={onOpenDailyReview}
+            onDismiss={onDismissDailyReview}
+          />
+        ) : null}
+
         <MobileDashboardSkeleton />
       </div>
     );
@@ -1384,6 +1646,14 @@ function ExpensesView({
         isOnline={isOnline}
         onNewExpenseClick={onNewExpenseClick}
       />
+
+      {shouldShowDailyReviewCard ? (
+        <DailyReviewCard
+          todayTotalLabel={formatCurrency(todayExpenseTotal)}
+          onOpen={onOpenDailyReview}
+          onDismiss={onDismissDailyReview}
+        />
+      ) : null}
 
       <UpcomingInvoicesStrip
         creditCards={creditCards}
@@ -1532,7 +1802,7 @@ function PageHeader({
           disabled={!isOnline}
           className="app-button-primary touch-button mt-5 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
-          {isOnline ? "+ Novo gasto" : "Novo gasto disponível com internet"}
+          {isOnline ? "+ Adicionar" : "Adicionar disponível com internet"}
         </button>
       </div>
     </header>

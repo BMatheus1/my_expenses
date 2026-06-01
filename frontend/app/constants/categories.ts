@@ -4,6 +4,7 @@ export const EXPENSE_CATEGORIES = [
   "Moradia",
   "Saúde",
   "Lazer",
+  "Miudezas",
   "Educação",
   "Outros",
 ] as const;

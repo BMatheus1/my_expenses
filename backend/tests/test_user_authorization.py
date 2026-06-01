@@ -209,6 +209,130 @@ def test_user_cannot_access_or_update_another_user_business(
     assert user_a_businesses[0]["name"] == business["name"]
 
 
+def test_user_cannot_access_another_user_business_children(
+    client: TestClient,
+) -> None:
+    user_a_token = register_user(client, USER_A)
+    user_b_token = register_user(client, USER_B)
+
+    business = create_business(client, user_a_token)
+    material = create_business_material(client, user_a_token, business["id"])
+    service = create_business_service(client, user_a_token, business["id"])
+
+    add_material_to_service(
+        client,
+        user_a_token,
+        business["id"],
+        service["id"],
+        material["id"],
+    )
+    sale = create_business_sale(client, user_a_token, business["id"], service["id"])
+
+    protected_requests = [
+        client.get(
+            f"{API_PREFIX}/businesses/{business['id']}/materials",
+            headers=auth_headers(user_b_token),
+        ),
+        client.put(
+            f"{API_PREFIX}/businesses/{business['id']}/materials/{material['id']}",
+            headers=auth_headers(user_b_token),
+            json=business_material_payload(name="Material invadido"),
+        ),
+        client.delete(
+            f"{API_PREFIX}/businesses/{business['id']}/materials/{material['id']}",
+            headers=auth_headers(user_b_token),
+        ),
+        client.get(
+            f"{API_PREFIX}/businesses/{business['id']}/services",
+            headers=auth_headers(user_b_token),
+        ),
+        client.put(
+            f"{API_PREFIX}/businesses/{business['id']}/services/{service['id']}",
+            headers=auth_headers(user_b_token),
+            json=business_service_payload(name="Serviço invadido"),
+        ),
+        client.delete(
+            f"{API_PREFIX}/businesses/{business['id']}/services/{service['id']}",
+            headers=auth_headers(user_b_token),
+        ),
+        client.get(
+            f"{API_PREFIX}/businesses/{business['id']}/sales",
+            headers=auth_headers(user_b_token),
+        ),
+    ]
+
+    assert sale["business_id"] == business["id"]
+
+    for response in protected_requests:
+        assert response.status_code in {403, 404}
+
+    user_a_materials = client.get(
+        f"{API_PREFIX}/businesses/{business['id']}/materials",
+        headers=auth_headers(user_a_token),
+    )
+    user_a_services = client.get(
+        f"{API_PREFIX}/businesses/{business['id']}/services",
+        headers=auth_headers(user_a_token),
+    )
+    user_a_sales = client.get(
+        f"{API_PREFIX}/businesses/{business['id']}/sales",
+        headers=auth_headers(user_a_token),
+    )
+
+    assert user_a_materials.status_code == 200
+    assert user_a_services.status_code == 200
+    assert user_a_sales.status_code == 200
+    assert [item["id"] for item in user_a_materials.json()] == [material["id"]]
+    assert [item["id"] for item in user_a_services.json()] == [service["id"]]
+    assert [item["id"] for item in user_a_sales.json()] == [sale["id"]]
+
+
+def test_user_settings_are_persisted_and_isolated(
+    client: TestClient,
+) -> None:
+    user_a_token = register_user(client, USER_A)
+    user_b_token = register_user(client, USER_B)
+
+    user_a_update = client.put(
+        f"{API_PREFIX}/user-settings",
+        headers=auth_headers(user_a_token),
+        json={
+            "app_theme": "rose",
+            "app_mode": "dark",
+            "daily_review_enabled": False,
+            "purpose_onboarding_seen": True,
+            "notifications_enabled": True,
+        },
+    )
+
+    user_b_settings = client.get(
+        f"{API_PREFIX}/user-settings",
+        headers=auth_headers(user_b_token),
+    )
+
+    user_a_settings = client.get(
+        f"{API_PREFIX}/user-settings",
+        headers=auth_headers(user_a_token),
+    )
+
+    assert user_a_update.status_code == 200, user_a_update.text
+    assert user_b_settings.status_code == 200, user_b_settings.text
+    assert user_a_settings.status_code == 200, user_a_settings.text
+
+    assert user_a_settings.json()["app_theme"] == "rose"
+    assert user_a_settings.json()["app_mode"] == "dark"
+    assert user_a_settings.json()["daily_review_enabled"] is False
+    assert user_a_settings.json()["purpose_onboarding_seen"] is True
+    assert user_a_settings.json()["notifications_enabled"] is True
+
+    assert user_b_settings.json()["app_theme"] == "emerald"
+    assert user_b_settings.json()["app_mode"] == "light"
+    assert user_b_settings.json()["daily_review_enabled"] is True
+    assert user_b_settings.json()["purpose_onboarding_seen"] is False
+    assert user_b_settings.json()["notifications_enabled"] is False
+    assert user_b_settings.json()["user_id"] != user_a_settings.json()["user_id"]
+
+
 def register_user(client: TestClient, user_data: dict[str, str]) -> str:
     response = client.post(
         f"{API_PREFIX}/auth/register",
@@ -309,3 +433,101 @@ def create_business(client: TestClient, token: str) -> dict:
     assert response.status_code == 201, response.text
 
     return response.json()
+
+
+def create_business_material(
+    client: TestClient,
+    token: str,
+    business_id: str,
+) -> dict:
+    response = client.post(
+        f"{API_PREFIX}/businesses/{business_id}/materials",
+        headers=auth_headers(token),
+        json=business_material_payload(),
+    )
+
+    assert response.status_code == 201, response.text
+
+    return response.json()
+
+
+def create_business_service(
+    client: TestClient,
+    token: str,
+    business_id: str,
+) -> dict:
+    response = client.post(
+        f"{API_PREFIX}/businesses/{business_id}/services",
+        headers=auth_headers(token),
+        json=business_service_payload(),
+    )
+
+    assert response.status_code == 201, response.text
+
+    return response.json()
+
+
+def add_material_to_service(
+    client: TestClient,
+    token: str,
+    business_id: str,
+    service_id: str,
+    material_id: str,
+) -> dict:
+    response = client.post(
+        f"{API_PREFIX}/businesses/{business_id}/services/{service_id}/materials",
+        headers=auth_headers(token),
+        json={
+            "material_id": material_id,
+            "quantity_used": 2,
+        },
+    )
+
+    assert response.status_code == 201, response.text
+
+    return response.json()
+
+
+def create_business_sale(
+    client: TestClient,
+    token: str,
+    business_id: str,
+    service_id: str,
+) -> dict:
+    response = client.post(
+        f"{API_PREFIX}/businesses/{business_id}/sales",
+        headers=auth_headers(token),
+        json={
+            "service_id": service_id,
+            "quantity": 1,
+            "sale_date": "2026-05-21",
+            "payment_method": "Pix",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+
+    return response.json()
+
+
+def business_material_payload(name: str = "Shampoo profissional") -> dict:
+    return {
+        "name": name,
+        "category": "Produtos",
+        "stock_quantity": 10,
+        "unit": "ml",
+        "total_cost": 100,
+        "supplier": "Fornecedor Teste",
+        "purchase_date": "2026-05-21",
+        "notes": "Material usado em teste.",
+    }
+
+
+def business_service_payload(name: str = "Corte masculino") -> dict:
+    return {
+        "name": name,
+        "category": "Serviço",
+        "price": 50,
+        "estimated_minutes": 30,
+        "notes": "Serviço usado em teste.",
+    }

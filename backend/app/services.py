@@ -22,6 +22,9 @@ from app.schemas import (
     IncomeRecord,
     IncomeResponse,
     IncomeUpdate,
+    UserSettingsRecord,
+    UserSettingsResponse,
+    UserSettingsUpdate,
 )
 from app.storage import (
     count_expenses_by_category,
@@ -39,6 +42,7 @@ from app.storage import (
     get_expense_category_record_by_normalized_name,
     get_expense_record_by_id,
     get_income_record_by_id,
+    get_user_settings_record,
     list_credit_card_records,
     list_custom_expense_category_records,
     list_expense_records,
@@ -49,6 +53,7 @@ from app.storage import (
     update_expense_record,
     update_expenses_category_name,
     update_income_record,
+    upsert_user_settings_record,
     delete_expenses_by_credit_card,
     snapshot_expenses_credit_card,
 )
@@ -91,6 +96,56 @@ def get_app_status() -> dict:
         "status": "ok",
         "message": "API funcionando",
     }
+
+
+def get_user_settings(user_id: str) -> UserSettingsResponse:
+    settings_record = get_or_create_user_settings_record(user_id)
+
+    return UserSettingsResponse.model_validate(settings_record.model_dump())
+
+
+def update_user_settings(
+    settings_data: UserSettingsUpdate,
+    user_id: str,
+) -> UserSettingsResponse:
+    current_settings = get_or_create_user_settings_record(user_id)
+    now = datetime.now(timezone.utc)
+    update_data = settings_data.model_dump(exclude_unset=True)
+
+    updated_settings = current_settings.model_copy(
+        update={
+            **update_data,
+            "updated_at": now,
+        },
+    )
+
+    saved_settings = upsert_user_settings_record(updated_settings)
+
+    return UserSettingsResponse.model_validate(saved_settings.model_dump())
+
+
+def get_or_create_user_settings_record(user_id: str) -> UserSettingsRecord:
+    existing_settings = get_user_settings_record(user_id)
+
+    if existing_settings is not None:
+        return existing_settings
+
+    now = datetime.now(timezone.utc)
+
+    return upsert_user_settings_record(
+        UserSettingsRecord(
+            id=str(uuid4()),
+            user_id=user_id,
+            app_theme="emerald",
+            app_mode="light",
+            daily_review_enabled=True,
+            daily_review_time=None,
+            purpose_onboarding_seen=False,
+            notifications_enabled=False,
+            created_at=now,
+            updated_at=now,
+        )
+    )
 
 
 def list_expense_categories(user_id: str) -> list[ExpenseCategoryResponse]:

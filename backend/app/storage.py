@@ -14,6 +14,7 @@ from app.schemas import (
     ExpenseRecord,
     ExpenseResponse,
     IncomeRecord,
+    UserSettingsRecord,
     UserRecord,
 )
 
@@ -72,6 +73,7 @@ def get_connection() -> Iterator[Connection]:
 def initialize_database() -> None:
     with get_connection() as connection:
         create_users_table(connection)
+        create_user_settings_table(connection)
         create_expense_categories_table(connection)
         create_credit_cards_table(connection)
         create_expenses_table(connection)
@@ -92,6 +94,25 @@ def create_users_table(connection: Connection) -> None:
             password_hash TEXT,
             provider TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL
+        )
+        """
+    )
+
+
+def create_user_settings_table(connection: Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_settings (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+            app_theme TEXT NOT NULL DEFAULT 'emerald',
+            app_mode TEXT NOT NULL DEFAULT 'light',
+            daily_review_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            daily_review_time TEXT,
+            purpose_onboarding_seen BOOLEAN NOT NULL DEFAULT FALSE,
+            notifications_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMPTZ NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL
         )
         """
     )
@@ -264,6 +285,12 @@ def create_database_indexes(connection: Connection) -> None:
     )
     connection.execute(
         """
+        CREATE INDEX IF NOT EXISTS idx_user_settings_user
+        ON user_settings(user_id)
+        """
+    )
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_expenses_credit_card_invoice
         ON expenses(user_id, credit_card_id, invoice_month)
         """
@@ -404,6 +431,90 @@ def get_user_record_by_id(user_id: str) -> UserRecord | None:
         return None
 
     return UserRecord.model_validate(row)
+
+
+def get_user_settings_record(user_id: str) -> UserSettingsRecord | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                app_theme,
+                app_mode,
+                daily_review_enabled,
+                daily_review_time,
+                purpose_onboarding_seen,
+                notifications_enabled,
+                created_at,
+                updated_at
+            FROM user_settings
+            WHERE user_id = %s
+            """,
+            (user_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return UserSettingsRecord.model_validate(row)
+
+
+def upsert_user_settings_record(
+    settings_record: UserSettingsRecord,
+) -> UserSettingsRecord:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            INSERT INTO user_settings (
+                id,
+                user_id,
+                app_theme,
+                app_mode,
+                daily_review_enabled,
+                daily_review_time,
+                purpose_onboarding_seen,
+                notifications_enabled,
+                created_at,
+                updated_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+                app_theme = EXCLUDED.app_theme,
+                app_mode = EXCLUDED.app_mode,
+                daily_review_enabled = EXCLUDED.daily_review_enabled,
+                daily_review_time = EXCLUDED.daily_review_time,
+                purpose_onboarding_seen = EXCLUDED.purpose_onboarding_seen,
+                notifications_enabled = EXCLUDED.notifications_enabled,
+                updated_at = EXCLUDED.updated_at
+            RETURNING
+                id,
+                user_id,
+                app_theme,
+                app_mode,
+                daily_review_enabled,
+                daily_review_time,
+                purpose_onboarding_seen,
+                notifications_enabled,
+                created_at,
+                updated_at
+            """,
+            (
+                settings_record.id,
+                settings_record.user_id,
+                settings_record.app_theme,
+                settings_record.app_mode,
+                settings_record.daily_review_enabled,
+                settings_record.daily_review_time,
+                settings_record.purpose_onboarding_seen,
+                settings_record.notifications_enabled,
+                settings_record.created_at,
+                settings_record.updated_at,
+            ),
+        ).fetchone()
+
+    return UserSettingsRecord.model_validate(row)
 
 
 def list_custom_expense_category_records(

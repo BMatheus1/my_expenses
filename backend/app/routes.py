@@ -44,6 +44,8 @@ from app.schemas import (
     MessageResponse,
     ResendVerificationEmailRequest,
     ResetPasswordRequest,
+    UserSettingsResponse,
+    UserSettingsUpdate,
     UserResponse,
     VerifyEmailRequest,
 )
@@ -58,6 +60,7 @@ from app.services import (
     delete_expense_category,
     delete_income,
     get_app_status,
+    get_user_settings,
     list_credit_cards,
     list_expense_categories,
     list_expenses,
@@ -66,6 +69,7 @@ from app.services import (
     update_expense,
     update_expense_category,
     update_income,
+    update_user_settings,
 )
 
 router = APIRouter()
@@ -208,6 +212,30 @@ def reset_password(reset_data: ResetPasswordRequest):
 )
 def get_me(current_user: UserResponse = Depends(get_current_user)):
     return current_user
+
+
+@router.get(
+    "/user-settings",
+    response_model=UserSettingsResponse,
+    tags=["User Settings"],
+)
+def read_user_settings(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return get_user_settings(current_user.id)
+
+
+@router.put(
+    "/user-settings",
+    response_model=UserSettingsResponse,
+    tags=["User Settings"],
+    dependencies=[Depends(write_rate_limit)],
+)
+def save_user_settings(
+    settings_data: UserSettingsUpdate,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return update_user_settings(settings_data, current_user.id)
 
 
 @router.delete(

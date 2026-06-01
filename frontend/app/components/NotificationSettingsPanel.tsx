@@ -8,10 +8,12 @@ import {
   getSmartNotificationPermissionStatus,
   isNativeNotificationRuntime,
   readSmartNotificationPreferences,
+  saveSmartNotificationPreferences,
   SMART_NOTIFICATIONS_CHANGED_EVENT,
   type SmartNotificationPermissionStatus,
   type SmartNotificationPreferences,
 } from "../lib/notification-service";
+import { getUserSettings, updateUserSettings } from "../lib/api";
 import type { User } from "../types/auth";
 
 type NotificationSettingsPanelProps = {
@@ -77,10 +79,25 @@ export function NotificationSettingsPanel({
     setPermissionStatus(nextPermissionStatus);
   }, []);
 
+  const loadServerPreference = useCallback(async () => {
+    try {
+      const userSettings = await getUserSettings();
+      const currentPreferences = readSmartNotificationPreferences(currentUser.id);
+
+      saveSmartNotificationPreferences(currentUser.id, {
+        ...currentPreferences,
+        enabled: userSettings.notifications_enabled,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  }, [currentUser.id]);
+
   useEffect(() => {
     setPreferences(readSmartNotificationPreferences(currentUser.id));
     void refreshStatus();
-  }, [currentUser.id, refreshStatus]);
+    void loadServerPreference();
+  }, [currentUser.id, loadServerPreference, refreshStatus]);
 
   useEffect(() => {
     function handleNotificationSettingsChange() {
@@ -112,6 +129,7 @@ export function NotificationSettingsPanel({
 
       setPermissionStatus(nextPermissionStatus);
       setPreferences(readSmartNotificationPreferences(currentUser.id));
+      await updateUserSettings({ notifications_enabled: nextPermissionStatus === "granted" });
 
       if (nextPermissionStatus === "granted") {
         setFeedbackMessage(
@@ -139,6 +157,7 @@ export function NotificationSettingsPanel({
     try {
       await disableSmartNotificationsForUser(currentUser.id);
       setPreferences(readSmartNotificationPreferences(currentUser.id));
+      await updateUserSettings({ notifications_enabled: false });
       setFeedbackMessage("Notificações desativadas neste aparelho.");
     } finally {
       setIsProcessing(false);

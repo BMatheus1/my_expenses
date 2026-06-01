@@ -23,6 +23,10 @@ import type {
 } from "../types/credit-card";
 import type { CreateExpenseRequest, Expense } from "../types/expense";
 import type { CreateIncomeRequest, Income } from "../types/income";
+import type {
+  UpdateUserSettingsRequest,
+  UserSettings,
+} from "../types/user-settings";
 import {
   clearStoredAuthToken,
   getStoredAuthToken,
@@ -426,6 +430,22 @@ export async function deleteCurrentAccount(
   clearAuthToken();
 
   return response;
+}
+
+/**
+ * User settings
+ */
+export async function getUserSettings(): Promise<UserSettings> {
+  return apiFetch<UserSettings>("/user-settings");
+}
+
+export async function updateUserSettings(
+  data: UpdateUserSettingsRequest,
+): Promise<UserSettings> {
+  return apiFetch<UserSettings>("/user-settings", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
 }
 
 /**

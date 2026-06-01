@@ -11,6 +11,7 @@ import {
   getDailyReviewEnabled,
   markDailyReviewClosed,
   markPurposeOnboardingAsSeen,
+  saveDailyReviewEnabled,
   shouldShowDailyReviewCard,
   shouldShowPurposeOnboarding,
   subscribeToDailyReviewSettings,
@@ -36,10 +37,12 @@ import {
   getExpenseCategories,
   getExpenses,
   getIncomes,
+  getUserSettings,
   updateCreditCard,
   updateExpense,
   updateExpenseCategory,
   updateIncome,
+  updateUserSettings,
 } from "../lib/api";
 import type { User } from "../types/auth";
 import type { ExpenseCategory } from "../types/category";
@@ -253,6 +256,24 @@ export function ExpensesDashboard({
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
+  const loadUserSettingsPreferences = useCallback(async () => {
+    try {
+      const userSettings = await getUserSettings();
+
+      setIsDailyReviewEnabled(userSettings.daily_review_enabled);
+      saveDailyReviewEnabled(currentUser.id, userSettings.daily_review_enabled);
+
+      if (userSettings.purpose_onboarding_seen) {
+        markPurposeOnboardingAsSeen(currentUser.id);
+        setIsPurposeOnboardingVisible(false);
+      } else {
+        setIsPurposeOnboardingVisible(true);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }, [currentUser.id]);
+
   useEffect(() => {
     setIsDailyReviewEnabled(getDailyReviewEnabled(currentUser.id));
     setDailyReviewDismissedDate(
@@ -262,11 +283,12 @@ export function ExpensesDashboard({
       wasDailyReviewClosed(currentUser.id, todayDate) ? todayDate : null
     );
     setIsPurposeOnboardingVisible(shouldShowPurposeOnboarding(currentUser.id));
+    void loadUserSettingsPreferences();
 
     return subscribeToDailyReviewSettings(() => {
       setIsDailyReviewEnabled(getDailyReviewEnabled(currentUser.id));
     });
-  }, [currentUser.id, todayDate]);
+  }, [currentUser.id, loadUserSettingsPreferences, todayDate]);
 
   useEffect(() => {
     if (categoryNames.length > 0 && !categoryNames.includes(category)) {
@@ -582,6 +604,9 @@ export function ExpensesDashboard({
   function handleDismissPurposeOnboarding() {
     markPurposeOnboardingAsSeen(currentUser.id);
     setIsPurposeOnboardingVisible(false);
+    void updateUserSettings({ purpose_onboarding_seen: true }).catch((error) => {
+      console.error(error);
+    });
   }
 
   async function handleCreateCreditCard(cardData: CreateCreditCardRequest) {

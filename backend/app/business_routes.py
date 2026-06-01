@@ -38,6 +38,7 @@ from app.business_services import (
     update_user_business_service,
     update_user_service_material,
 )
+from app.security import write_rate_limit
 from app.schemas import UserResponse
 
 router = APIRouter(prefix="/businesses", tags=["Businesses"])
@@ -52,6 +53,7 @@ def get_businesses(current_user: UserResponse = Depends(get_current_user)):
     "",
     response_model=BusinessResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(write_rate_limit)],
 )
 def add_business(
     business_data: BusinessCreate,
@@ -60,7 +62,11 @@ def add_business(
     return create_user_business(business_data, current_user.id)
 
 
-@router.put("/{business_id}", response_model=BusinessResponse)
+@router.put(
+    "/{business_id}",
+    response_model=BusinessResponse,
+    dependencies=[Depends(write_rate_limit)],
+)
 def edit_business(
     business_id: str,
     business_data: BusinessUpdate,
@@ -69,7 +75,11 @@ def edit_business(
     return update_user_business(business_id, business_data, current_user.id)
 
 
-@router.post("/{business_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/{business_id}/delete",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(write_rate_limit)],
+)
 def remove_business(
     business_id: str,
     confirmation_data: BusinessDeleteConfirmation,
@@ -110,6 +120,7 @@ def get_business_materials(
     "/{business_id}/materials",
     response_model=BusinessMaterialResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(write_rate_limit)],
 )
 def add_business_material(
     business_id: str,
@@ -126,6 +137,7 @@ def add_business_material(
 @router.put(
     "/{business_id}/materials/{material_id}",
     response_model=BusinessMaterialResponse,
+    dependencies=[Depends(write_rate_limit)],
 )
 def edit_business_material(
     business_id: str,
@@ -144,6 +156,7 @@ def edit_business_material(
 @router.delete(
     "/{business_id}/materials/{material_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(write_rate_limit)],
 )
 def remove_business_material(
     business_id: str,
@@ -170,6 +183,7 @@ def get_business_services(
     "/{business_id}/services",
     response_model=BusinessServiceResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(write_rate_limit)],
 )
 def add_business_service(
     business_id: str,
@@ -186,6 +200,7 @@ def add_business_service(
 @router.put(
     "/{business_id}/services/{service_id}",
     response_model=BusinessServiceResponse,
+    dependencies=[Depends(write_rate_limit)],
 )
 def edit_business_service(
     business_id: str,
@@ -204,6 +219,7 @@ def edit_business_service(
 @router.delete(
     "/{business_id}/services/{service_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(write_rate_limit)],
 )
 def remove_business_service(
     business_id: str,
@@ -219,6 +235,7 @@ def remove_business_service(
     "/{business_id}/services/{service_id}/materials",
     response_model=BusinessServiceResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(write_rate_limit)],
 )
 def add_material_to_service(
     business_id: str,
@@ -237,6 +254,7 @@ def add_material_to_service(
 @router.put(
     "/{business_id}/services/{service_id}/materials/{recipe_item_id}",
     response_model=BusinessServiceResponse,
+    dependencies=[Depends(write_rate_limit)],
 )
 def edit_service_material(
     business_id: str,
@@ -257,6 +275,7 @@ def edit_service_material(
 @router.delete(
     "/{business_id}/services/{service_id}/materials/{recipe_item_id}",
     response_model=BusinessServiceResponse,
+    dependencies=[Depends(write_rate_limit)],
 )
 def remove_service_material(
     business_id: str,
@@ -287,6 +306,7 @@ def get_business_sales(
     "/{business_id}/sales",
     response_model=BusinessSaleResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(write_rate_limit)],
 )
 def add_business_sale(
     business_id: str,

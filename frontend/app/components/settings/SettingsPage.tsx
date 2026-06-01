@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AccountDeletionSection } from "../AccountDeletionSection";
 import { NotificationSettingsPanel } from "../NotificationSettingsPanel";
 import {
@@ -29,6 +29,7 @@ import {
   getDailyReviewEnabled,
   saveDailyReviewEnabled,
 } from "@/app/lib/daily-review";
+import { getUserSettings, updateUserSettings } from "@/app/lib/api";
 
 const DISPLAY_MODES: Array<{
   value: AppColorMode;
@@ -75,9 +76,35 @@ export default function SettingsPage({
   const [autoLogoutEnabled, setAutoLogoutEnabled] = useState(true);
   const [autoLogoutMinutes, setAutoLogoutMinutes] = useState(15);
   const [dailyReviewEnabled, setDailyReviewEnabled] = useState(true);
+  const [settingsMessage, setSettingsMessage] = useState("");
   const [, refreshSessionInfo] = useState(0);
 
   const sessionInfo = getSessionSecurityInfo();
+
+  const loadUserSettings = useCallback(async () => {
+    try {
+      const userSettings = await getUserSettings();
+      const appTheme = isKnownTheme(userSettings.app_theme)
+        ? userSettings.app_theme
+        : "emerald";
+      const appMode =
+        userSettings.app_mode === "dark" || userSettings.app_mode === "light"
+          ? userSettings.app_mode
+          : "light";
+
+      setSelectedTheme(appTheme);
+      setSelectedMode(appMode);
+      setDailyReviewEnabled(userSettings.daily_review_enabled);
+      saveAndApplyAppTheme(appTheme, currentUser.id);
+      saveAndApplyAppMode(appMode, currentUser.id);
+      saveDailyReviewEnabled(currentUser.id, userSettings.daily_review_enabled);
+    } catch (error) {
+      console.error(error);
+      setSettingsMessage(
+        "Não conseguimos carregar suas configurações agora. Usamos as preferências deste dispositivo.",
+      );
+    }
+  }, [currentUser.id]);
 
   useEffect(() => {
     initializeUserAppTheme(currentUser.id);
@@ -88,16 +115,30 @@ export default function SettingsPage({
     setAutoLogoutMinutes(getAutoLogoutMinutes());
     setDailyReviewEnabled(getDailyReviewEnabled(currentUser.id));
     refreshSessionInfo((currentValue) => currentValue + 1);
-  }, [currentUser.id]);
+    void loadUserSettings();
+  }, [currentUser.id, loadUserSettings]);
+
+  async function persistUserSettings(data: Parameters<typeof updateUserSettings>[0]) {
+    try {
+      setSettingsMessage("");
+      await updateUserSettings(data);
+      setSettingsMessage("Suas configurações foram salvas.");
+    } catch (error) {
+      console.error(error);
+      setSettingsMessage("Não conseguimos salvar agora. Tente novamente.");
+    }
+  }
 
   function handleThemeChange(theme: AppThemeName) {
     setSelectedTheme(theme);
     saveAndApplyAppTheme(theme, currentUser.id);
+    void persistUserSettings({ app_theme: theme });
   }
 
   function handleModeChange(mode: AppColorMode) {
     setSelectedMode(mode);
     saveAndApplyAppMode(mode, currentUser.id);
+    void persistUserSettings({ app_mode: mode });
   }
 
   function handleRememberSessionChange(value: boolean) {
@@ -119,6 +160,7 @@ export default function SettingsPage({
   function handleDailyReviewEnabledChange(value: boolean) {
     setDailyReviewEnabled(value);
     saveDailyReviewEnabled(currentUser.id, value);
+    void persistUserSettings({ daily_review_enabled: value });
   }
 
   function handleClearSessionAndLogout() {
@@ -266,6 +308,12 @@ export default function SettingsPage({
         title="Aparência e tema"
         description="Personalize o visual do app, escolha o modo claro ou escuro e selecione uma paleta para toda a interface."
       />
+
+      {settingsMessage ? (
+        <p className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-4 text-sm font-bold text-[var(--app-text-soft)]">
+          {settingsMessage}
+        </p>
+      ) : null}
 
       <section className="app-card rounded-3xl p-6">
         <SectionHeader
@@ -637,4 +685,8 @@ function formatDateTime(date: Date | null): string | null {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
+}
+
+function isKnownTheme(value: string): value is AppThemeName {
+  return APP_THEMES.some((theme) => theme.name === value);
 }

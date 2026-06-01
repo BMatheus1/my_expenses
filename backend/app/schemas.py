@@ -199,6 +199,88 @@ class ExpenseCategoryRecord(BaseModel):
     created_at: datetime
 
 
+class UserSettingsUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    app_theme: str | None = Field(default=None, min_length=2, max_length=30)
+    app_mode: str | None = Field(default=None, min_length=4, max_length=10)
+    daily_review_enabled: bool | None = None
+    daily_review_time: str | None = Field(default=None, max_length=5)
+    purpose_onboarding_seen: bool | None = None
+    notifications_enabled: bool | None = None
+
+    @field_validator("app_theme")
+    @classmethod
+    def validate_app_theme(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+
+        allowed_themes = {
+            "emerald",
+            "ocean",
+            "royal",
+            "violet",
+            "rose",
+            "sunset",
+            "amber",
+            "teal",
+            "graphite",
+            "midnight",
+        }
+
+        if value not in allowed_themes:
+            raise ValueError("Tema inválido.")
+
+        return value
+
+    @field_validator("app_mode")
+    @classmethod
+    def validate_app_mode(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+
+        if value not in {"light", "dark"}:
+            raise ValueError("Modo de aparência inválido.")
+
+        return value
+
+    @field_validator("daily_review_time")
+    @classmethod
+    def validate_daily_review_time(cls, value: str | None) -> str | None:
+        if value in {None, ""}:
+            return value
+
+        if len(value) != 5 or value[2] != ":":
+            raise ValueError("Horário de revisão diária inválido.")
+
+        hour, minute = value.split(":")
+
+        if not hour.isdigit() or not minute.isdigit():
+            raise ValueError("Horário de revisão diária inválido.")
+
+        if int(hour) > 23 or int(minute) > 59:
+            raise ValueError("Horário de revisão diária inválido.")
+
+        return value
+
+
+class UserSettingsResponse(BaseModel):
+    id: str
+    user_id: str
+    app_theme: str = "emerald"
+    app_mode: str = "light"
+    daily_review_enabled: bool = True
+    daily_review_time: str | None = None
+    purpose_onboarding_seen: bool = False
+    notifications_enabled: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+
+class UserSettingsRecord(UserSettingsResponse):
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CreditCardBase(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

@@ -50,8 +50,8 @@ export function ExpenseList({
         ) : expenses.length === 0 ? (
           <div className="p-5">
             <EmptyState
-              title="Nenhum gasto encontrado"
-              description="Cadastre seu primeiro gasto ou ajuste os filtros para encontrar despesas já registradas."
+              title="Você ainda não registrou gastos este mês."
+              description="Comece com um Gasto Rápido ou ajuste os filtros para encontrar despesas já registradas."
             />
           </div>
         ) : (

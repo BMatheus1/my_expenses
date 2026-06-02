@@ -237,8 +237,8 @@ export function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-sm">
-      <div className="app-card max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="app-card mobile-sheet-panel w-full max-w-xl rounded-3xl p-5 shadow-xl sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-4">
           <h2 className="texto-quebra text-xl font-black app-title">{title}</h2>
 

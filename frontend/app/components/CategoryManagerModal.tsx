@@ -79,8 +79,8 @@ export function CategoryManagerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 px-4 py-6">
-      <section className="w-full max-w-md rounded-3xl border border-stone-200 bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-6">
+      <section className="mobile-sheet-panel w-full max-w-md rounded-3xl border border-stone-200 bg-white shadow-xl">
         <header className="flex items-start justify-between gap-4 border-b border-stone-100 px-5 py-4">
           <div>
             <h2 className="text-base font-bold text-stone-950">

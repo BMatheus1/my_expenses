@@ -7,25 +7,28 @@ import { AuthGate } from "./components/AuthGate";
 
 const BENEFITS = [
   {
-    title: "Anote rápido",
-    description: "Registre pequenos gastos em poucos segundos pelo celular.",
+    title: "Gasto Rápido",
+    description: "Registre em poucos toques.",
   },
   {
-    title: "Feche o dia",
-    description: "Recupere o que ficou faltando sem formulário longo.",
+    title: "Fechamento do Dia",
+    description: "Recupere o que ficou faltando.",
   },
   {
-    title: "Entenda seu mês",
-    description: "Veja para onde seu dinheiro está indo com clareza.",
+    title: "Miudezas",
+    description: "Melhor aproximado do que esquecido.",
+  },
+  {
+    title: "Meu mês",
+    description: "Veja para onde seu dinheiro foi.",
   },
 ];
 
 const SECURITY_ITEMS = [
-  "Verificação de e-mail",
+  "Dados organizados por usuário",
   "Login com Google",
-  "Recuperação de senha",
   "Sessão protegida",
-  "Exclusão de conta",
+  "Experiência simples",
 ];
 
 const IS_CAPACITOR_NATIVE_BUILD =
@@ -93,12 +96,12 @@ function WebLandingPage() {
           </Link>
 
           <nav className="hidden items-center gap-6 text-sm font-bold text-stone-600 sm:flex">
-            <a href="#beneficios" className="transition hover:text-emerald-700">
-              Benefícios
+            <a href="#problema" className="transition hover:text-emerald-700">
+              Como ajuda
             </a>
 
-            <a href="#seguranca" className="transition hover:text-emerald-700">
-              Segurança
+            <a href="#recursos" className="transition hover:text-emerald-700">
+              Recursos
             </a>
 
             <Link href="/contato" className="transition hover:text-emerald-700">
@@ -122,13 +125,16 @@ function WebLandingPage() {
           </p>
 
           <h1 className="mt-4 text-4xl font-black tracking-tight text-stone-950 sm:text-5xl lg:text-6xl">
-            Anote rápido. Feche o dia. Entenda seu mês.
+            Controle financeiro para a vida real.
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-8 text-stone-600 sm:text-lg">
-            O My Expenses ajuda você a manter controle mesmo quando o dia está
-            corrido: registre gastos em segundos, revise o que esqueceu e veja
-            para onde seu dinheiro foi.
+            Anote gastos em segundos, feche o dia quando esquecer e entenda para
+            onde seu dinheiro está indo.
+          </p>
+
+          <p className="mt-3 max-w-2xl text-sm font-black text-stone-700 sm:text-base">
+            Anote rápido. Feche o dia. Entenda seu mês.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -140,15 +146,15 @@ function WebLandingPage() {
             </Link>
 
             <Link
-              href="/contato"
+              href="/app?auth=login&focus=auth"
               className="rounded-full border border-stone-300 bg-white px-6 py-4 text-center text-sm font-black text-stone-700 transition hover:bg-stone-100"
             >
-              Falar com suporte
+              Entrar
             </Link>
           </div>
 
           <p className="mt-4 text-xs font-semibold text-stone-500">
-            Sem anúncios. Com autenticação segura. Feito para uso diário.
+            Sem planilha, sem culpa e sem prometer integração bancária.
           </p>
         </div>
 
@@ -192,23 +198,49 @@ function WebLandingPage() {
         </div>
       </section>
 
-      <section id="beneficios" className="border-y border-stone-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-14">
-          <div className="max-w-2xl">
+      <section id="problema" className="border-y border-stone-200 bg-white">
+        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div>
             <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
-              Benefícios
+              Vida corrida
             </p>
 
             <h2 className="mt-3 text-3xl font-black tracking-tight">
-              Feito para o jeito real como o dia acontece.
+              Nem sempre dá para anotar tudo na hora.
             </h2>
           </div>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <p className="text-base leading-8 text-stone-600">
+            Pequenos gastos aparecem durante o dia: café, Pix, lanche,
+            transporte, mercado. O My Expenses foi pensado para quem vive na
+            correria e quer manter o controle sem complicação.
+          </p>
+        </div>
+      </section>
+
+      <section id="recursos" className="bg-stone-50">
+        <div className="mx-auto max-w-6xl px-4 py-14">
+          <div className="max-w-2xl">
+            <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
+              Solução simples
+            </p>
+
+            <h2 className="mt-3 text-3xl font-black tracking-tight">
+              Registre rápido, revise com calma e entenda o mês.
+            </h2>
+
+            <p className="mt-3 text-sm leading-7 text-stone-600">
+              Ganhos, gastos, cartões, relatórios e Meus Negócios ficam no mesmo
+              lugar, sem linguagem técnica e sem prometer leitura automática de
+              banco.
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-4">
             {BENEFITS.map((benefit) => (
               <article
                 key={benefit.title}
-                className="rounded-3xl border border-stone-200 bg-stone-50 p-6"
+                className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm"
               >
                 <h3 className="text-lg font-black">{benefit.title}</h3>
 
@@ -225,16 +257,16 @@ function WebLandingPage() {
         <div className="grid gap-8 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm lg:grid-cols-2 lg:p-10">
           <div>
             <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
-              Segurança
+              Confiança
             </p>
 
             <h2 className="mt-3 text-3xl font-black tracking-tight">
-              Seus dados financeiros precisam de cuidado.
+              Seus dados organizados por usuário.
             </h2>
 
             <p className="mt-4 text-sm leading-7 text-stone-600">
-              O app foi estruturado com autenticação, verificação de e-mail,
-              sessões protegidas e isolamento dos dados por usuário.
+              O app usa login, sessões protegidas e separação das informações
+              por conta para manter a experiência simples e confiável.
             </p>
           </div>
 
@@ -255,12 +287,11 @@ function WebLandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
           <div>
             <h2 className="text-3xl font-black tracking-tight">
-              Controle financeiro sem cobrança e sem complicação.
+              Comece simples hoje.
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-stone-300">
-              Comece registrando um gasto rápido. No fim do dia, revise o que
-              ficou faltando.
+              Seu dinheiro mais claro, sem planilha e sem culpa.
             </p>
           </div>
 

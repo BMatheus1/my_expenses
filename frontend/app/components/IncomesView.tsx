@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { EmptyState, LoadingButton, LoadingCard } from "./AppFeedback";
 import { MonthSelect } from "./MonthSelect";
 import { INCOME_SOURCES } from "../constants/incomeSources";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import type { Income } from "../types/income";
 import {
   formatCurrency,
@@ -61,6 +62,7 @@ export function IncomesView({
   const [selectedMonth, setSelectedMonth] = useState(() => getCurrentMonth());
   const [selectedSource, setSelectedSource] = useState("Todas");
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebouncedValue(searchTerm);
 
   const [editingIncomeId, setEditingIncomeId] = useState<string | null>(null);
   const [description, setDescription] = useState("");
@@ -79,7 +81,7 @@ export function IncomesView({
   const isEditing = editingIncomeId !== null;
 
   const filteredIncomes = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = debouncedSearchTerm.trim().toLowerCase();
 
     return incomes.filter((income) => {
       const matchesMonth = income.date.startsWith(selectedMonth);
@@ -93,7 +95,7 @@ export function IncomesView({
 
       return matchesMonth && matchesSource && matchesDescription;
     });
-  }, [incomes, selectedMonth, selectedSource, searchTerm]);
+  }, [incomes, selectedMonth, selectedSource, debouncedSearchTerm]);
 
   const monthlyTotal = useMemo(() => {
     return filteredIncomes.reduce((total, income) => total + income.amount, 0);
@@ -679,7 +681,7 @@ function IncomeList({ incomes, isLoading, onEdit, onDelete }: IncomeListProps) {
           <div className="p-5">
             <EmptyState
               title="Nenhum ganho encontrado"
-              description="Cadastre seu primeiro ganho ou ajuste os filtros para encontrar entradas já registradas."
+              description="Quando entrar dinheiro, registre aqui para acompanhar seu mês."
             />
           </div>
         ) : (

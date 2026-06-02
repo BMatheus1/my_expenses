@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { useOnlineStatus } from "@/app/hooks/useOnlineStatus";
+import { useDebouncedValue } from "@/app/hooks/useDebouncedValue";
 import {
   BUSINESS_NAVIGATION_EVENT,
   type BusinessNavigationPayload,
@@ -140,6 +141,7 @@ export default function BusinessWorkspace() {
 
   const [vendaForm, setVendaForm] = useState<SaleFormState>(vendaInicial);
   const [buscaEstoque, setBuscaEstoque] = useState("");
+  const buscaEstoqueDebounced = useDebouncedValue(buscaEstoque);
   const [categoriaEstoque, setCategoriaEstoque] = useState("Todas");
 
   const negocioSelecionado = useMemo(
@@ -156,7 +158,7 @@ export default function BusinessWorkspace() {
 
   const materiaisFiltrados = useMemo(() => {
     return materiais.filter((material) => {
-      const busca = buscaEstoque.trim().toLowerCase();
+      const busca = buscaEstoqueDebounced.trim().toLowerCase();
 
       const correspondeBusca =
         !busca ||
@@ -169,7 +171,7 @@ export default function BusinessWorkspace() {
 
       return correspondeBusca && correspondeCategoria;
     });
-  }, [materiais, buscaEstoque, categoriaEstoque]);
+  }, [materiais, buscaEstoqueDebounced, categoriaEstoque]);
 
   const servicoSelecionadoParaFicha = useMemo(
     () => servicos.find((servico) => servico.id === fichaForm.service_id) ?? null,

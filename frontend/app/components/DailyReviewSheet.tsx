@@ -7,6 +7,7 @@ import {
   calculateMissingAmount,
   formatCurrencyBRL,
 } from "../utils/dailyReview";
+import { useKeyboardAwareViewport } from "../hooks/useKeyboardAwareViewport";
 import { parseMoneyToNumber, sanitizeMoneyInput } from "../utils/formatters";
 import { LoadingButton } from "./AppFeedback";
 
@@ -39,6 +40,8 @@ export function DailyReviewSheet({
   onSubmitDifference,
   onResetSuccess,
 }: DailyReviewSheetProps) {
+  useKeyboardAwareViewport();
+
   const [step, setStep] = useState<ReviewStep>("intro");
   const [informedTotal, setInformedTotal] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(MISC_EXPENSE_CATEGORY);
@@ -105,7 +108,7 @@ export function DailyReviewSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-950/35 px-3 pb-3 backdrop-blur-sm sm:items-center sm:p-6"
+      className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-950/35 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Fechamento do dia"
@@ -115,7 +118,7 @@ export function DailyReviewSheet({
         }
       }}
     >
-      <section className="w-full max-w-lg rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 text-[var(--app-text)] shadow-2xl sm:p-5">
+      <section className="mobile-sheet-panel w-full max-w-lg rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 text-[var(--app-text)] shadow-2xl sm:p-5">
         <SheetHeader onClose={onClose} />
 
         {step === "intro" ? (
@@ -306,7 +309,7 @@ export function DailyReviewSheet({
           <div className="mt-5 rounded-3xl border border-[var(--brand-border)] bg-[var(--brand-soft)] p-5 text-[var(--brand-text)]">
             <h3 className="text-lg font-black">Fechamento salvo.</h3>
             <p className="mt-1 text-sm leading-6">
-              Dia organizado. Você ainda pode adicionar novos gastos se precisar.
+              Dia organizado. Melhor aproximado do que esquecido.
             </p>
 
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -377,7 +380,7 @@ function ReviewMetric({ label, value }: { label: string; value: number }) {
 function ErrorMessage({ message }: { message: string }) {
   return (
     <p className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-      {message}
+      {message || "Não conseguimos salvar agora. Tente novamente."}
     </p>
   );
 }

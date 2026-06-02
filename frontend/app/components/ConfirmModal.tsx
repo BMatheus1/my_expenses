@@ -33,8 +33,8 @@ export function ConfirmModal({
       : "bg-emerald-700 text-white hover:bg-emerald-800";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950 bg-opacity-40 px-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950 bg-opacity-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-4">
+      <div className="mobile-sheet-panel w-full max-w-md rounded-3xl bg-white p-5 shadow-xl sm:p-6">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-100 text-xl font-bold text-stone-700">
           !
         </div>

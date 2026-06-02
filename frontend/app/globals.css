@@ -21,6 +21,7 @@
   --app-danger-border: #fecaca;
   --app-danger-text: #b91c1c;
   --app-radius: 1.5rem;
+  --safe-viewport-height: 100dvh;
 
   --brand-primary: #047857;
   --brand-primary-hover: #065f46;
@@ -385,6 +386,14 @@ button:disabled {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-accent) 18%, transparent);
 }
 
+.mobile-sheet-panel {
+  max-height: min(88vh, calc(var(--safe-viewport-height, 100dvh) - max(1.5rem, env(safe-area-inset-top)) - max(1rem, env(safe-area-inset-bottom))));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
 .app-btn,
 .app-button-primary,
 .app-button-secondary {
@@ -706,6 +715,10 @@ html[data-app-mode="dark"] .wheel-select-panel {
 @media (min-width: 1024px) {
   .mobile-shell-content {
     padding-top: 1.25rem;
+  }
+
+  .mobile-sheet-panel {
+    max-height: min(90vh, 46rem);
   }
 }
 

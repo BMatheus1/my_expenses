@@ -14,7 +14,10 @@ import {
 } from "../lib/api";
 import { saveCachedAuthenticatedUser } from "../lib/auth-session-cache";
 import type { User } from "../types/auth";
-import { smartScrollToRef } from "../utils/smartScroll";
+import {
+  scrollElementIntoSafeView,
+  smartScrollToRef,
+} from "../utils/smartScroll";
 import { LoadingButton } from "./AppFeedback";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 
@@ -88,6 +91,28 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     },
     [onAuthenticated],
   );
+
+  useEffect(() => {
+    function handleFocusIn(event: FocusEvent) {
+      const target = event.target;
+
+      if (!isScrollableAuthField(target)) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        scrollElementIntoSafeView(target, {
+          block: "center",
+        });
+      }, 120);
+    }
+
+    document.addEventListener("focusin", handleFocusIn);
+
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+    };
+  }, []);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -418,18 +443,18 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           </p>
 
           <h1 className="mt-4 text-3xl font-bold tracking-tight text-stone-950 sm:text-4xl lg:text-5xl">
-            Controle seus gastos com clareza e segurança.
+            Controle financeiro para a vida real.
           </h1>
 
           <p className="mt-4 max-w-xl text-base leading-7 text-stone-600">
-            Organize despesas, ganhos, relatórios e pequenos negócios em um só
-            lugar, com autenticação segura e proteção por usuário.
+            Anote rápido, feche o dia e entenda seu mês em um app simples, com
+            autenticação segura e proteção por usuário.
           </p>
 
           <div className="mt-8 grid min-w-0 gap-3 sm:grid-cols-3">
-            <FeatureCard title="Carteira" description="Ganhos e gastos" />
-            <FeatureCard title="Relatórios" description="Resumo mensal" />
-            <FeatureCard title="Segurança" description="Sessão protegida" />
+            <FeatureCard title="Gasto rápido" description="Poucos toques" />
+            <FeatureCard title="Fechamento" description="Sem culpa" />
+            <FeatureCard title="Meu mês" description="Clareza no resumo" />
           </div>
         </section>
 
@@ -873,6 +898,18 @@ function getSecondaryActionLabel(mode: AuthMode) {
 
 function clearUrlTokens() {
   window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+function isScrollableAuthField(target: EventTarget | null): target is HTMLElement {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  );
 }
 
 function normalizeName(value: string) {

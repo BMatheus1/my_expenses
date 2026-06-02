@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CreditCardDeleteModal } from "./CreditCardDeleteModal";
 
 import { EXPENSE_CATEGORIES } from "../constants/categories";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import {
   dismissDailyReviewCard,
@@ -156,6 +157,7 @@ export function ExpensesDashboard({
   );
   const [selectedCategory, setSelectedCategory] = useState("Todas");
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebouncedValue(searchTerm);
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -432,7 +434,7 @@ export function ExpensesDashboard({
   }, [incomes, selectedMonth]);
 
   const filteredExpenses = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = debouncedSearchTerm.trim().toLowerCase();
 
     return monthlyExpenses.filter((expense) => {
       const matchesCategory =
@@ -444,7 +446,7 @@ export function ExpensesDashboard({
 
       return matchesCategory && matchesDescription;
     });
-  }, [monthlyExpenses, selectedCategory, searchTerm]);
+  }, [monthlyExpenses, selectedCategory, debouncedSearchTerm]);
 
   const monthlyExpenseTotal = useMemo(() => {
     return monthlyExpenses.reduce(

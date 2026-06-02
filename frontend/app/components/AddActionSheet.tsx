@@ -1,5 +1,7 @@
 "use client";
 
+import { useKeyboardAwareViewport } from "../hooks/useKeyboardAwareViewport";
+
 type AddAction = "quick" | "full" | "daily-review";
 
 type AddActionSheetProps = {
@@ -37,13 +39,15 @@ export function AddActionSheet({
   onClose,
   onSelect,
 }: AddActionSheetProps) {
+  useKeyboardAwareViewport();
+
   if (!isOpen) {
     return null;
   }
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/35 px-3 pb-3 backdrop-blur-sm sm:items-center sm:p-6"
+      className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/35 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Adicionar lançamento"
@@ -53,7 +57,7 @@ export function AddActionSheet({
         }
       }}
     >
-      <section className="w-full max-w-md rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 text-[var(--app-text)] shadow-2xl sm:p-5">
+      <section className="mobile-sheet-panel w-full max-w-md rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 text-[var(--app-text)] shadow-2xl sm:p-5">
         <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--app-border-strong)] sm:hidden" />
 
         <div className="flex items-start justify-between gap-4">

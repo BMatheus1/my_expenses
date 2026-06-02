@@ -1,9 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import type { User } from "../types/auth";
-import { scrollToPageTop } from "../utils/smartScroll";
+import {
+  scrollElementIntoSafeView,
+  scrollToPageTop,
+} from "../utils/smartScroll";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { SmartNotificationsBridge } from "./SmartNotificationsBridge";
 import type { AppView } from "./Sidebar";
@@ -24,6 +27,28 @@ export function AppShell({
   onLogout,
   children,
 }: AppShellProps) {
+  useEffect(() => {
+    function handleFocusIn(event: FocusEvent) {
+      const target = event.target;
+
+      if (!isScrollableFormField(target)) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        scrollElementIntoSafeView(target, {
+          block: "center",
+        });
+      }, 120);
+    }
+
+    document.addEventListener("focusin", handleFocusIn);
+
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+    };
+  }, []);
+
   function handleActiveViewChange(view: AppView) {
     onActiveViewChange(view);
     scrollToPageTop(80);
@@ -55,5 +80,18 @@ export function AppShell({
         onLogout={onLogout}
       />
     </main>
+  );
+}
+
+function isScrollableFormField(target: EventTarget | null): target is HTMLElement {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    target.getAttribute("contenteditable") === "true"
   );
 }

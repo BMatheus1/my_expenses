@@ -38,6 +38,9 @@ const serviceWorkerHeaders = [
 
 const capacitorConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  env: {
+    NEXT_PUBLIC_CAPACITOR_BUILD: "true",
+  },
   output: "export",
   trailingSlash: true,
   images: {
@@ -47,6 +50,9 @@ const capacitorConfig: NextConfig = {
 
 const webConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  env: {
+    NEXT_PUBLIC_CAPACITOR_BUILD: "false",
+  },
 
   async headers() {
     return [

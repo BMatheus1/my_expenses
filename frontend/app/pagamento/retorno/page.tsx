@@ -8,7 +8,11 @@ import {
   getBillingStatus,
   syncBillingStatus,
 } from "../../lib/billing-api";
-import type { BillingStatusResponse } from "../../types/billing";
+import {
+  getCurrentPathWithSearch,
+  savePostAuthRedirect,
+} from "../../lib/post-auth-redirect";
+import { trackEvent } from "../../lib/tracking";
 import { LoadingButton, Spinner } from "../../components/AppFeedback";
 
 const MAX_SYNC_ATTEMPTS = 8;
@@ -28,7 +32,6 @@ function wait(milliseconds: number) {
 export default function PaymentReturnPage() {
   const router = useRouter();
   const [returnState, setReturnState] = useState<ReturnState>("checking");
-  const [billing, setBilling] = useState<BillingStatusResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [attempt, setAttempt] = useState(1);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -36,14 +39,27 @@ export default function PaymentReturnPage() {
   const confirmSubscription = useCallback(async () => {
     setReturnState("checking");
     setErrorMessage("");
+    trackEvent("payment_return_accessed", {
+      authenticated: true,
+    });
 
     for (let currentAttempt = 1; currentAttempt <= MAX_SYNC_ATTEMPTS; currentAttempt += 1) {
       setAttempt(currentAttempt);
 
       try {
+        trackEvent("payment_return_sync_called", {
+          sync_called: true,
+          attempt: currentAttempt,
+        });
         await syncBillingStatus();
         const loadedBilling = await getBillingStatus();
-        setBilling(loadedBilling);
+        trackEvent("payment_return_sync_result", {
+          provider_subscription_id_present: Boolean(
+            loadedBilling.provider_subscription_id,
+          ),
+          internal_status: loadedBilling.status,
+          is_access_allowed: loadedBilling.is_access_allowed,
+        });
 
         if (loadedBilling.is_access_allowed) {
           router.replace("/app");
@@ -60,6 +76,12 @@ export default function PaymentReturnPage() {
         }
       } catch (error) {
         if (error instanceof ApiError && error.statusCode === 401) {
+          savePostAuthRedirect(getCurrentPathWithSearch());
+          trackEvent("payment_return_auth_required", {
+            authenticated: false,
+            redirect_saved: true,
+            sync_called: true,
+          });
           setReturnState("unauthenticated");
           return;
         }
@@ -91,24 +113,29 @@ export default function PaymentReturnPage() {
     }
   }
 
+  function handleLoginRedirect() {
+    savePostAuthRedirect(getCurrentPathWithSearch());
+    router.replace("/app?auth=login&focus=auth");
+  }
+
   const showSpinner = returnState === "checking";
   const title =
     returnState === "unauthenticated"
-      ? "Entre para confirmar assinatura"
+      ? "Entre novamente"
       : returnState === "pending"
         ? "Assinatura em confirmação"
         : returnState === "blocked"
-          ? "Assinatura não liberada"
+          ? "Não conseguimos confirmar"
           : returnState === "error"
             ? "Não foi possível confirmar"
             : "Verificando sua assinatura...";
   const description =
     returnState === "unauthenticated"
-      ? "Para concluir a verificação, entre com a mesma conta usada no checkout."
+      ? "Entre novamente para concluir a ativação da sua assinatura."
       : returnState === "pending"
-        ? "Sua assinatura ainda está sendo confirmada. Aguarde alguns instantes e tente novamente."
+        ? "Sua assinatura ainda está sendo confirmada. Isso pode levar alguns instantes."
         : returnState === "blocked"
-          ? billing?.message || "Ainda não encontramos uma assinatura ativa para esta conta."
+          ? "Não conseguimos confirmar sua assinatura ainda."
           : returnState === "error"
             ? errorMessage
             : `Estamos preparando seu ambiente. Isso leva só alguns instantes. Tentativa ${attempt} de ${MAX_SYNC_ATTEMPTS}.`;
@@ -126,7 +153,9 @@ export default function PaymentReturnPage() {
         </h1>
         <p className="app-muted mt-3 text-sm leading-6">{description}</p>
 
-        {returnState === "pending" || returnState === "error" ? (
+        {returnState === "pending" ||
+        returnState === "error" ||
+        returnState === "blocked" ? (
           <div className="mt-6">
             <LoadingButton
               isLoading={isRetrying}
@@ -140,13 +169,13 @@ export default function PaymentReturnPage() {
         ) : null}
 
         {returnState === "blocked" ? (
-          <div className="mt-6">
+          <div className="mt-3">
             <button
               type="button"
               onClick={() => router.replace("/app")}
-              className="app-button-primary touch-button w-full justify-center"
+              className="app-button-secondary touch-button w-full justify-center"
             >
-              Voltar para assinatura
+              Tentar assinatura novamente
             </button>
           </div>
         ) : null}
@@ -155,10 +184,10 @@ export default function PaymentReturnPage() {
           <div className="mt-6">
             <button
               type="button"
-              onClick={() => router.replace("/app?auth=login")}
+              onClick={handleLoginRedirect}
               className="app-button-primary touch-button w-full justify-center"
             >
-              Entrar para confirmar assinatura
+              Entrar
             </button>
           </div>
         ) : null}

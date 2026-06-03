@@ -19,6 +19,7 @@ import {
   scrollElementIntoSafeView,
   smartScrollToRef,
 } from "../utils/smartScroll";
+import { consumePostAuthRedirect } from "../lib/post-auth-redirect";
 import { LoadingButton } from "./AppFeedback";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 
@@ -88,6 +89,16 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const handleAuthenticated = useCallback(
     (user: User) => {
       saveCachedAuthenticatedUser(user);
+      const redirectTo = consumePostAuthRedirect();
+      trackEvent("post_auth_redirect_applied", {
+        applied: Boolean(redirectTo),
+      });
+
+      if (redirectTo) {
+        window.location.replace(redirectTo);
+        return;
+      }
+
       onAuthenticated(user);
     },
     [onAuthenticated],

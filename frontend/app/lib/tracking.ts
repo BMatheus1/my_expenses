@@ -11,7 +11,12 @@ export type TrackingEventName =
   | "daily_review_completed"
   | "subscription_status_loaded"
   | "trial_expired_viewed"
-  | "subscription_screen_viewed";
+  | "subscription_screen_viewed"
+  | "payment_return_accessed"
+  | "payment_return_sync_called"
+  | "payment_return_sync_result"
+  | "payment_return_auth_required"
+  | "post_auth_redirect_applied";
 
 export function trackEvent(
   eventName: TrackingEventName,

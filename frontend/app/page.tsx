@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { AuthGate } from "./components/AuthGate";
+import { trackEvent } from "./lib/tracking";
 
 const BENEFITS = [
   {
@@ -29,6 +30,34 @@ const SECURITY_ITEMS = [
   "Login com Google",
   "Sessão protegida",
   "Experiência simples",
+];
+
+const VALUE_ITEMS = [
+  "Sem anúncios",
+  "Sem plano confuso",
+  "Sem planilha",
+  "Cancele quando quiser",
+  "Experiência mobile-first",
+  "Feito para gastos da vida real",
+];
+
+const ROUTINE_STEPS = [
+  {
+    title: "A rotina é corrida.",
+    description: "Nem sempre dá para abrir um formulário completo na hora.",
+  },
+  {
+    title: "Gastos pequenos passam.",
+    description: "Café, Pix, lanche e transporte parecem pouco isolados.",
+  },
+  {
+    title: "O mês fica nebuloso.",
+    description: "No fim, fica difícil entender para onde o dinheiro foi.",
+  },
+  {
+    title: "O app acompanha seu ritmo.",
+    description: "Anote rápido, feche o dia e entenda seu mês.",
+  },
 ];
 
 const IS_CAPACITOR_NATIVE_BUILD =
@@ -87,6 +116,12 @@ function WebLandingPage() {
     window.location.replace(destination);
   }, []);
 
+  function trackLandingCta(label: string) {
+    trackEvent("landing_cta_clicked", {
+      label,
+    });
+  }
+
   return (
     <main className="min-h-screen bg-stone-50 text-stone-950">
       <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
@@ -137,16 +172,22 @@ function WebLandingPage() {
             Anote rápido. Feche o dia. Entenda seu mês.
           </p>
 
+          <p className="mt-5 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700">
+            Teste grátis por 30 dias. Depois, R$ 8,99/mês.
+          </p>
+
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/app?auth=register&focus=auth"
+              onClick={() => trackLandingCta("Começar 30 dias grátis")}
               className="rounded-full bg-emerald-600 px-6 py-4 text-center text-sm font-black text-white transition hover:bg-emerald-700"
             >
-              Começar agora
+              Começar 30 dias grátis
             </Link>
 
             <Link
               href="/app?auth=login&focus=auth"
+              onClick={() => trackLandingCta("Entrar")}
               className="rounded-full border border-stone-300 bg-white px-6 py-4 text-center text-sm font-black text-stone-700 transition hover:bg-stone-100"
             >
               Entrar
@@ -198,6 +239,23 @@ function WebLandingPage() {
         </div>
       </section>
 
+      <section className="mx-auto max-w-6xl px-4 pb-6">
+        <div className="rounded-3xl border border-stone-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
+            Uma pergunta simples
+          </p>
+
+          <h2 className="mx-auto mt-3 max-w-3xl text-2xl font-black tracking-tight sm:text-3xl">
+            Você sabe quanto seus pequenos gastos somaram este mês?
+          </h2>
+
+          <p className="mx-auto mt-3 max-w-3xl text-sm leading-7 text-stone-600">
+            O problema não é gastar. É não perceber quanto café, Pix, lanche,
+            transporte e mercado viram quando o mês fecha.
+          </p>
+        </div>
+      </section>
+
       <section id="problema" className="border-y border-stone-200 bg-white">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
@@ -214,6 +272,28 @@ function WebLandingPage() {
             Pequenos gastos aparecem durante o dia: café, Pix, lanche,
             transporte, mercado. O My Expenses foi pensado para quem vive na
             correria e quer manter o controle sem complicação.
+          </p>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 py-14">
+        <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm lg:p-10">
+          <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
+            Outro jeito de pensar
+          </p>
+
+          <h2 className="mt-3 text-3xl font-black tracking-tight">
+            O problema não é falta de planilha. É depender da memória.
+          </h2>
+
+          <p className="mt-4 max-w-3xl text-sm leading-7 text-stone-600">
+            A maioria das pessoas não abandona o controle financeiro porque não
+            se importa. Ela abandona porque a rotina é corrida, os gastos são
+            pequenos e registrar tudo na hora dá trabalho.
+          </p>
+
+          <p className="mt-4 text-sm font-black text-stone-800">
+            O My Expenses foi feito para esse comportamento real.
           </p>
         </div>
       </section>
@@ -248,6 +328,63 @@ function WebLandingPage() {
                   {benefit.description}
                 </p>
               </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-stone-200 bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-14">
+          <div className="grid gap-4 md:grid-cols-4">
+            {ROUTINE_STEPS.map((step) => (
+              <article
+                key={step.title}
+                className="rounded-3xl border border-stone-200 bg-stone-50 p-5"
+              >
+                <h3 className="text-base font-black">{step.title}</h3>
+
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  {step.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 py-14">
+        <div className="grid gap-8 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm lg:grid-cols-[1fr_0.8fr] lg:p-10">
+          <div>
+            <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
+              Plano simples
+            </p>
+
+            <h2 className="mt-3 text-3xl font-black tracking-tight">
+              Um plano simples, sem pegadinhas.
+            </h2>
+
+            <p className="mt-4 text-sm leading-7 text-stone-600">
+              Teste grátis por 30 dias. Depois, R$ 8,99/mês para continuar
+              usando. Sem anúncios, sem plano confuso e sem tabela de planos.
+            </p>
+
+            <Link
+              href="/app?auth=register&focus=auth"
+              onClick={() => trackLandingCta("Pricing começar 30 dias grátis")}
+              className="mt-6 inline-flex rounded-full bg-emerald-600 px-6 py-4 text-center text-sm font-black text-white transition hover:bg-emerald-700"
+            >
+              Começar 30 dias grátis
+            </Link>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            {VALUE_ITEMS.map((item) => (
+              <div
+                key={item}
+                className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold text-stone-700"
+              >
+                {item}
+              </div>
             ))}
           </div>
         </div>
@@ -298,9 +435,10 @@ function WebLandingPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href="/app?auth=register&focus=auth"
+              onClick={() => trackLandingCta("Final começar 30 dias grátis")}
               className="rounded-full bg-emerald-500 px-6 py-4 text-center text-sm font-black text-white transition hover:bg-emerald-600"
             >
-              Criar conta
+              Começar 30 dias grátis
             </Link>
 
             <Link

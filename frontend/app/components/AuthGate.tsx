@@ -8,7 +8,9 @@ import {
 import {
   ApiError,
   getCurrentUser,
+  getSubscriptionStatus,
   logoutCurrentSession,
+  refreshSubscriptionStatus,
   setUnauthorizedHandler,
 } from "../lib/api";
 import {
@@ -24,9 +26,12 @@ import {
   SECURITY_SETTINGS_CHANGED_EVENT,
 } from "../lib/security";
 import type { User } from "../types/auth";
+import type { SubscriptionStatusResponse } from "../types/subscription";
 import { AuthPage } from "./AuthPage";
 import { PageLoading } from "./AppFeedback";
 import { ExpensesDashboard } from "./ExpensesDashboard";
+import { SubscriptionScreen } from "./SubscriptionScreen";
+import { trackEvent } from "../lib/tracking";
 
 const USER_ACTIVITY_EVENTS = [
   "click",
@@ -79,6 +84,9 @@ export function AuthGate() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [sessionError, setSessionError] = useState(false);
   const [sessionErrorMessage, setSessionErrorMessage] = useState("");
+  const [subscription, setSubscription] =
+    useState<SubscriptionStatusResponse | null>(null);
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
   const [securitySettingsVersion, setSecuritySettingsVersion] = useState(0);
   
   const currentUserId = currentUser?.id ?? null;
@@ -89,6 +97,7 @@ export function AuthGate() {
     clearCachedAuthenticatedUser();
     applyDefaultAppAppearance();
     setCurrentUser(null);
+    setSubscription(null);
   }, []);
 
   const checkSession = useCallback(async () => {
@@ -180,6 +189,65 @@ export function AuthGate() {
     applyDefaultAppAppearance();
   }, [currentUserId, isCheckingSession]);
 
+  useEffect(() => {
+    if (!currentUser || isBrowserOffline()) {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadSubscriptionStatus() {
+      setIsCheckingSubscription(true);
+
+      try {
+        const searchParams = new URLSearchParams(window.location.search);
+        const shouldRefreshCheckout =
+          searchParams.get("checkout") === "subscription_return";
+        const loadedSubscription = shouldRefreshCheckout
+          ? await refreshSubscriptionStatus()
+          : await getSubscriptionStatus();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSubscription(loadedSubscription);
+        trackEvent("subscription_status_loaded", {
+          status: loadedSubscription.status,
+          can_access_app: loadedSubscription.can_access_app,
+        });
+
+        if (shouldRefreshCheckout) {
+          trackEvent("checkout_returned", {
+            status: loadedSubscription.status,
+          });
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setSessionError(true);
+        setSessionErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Não conseguimos carregar sua assinatura agora.",
+        );
+      } finally {
+        if (isMounted) {
+          setIsCheckingSubscription(false);
+        }
+      }
+    }
+
+    void loadSubscriptionStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
+
 
   useEffect(() => {
     void checkSession();
@@ -243,11 +311,19 @@ export function AuthGate() {
     };
   }, [currentUser, handleLogout, securitySettingsVersion]);
 
-  if (isCheckingSession) {
+  if (
+    isCheckingSession ||
+    (currentUser && isCheckingSubscription) ||
+    (currentUser && !subscription && !isBrowserOffline())
+  ) {
     return (
       <PageLoading
-        title="Conectando sua conta"
-        description="Estamos preparando seu ambiente. Na primeira abertura, isso pode levar alguns segundos."
+        title={currentUser ? "Conferindo assinatura" : "Conectando sua conta"}
+        description={
+          currentUser
+            ? "Estamos validando seu acesso com segurança."
+            : "Estamos preparando seu ambiente. Na primeira abertura, isso pode levar alguns segundos."
+        }
       />
     );
   }
@@ -283,6 +359,17 @@ export function AuthGate() {
 
   if (!currentUser) {
     return <AuthPage onAuthenticated={setCurrentUser} />;
+  }
+
+  if (subscription && !subscription.can_access_app) {
+    return (
+      <SubscriptionScreen
+        currentUser={currentUser}
+        subscription={subscription}
+        onSubscriptionChange={setSubscription}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return <ExpensesDashboard currentUser={currentUser} onLogout={handleLogout} />;

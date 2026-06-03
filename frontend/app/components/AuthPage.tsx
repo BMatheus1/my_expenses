@@ -13,6 +13,7 @@ import {
   verifyEmail,
 } from "../lib/api";
 import { saveCachedAuthenticatedUser } from "../lib/auth-session-cache";
+import { trackEvent } from "../lib/tracking";
 import type { User } from "../types/auth";
 import {
   scrollElementIntoSafeView,
@@ -285,6 +286,9 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
       const registeredEmail = email.trim();
 
       setVerificationEmail(registeredEmail);
+      trackEvent("signup_completed", {
+        email_domain: registeredEmail.split("@")[1] ?? "",
+      });
       setEmail(registeredEmail);
       setSuccessMessage(response.message);
       setMode("verify-email");
@@ -449,6 +453,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           <p className="mt-4 max-w-xl text-base leading-7 text-stone-600">
             Anote rápido, feche o dia e entenda seu mês em um app simples, com
             autenticação segura e proteção por usuário.
+          </p>
+
+          <p className="mt-4 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700">
+            Teste grátis por 30 dias. Depois, R$ 8,99/mês.
           </p>
 
           <div className="mt-8 grid min-w-0 gap-3 sm:grid-cols-3">

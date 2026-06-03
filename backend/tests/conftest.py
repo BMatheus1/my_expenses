@@ -52,6 +52,7 @@ TABLES_TO_TRUNCATE = [
     "incomes",
     "expense_categories",
     "user_settings",
+    "subscriptions",
     "users",
 ]
 

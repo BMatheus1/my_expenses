@@ -130,6 +130,10 @@ export function DailyReviewSheet({
               Hoje você registrou {formatCurrencyBRL(todayTotal)} em gastos.
               Quer conferir se ficou faltando algo?
             </p>
+            <p className="app-muted mt-2 text-sm leading-6">
+              Não lembrou de tudo? Sem problema. Feche o dia em menos de 1
+              minuto.
+            </p>
 
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
               <button

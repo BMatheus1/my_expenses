@@ -44,6 +44,9 @@ from app.schemas import (
     MessageResponse,
     ResendVerificationEmailRequest,
     ResetPasswordRequest,
+    SubscriptionCheckoutResponse,
+    SubscriptionStatusResponse,
+    SubscriptionWebhookResponse,
     UserSettingsResponse,
     UserSettingsUpdate,
     UserResponse,
@@ -71,6 +74,14 @@ from app.services import (
     update_income,
     update_user_settings,
 )
+from app.subscription_service import (
+    create_subscription_checkout,
+    get_subscription_status,
+    handle_mercado_pago_webhook,
+    refresh_subscription_from_provider,
+    start_trial,
+)
+from app.subscription_dependencies import require_active_subscription
 
 router = APIRouter()
 router.include_router(business_router)
@@ -215,6 +226,71 @@ def get_me(current_user: UserResponse = Depends(get_current_user)):
 
 
 @router.get(
+    "/subscription/status",
+    response_model=SubscriptionStatusResponse,
+    tags=["Subscription"],
+)
+def read_subscription_status(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return get_subscription_status(current_user)
+
+
+@router.post(
+    "/subscription/start-trial",
+    response_model=SubscriptionStatusResponse,
+    tags=["Subscription"],
+    dependencies=[Depends(write_rate_limit)],
+)
+def start_subscription_trial(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return start_trial(current_user)
+
+
+@router.post(
+    "/subscription/checkout",
+    response_model=SubscriptionCheckoutResponse,
+    tags=["Subscription"],
+    dependencies=[Depends(write_rate_limit)],
+)
+def create_checkout(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return create_subscription_checkout(current_user)
+
+
+@router.post(
+    "/subscription/refresh",
+    response_model=SubscriptionStatusResponse,
+    tags=["Subscription"],
+    dependencies=[Depends(write_rate_limit)],
+)
+def refresh_subscription(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return refresh_subscription_from_provider(current_user)
+
+
+@router.post(
+    "/webhooks/mercado-pago",
+    response_model=SubscriptionWebhookResponse,
+    tags=["Subscription"],
+)
+async def mercado_pago_webhook(request: Request):
+    try:
+        payload = await request.json()
+    except ValueError:
+        payload = {}
+
+    query = {key: value for key, value in request.query_params.items()}
+    headers = {key.lower(): value for key, value in request.headers.items()}
+    handle_mercado_pago_webhook(payload, query, headers)
+
+    return SubscriptionWebhookResponse()
+
+
+@router.get(
     "/user-settings",
     response_model=UserSettingsResponse,
     tags=["User Settings"],
@@ -265,7 +341,7 @@ def delete_account(
     tags=["Expense Categories"],
 )
 def get_expense_categories(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     return list_expense_categories(current_user.id)
 
@@ -279,7 +355,7 @@ def get_expense_categories(
 )
 def add_expense_category(
     category_data: ExpenseCategoryCreate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     return create_expense_category(category_data, current_user.id)
 
@@ -293,7 +369,7 @@ def add_expense_category(
 def edit_expense_category(
     category_id: str,
     category_data: ExpenseCategoryUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     return update_expense_category(
         category_id=category_id,
@@ -310,7 +386,7 @@ def edit_expense_category(
 )
 def remove_expense_category(
     category_id: str,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     delete_expense_category(category_id, current_user.id)
 
@@ -322,7 +398,9 @@ def remove_expense_category(
     response_model=list[CreditCardResponse],
     tags=["Credit Cards"],
 )
-def get_credit_cards(current_user: UserResponse = Depends(get_current_user)):
+def get_credit_cards(
+    current_user: UserResponse = Depends(require_active_subscription),
+):
     return list_credit_cards(current_user.id)
 
 
@@ -335,7 +413,7 @@ def get_credit_cards(current_user: UserResponse = Depends(get_current_user)):
 )
 def add_credit_card(
     card_data: CreditCardCreate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     return create_credit_card(card_data, current_user.id)
 
@@ -349,7 +427,7 @@ def add_credit_card(
 def edit_credit_card(
     card_id: str,
     card_data: CreditCardUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     return update_credit_card(card_id, card_data, current_user.id)
 
@@ -363,7 +441,7 @@ def edit_credit_card(
 def remove_credit_card(
     card_id: str,
     delete_linked_expenses: bool = Query(default=False),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     delete_credit_card(
         card_id=card_id,
@@ -378,7 +456,9 @@ def remove_credit_card(
     response_model=list[ExpenseResponse],
     tags=["Expenses"],
 )
-def get_expenses(current_user: UserResponse = Depends(get_current_user)):
+def get_expenses(
+    current_user: UserResponse = Depends(require_active_subscription),
+):
     return list_expenses(current_user.id)
 
 
@@ -391,7 +471,7 @@ def get_expenses(current_user: UserResponse = Depends(get_current_user)):
 )
 def add_expense(
     expense_data: ExpenseCreate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     return create_expense(expense_data, current_user.id)
 
@@ -405,7 +485,7 @@ def add_expense(
 def edit_expense(
     expense_id: str,
     expense_data: ExpenseUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     return update_expense(expense_id, expense_data, current_user.id)
 
@@ -418,7 +498,7 @@ def edit_expense(
 )
 def remove_expense(
     expense_id: str,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     delete_expense(expense_id, current_user.id)
 
@@ -430,7 +510,9 @@ def remove_expense(
     response_model=list[IncomeResponse],
     tags=["Incomes"],
 )
-def get_incomes(current_user: UserResponse = Depends(get_current_user)):
+def get_incomes(
+    current_user: UserResponse = Depends(require_active_subscription),
+):
     return list_incomes(current_user.id)
 
 
@@ -443,7 +525,7 @@ def get_incomes(current_user: UserResponse = Depends(get_current_user)):
 )
 def add_income(
     income_data: IncomeCreate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     return create_income(income_data, current_user.id)
 
@@ -457,7 +539,7 @@ def add_income(
 def edit_income(
     income_id: str,
     income_data: IncomeUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     return update_income(income_id, income_data, current_user.id)
 
@@ -470,7 +552,7 @@ def edit_income(
 )
 def remove_income(
     income_id: str,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_active_subscription),
 ):
     delete_income(income_id, current_user.id)
 

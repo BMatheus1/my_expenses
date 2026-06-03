@@ -207,6 +207,9 @@ export function QuickAddExpenseSheet({
                 Miudezas é para pequenos gastos que você não lembra exatamente,
                 mas não quer deixar fora do controle.
               </p>
+              <p className="app-muted mt-1 text-sm leading-6">
+                Para aqueles gastos pequenos que acontecem no meio da correria.
+              </p>
 
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {categoryOptions.map((categoryName) => (

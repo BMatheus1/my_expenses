@@ -14,6 +14,7 @@ from app.schemas import (
     ExpenseRecord,
     ExpenseResponse,
     IncomeRecord,
+    SubscriptionRecord,
     UserSettingsRecord,
     UserRecord,
 )
@@ -73,6 +74,7 @@ def get_connection() -> Iterator[Connection]:
 def initialize_database() -> None:
     with get_connection() as connection:
         create_users_table(connection)
+        create_subscriptions_table(connection)
         create_user_settings_table(connection)
         create_expense_categories_table(connection)
         create_credit_cards_table(connection)
@@ -95,6 +97,36 @@ def create_users_table(connection: Connection) -> None:
             provider TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL
         )
+        """
+    )
+
+
+def create_subscriptions_table(connection: Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS subscriptions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+            trial_start_at TIMESTAMPTZ,
+            trial_end_at TIMESTAMPTZ,
+            subscription_status TEXT NOT NULL DEFAULT 'inactive',
+            subscription_provider TEXT,
+            provider_customer_id TEXT,
+            provider_subscription_id TEXT,
+            current_period_start TIMESTAMPTZ,
+            current_period_end TIMESTAMPTZ,
+            cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
+            checkout_url TEXT,
+            created_at TIMESTAMPTZ NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        ALTER TABLE subscriptions
+        ADD COLUMN IF NOT EXISTS checkout_url TEXT
         """
     )
 
@@ -291,6 +323,18 @@ def create_database_indexes(connection: Connection) -> None:
     )
     connection.execute(
         """
+        CREATE INDEX IF NOT EXISTS idx_subscriptions_user
+        ON subscriptions(user_id)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_subscriptions_provider_subscription
+        ON subscriptions(provider_subscription_id)
+        """
+    )
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_expenses_credit_card_invoice
         ON expenses(user_id, credit_card_id, invoice_month)
         """
@@ -458,6 +502,143 @@ def get_user_settings_record(user_id: str) -> UserSettingsRecord | None:
         return None
 
     return UserSettingsRecord.model_validate(row)
+
+
+def get_subscription_record(user_id: str) -> SubscriptionRecord | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                trial_start_at,
+                trial_end_at,
+                subscription_status,
+                subscription_provider,
+                provider_customer_id,
+                provider_subscription_id,
+                current_period_start,
+                current_period_end,
+                cancel_at_period_end,
+                checkout_url,
+                created_at,
+                updated_at
+            FROM subscriptions
+            WHERE user_id = %s
+            """,
+            (user_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return SubscriptionRecord.model_validate(row)
+
+
+def get_subscription_record_by_provider_subscription_id(
+    provider_subscription_id: str,
+) -> SubscriptionRecord | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                trial_start_at,
+                trial_end_at,
+                subscription_status,
+                subscription_provider,
+                provider_customer_id,
+                provider_subscription_id,
+                current_period_start,
+                current_period_end,
+                cancel_at_period_end,
+                checkout_url,
+                created_at,
+                updated_at
+            FROM subscriptions
+            WHERE provider_subscription_id = %s
+            """,
+            (provider_subscription_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return SubscriptionRecord.model_validate(row)
+
+
+def upsert_subscription_record(
+    subscription: SubscriptionRecord,
+) -> SubscriptionRecord:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            INSERT INTO subscriptions (
+                id,
+                user_id,
+                trial_start_at,
+                trial_end_at,
+                subscription_status,
+                subscription_provider,
+                provider_customer_id,
+                provider_subscription_id,
+                current_period_start,
+                current_period_end,
+                cancel_at_period_end,
+                checkout_url,
+                created_at,
+                updated_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+                trial_start_at = EXCLUDED.trial_start_at,
+                trial_end_at = EXCLUDED.trial_end_at,
+                subscription_status = EXCLUDED.subscription_status,
+                subscription_provider = EXCLUDED.subscription_provider,
+                provider_customer_id = EXCLUDED.provider_customer_id,
+                provider_subscription_id = EXCLUDED.provider_subscription_id,
+                current_period_start = EXCLUDED.current_period_start,
+                current_period_end = EXCLUDED.current_period_end,
+                cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+                checkout_url = EXCLUDED.checkout_url,
+                updated_at = EXCLUDED.updated_at
+            RETURNING
+                id,
+                user_id,
+                trial_start_at,
+                trial_end_at,
+                subscription_status,
+                subscription_provider,
+                provider_customer_id,
+                provider_subscription_id,
+                current_period_start,
+                current_period_end,
+                cancel_at_period_end,
+                checkout_url,
+                created_at,
+                updated_at
+            """,
+            (
+                subscription.id,
+                subscription.user_id,
+                subscription.trial_start_at,
+                subscription.trial_end_at,
+                subscription.subscription_status,
+                subscription.subscription_provider,
+                subscription.provider_customer_id,
+                subscription.provider_subscription_id,
+                subscription.current_period_start,
+                subscription.current_period_end,
+                subscription.cancel_at_period_end,
+                subscription.checkout_url,
+                subscription.created_at,
+                subscription.updated_at,
+            ),
+        ).fetchone()
+
+    return SubscriptionRecord.model_validate(row)
 
 
 def upsert_user_settings_record(

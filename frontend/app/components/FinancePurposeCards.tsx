@@ -39,13 +39,13 @@ type MoneyDestinationCardProps = {
 
 const ONBOARDING_ITEMS = [
   {
-    title: "Controle sem complicação",
-    description: "Registre seus gastos em poucos segundos, sem formulários longos.",
+    title: "Anote rápido",
+    description: "Registre pequenos gastos em poucos toques, sem formulário longo.",
   },
   {
-    title: "Esqueceu de anotar?",
+    title: "Feche o dia",
     description:
-      "Tudo bem. No Fechamento do Dia, você recupera o que ficou faltando.",
+      "Esqueceu de anotar? Revise o que ficou faltando no fim do dia.",
   },
   {
     title: "Entenda seu mês",
@@ -123,7 +123,8 @@ export function TodayStatusCard({
               Olá, {firstName}
             </h1>
             <p className="app-muted mt-2 max-w-2xl text-sm font-medium leading-6">
-              Vamos manter seu dia organizado sem complicar sua rotina?
+              Hoje está em aberto. Registre rápido agora ou feche o dia mais
+              tarde.
             </p>
           </div>
 
@@ -216,6 +217,10 @@ export function MonthlyPurposeSummary({
       <p className="app-muted mt-3 text-sm leading-6">
         {monthlyInsightMessage}
       </p>
+      <p className="app-muted mt-2 text-sm leading-6">
+        Seu mês fica mais claro quando os pequenos gastos também entram na
+        conta.
+      </p>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <CompactMetric label="Ganhos" value={monthlyIncomeTotal} />
@@ -260,8 +265,7 @@ export function MoneyDestinationCard({
         </div>
       ) : (
         <p className="app-muted mt-4 text-sm leading-6">
-          Quando você registrar seus primeiros gastos, vamos mostrar aqui para
-          onde seu dinheiro está indo.
+          Comece com um gasto rápido. O importante é dar o primeiro passo.
         </p>
       )}
     </section>

@@ -281,6 +281,60 @@ class UserSettingsRecord(UserSettingsResponse):
     model_config = ConfigDict(from_attributes=True)
 
 
+SubscriptionStatus = str
+
+
+class SubscriptionRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    trial_start_at: datetime | None = None
+    trial_end_at: datetime | None = None
+    subscription_status: SubscriptionStatus = "inactive"
+    subscription_provider: str | None = None
+    provider_customer_id: str | None = None
+    provider_subscription_id: str | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    cancel_at_period_end: bool = False
+    checkout_url: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SubscriptionStatusResponse(BaseModel):
+    id: str
+    user_id: str
+    status: SubscriptionStatus
+    can_access_app: bool
+    can_start_trial: bool
+    trial_start_at: datetime | None = None
+    trial_end_at: datetime | None = None
+    trial_days_remaining: int = 0
+    monthly_price: float = 8.99
+    currency_id: str = "BRL"
+    provider: str | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    cancel_at_period_end: bool = False
+    checkout_url: str | None = None
+    message: str
+
+
+class SubscriptionCheckoutResponse(BaseModel):
+    checkout_url: str
+    provider: str = "mercado_pago"
+    provider_subscription_id: str | None = None
+    status: SubscriptionStatus
+    message: str
+
+
+class SubscriptionWebhookResponse(BaseModel):
+    received: bool = True
+    message: str = "Evento recebido."
+
+
 class CreditCardBase(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

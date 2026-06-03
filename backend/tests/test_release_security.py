@@ -466,7 +466,16 @@ def register_verified_credentials_user(
 
     assert login_response.status_code == 200, login_response.text
 
-    return login_response.json()["access_token"]
+    access_token = login_response.json()["access_token"]
+
+    trial_response = client.post(
+        f"{API_PREFIX}/subscription/start-trial",
+        headers=auth_headers(access_token),
+    )
+
+    assert trial_response.status_code == 200, trial_response.text
+
+    return access_token
 
 
 def auth_headers(access_token: str) -> dict[str, str]:

@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_allowed_client_ids: str = ""
 
+    mercado_pago_access_token: str = ""
+    mercado_pago_webhook_secret: str = ""
+    mercado_pago_api_base_url: str = "https://api.mercadopago.com"
+    subscription_monthly_price: float = 8.99
+    subscription_trial_days: int = 30
+    subscription_currency_id: str = "BRL"
+
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     cors_methods: str = "GET,POST,PUT,DELETE,OPTIONS"
     cors_headers: str = "Authorization,Content-Type"
@@ -191,6 +198,22 @@ class Settings(BaseSettings):
     def validate_max_request_body_bytes(cls, value: int) -> int:
         if value < 10_000:
             raise ValueError("MAX_REQUEST_BODY_BYTES está baixo demais.")
+
+        return value
+
+    @field_validator("subscription_monthly_price")
+    @classmethod
+    def validate_subscription_monthly_price(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("SUBSCRIPTION_MONTHLY_PRICE precisa ser maior que zero.")
+
+        return round(value, 2)
+
+    @field_validator("subscription_trial_days")
+    @classmethod
+    def validate_subscription_trial_days(cls, value: int) -> int:
+        if value < 0 or value > 90:
+            raise ValueError("SUBSCRIPTION_TRIAL_DAYS deve ficar entre 0 e 90.")
 
         return value
 

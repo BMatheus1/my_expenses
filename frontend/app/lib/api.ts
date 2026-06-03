@@ -27,6 +27,10 @@ import type {
   UpdateUserSettingsRequest,
   UserSettings,
 } from "../types/user-settings";
+import type {
+  SubscriptionCheckoutResponse,
+  SubscriptionStatusResponse,
+} from "../types/subscription";
 import {
   clearStoredAuthToken,
   getStoredAuthToken,
@@ -445,6 +449,31 @@ export async function updateUserSettings(
   return apiFetch<UserSettings>("/user-settings", {
     method: "PUT",
     body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Subscription
+ */
+export async function getSubscriptionStatus(): Promise<SubscriptionStatusResponse> {
+  return apiFetch<SubscriptionStatusResponse>("/subscription/status");
+}
+
+export async function startSubscriptionTrial(): Promise<SubscriptionStatusResponse> {
+  return apiFetch<SubscriptionStatusResponse>("/subscription/start-trial", {
+    method: "POST",
+  });
+}
+
+export async function createSubscriptionCheckout(): Promise<SubscriptionCheckoutResponse> {
+  return apiFetch<SubscriptionCheckoutResponse>("/subscription/checkout", {
+    method: "POST",
+  });
+}
+
+export async function refreshSubscriptionStatus(): Promise<SubscriptionStatusResponse> {
+  return apiFetch<SubscriptionStatusResponse>("/subscription/refresh", {
+    method: "POST",
   });
 }
 

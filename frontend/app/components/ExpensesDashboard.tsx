@@ -46,6 +46,7 @@ import {
   updateUserSettings,
 } from "../lib/api";
 import type { User } from "../types/auth";
+import { trackEvent } from "../lib/tracking";
 import type { ExpenseCategory } from "../types/category";
 import type { CreateCreditCardRequest, CreditCard } from "../types/credit-card";
 import type {
@@ -1136,9 +1137,13 @@ export function ExpensesDashboard({
           )
         );
       } else {
+        const hadExpensesBeforeCreate = expenses.length > 0;
         const createdExpense = await createExpense(expenseData);
 
         setExpenses((currentExpenses) => [createdExpense, ...currentExpenses]);
+        trackEvent("first_expense_created", {
+          is_first_expense: !hadExpensesBeforeCreate,
+        });
 
         if (expenseData.installments_count > 1) {
           void loadExpenses();
@@ -1190,6 +1195,10 @@ export function ExpensesDashboard({
 
       setExpenses((currentExpenses) => [createdExpense, ...currentExpenses]);
       setDidSaveQuickExpense(true);
+      trackEvent("quick_expense_created", {
+        category: createdExpense.category,
+        amount: createdExpense.amount,
+      });
       void loadCategories();
       showSuccessToast("Gasto salvo em segundos.");
     } catch (error) {
@@ -1234,6 +1243,10 @@ export function ExpensesDashboard({
       setDidSaveDailyReview(true);
       handleMarkDailyReviewClosed();
       handleDismissDailyReviewCard();
+      trackEvent("daily_review_completed", {
+        category: createdExpense.category,
+        amount: createdExpense.amount,
+      });
       void loadCategories();
       showSuccessToast(
         data.category === "Miudezas"

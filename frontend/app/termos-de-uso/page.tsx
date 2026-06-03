@@ -11,7 +11,7 @@ export default function TermsOfUsePage() {
         </h1>
 
         <p className="mt-3 text-sm leading-6 text-stone-500">
-          Última atualização: 24 de maio de 2026
+          Ultima atualizacao: 03 de junho de 2026
         </p>
 
         <div className="mt-8 space-y-8 text-sm leading-7 text-stone-700">
@@ -21,16 +21,16 @@ export default function TermsOfUsePage() {
             </h2>
 
             <p className="mt-3">
-              O My Expenses é uma aplicação para organização financeira pessoal,
-              controle de ganhos, gastos, categorias, relatórios e pequenos
-              controles de negócio.
+              O My Expenses e uma aplicacao para organizacao financeira pessoal,
+              controle de ganhos, gastos, categorias, relatorios e pequenos
+              controles de negocio.
             </p>
 
             <p className="mt-3">
-              O aplicativo não substitui orientação financeira, contábil,
-              jurídica, tributária ou profissional. As informações exibidas têm
+              O aplicativo nao substitui orientacao financeira, contabil,
+              juridica, tributaria ou profissional. As informacoes exibidas tem
               finalidade organizacional e dependem dos dados informados pelo
-              próprio usuário.
+              proprio usuario.
             </p>
           </section>
 
@@ -40,103 +40,103 @@ export default function TermsOfUsePage() {
             </h2>
 
             <p className="mt-3">
-              Para utilizar o My Expenses, o usuário deve criar uma conta,
-              informar dados verdadeiros e manter suas credenciais em segurança.
-              O acesso pode ocorrer por e-mail e senha ou por login Google,
-              conforme o método escolhido.
-            </p>
-
-            <p className="mt-3">
-              Contas criadas com Google devem ser acessadas pelo Google. Contas
-              criadas com e-mail e senha devem ser acessadas pelo login normal.
+              Para utilizar o My Expenses, o usuario deve criar uma conta,
+              informar dados verdadeiros e manter suas credenciais em seguranca.
+              O acesso pode ocorrer por e-mail e senha ou por login Google.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              3. Responsabilidade do usuário
+              3. Teste gratis, assinatura e pagamento
             </h2>
 
             <p className="mt-3">
-              O usuário é responsável pelos dados financeiros que cadastra,
-              pela conferência das informações, pela proteção de sua conta e pelo
-              uso adequado da plataforma.
+              O My Expenses e um app pago. Novos usuarios podem ter acesso a 1
+              mes gratis. Apos o periodo de teste, o uso completo depende de
+              assinatura recorrente de R$ 8,99 por mes.
             </p>
 
             <p className="mt-3">
-              É proibido tentar acessar, alterar, explorar, excluir ou visualizar
-              dados de outros usuários, bem como tentar burlar mecanismos de
-              segurança do sistema.
+              Os pagamentos sao processados pelo Mercado Pago. O app nao coleta
+              nem armazena dados completos de cartao. Se houver falha de
+              pagamento, cancelamento, assinatura vencida ou ausencia de
+              assinatura ativa, o acesso aos modulos principais podera ser
+              bloqueado ate regularizacao.
+            </p>
+
+            <p className="mt-3">
+              O usuario pode cancelar quando quiser. Alteracoes futuras de preco
+              poderao ocorrer apenas com aviso previo adequado.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              4. Segurança da conta
+              4. Responsabilidade do usuario
             </h2>
 
             <p className="mt-3">
-              O My Expenses utiliza medidas de segurança como autenticação,
-              verificação de e-mail, isolamento de dados por usuário, tokens
-              seguros, cookies HttpOnly, limitação de requisições e validações
-              no backend.
-            </p>
-
-            <p className="mt-3">
-              Mesmo com boas práticas de segurança, nenhum sistema é totalmente
-              imune a falhas, indisponibilidades ou riscos técnicos.
+              O usuario e responsavel pelos dados financeiros que cadastra, pela
+              conferencia das informacoes, pela protecao de sua conta e pelo uso
+              adequado da plataforma.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              5. Disponibilidade do serviço
+              5. Seguranca da conta
             </h2>
 
             <p className="mt-3">
-              O serviço pode passar por manutenções, atualizações, correções,
-              instabilidades ou interrupções temporárias. Faremos esforços
-              razoáveis para manter a aplicação funcionando com segurança.
+              O My Expenses utiliza autenticacao, verificacao de e-mail,
+              isolamento de dados por usuario, tokens seguros, cookies HttpOnly,
+              rate limit e validacoes no backend.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              6. Exclusão de conta
+              6. Disponibilidade do servico
             </h2>
 
             <p className="mt-3">
-              O usuário poderá solicitar ou realizar a exclusão da própria conta,
-              quando a funcionalidade estiver disponível. A exclusão poderá
-              remover dados pessoais, registros financeiros, categorias e demais
-              dados vinculados à conta.
-            </p>
-
-            <p className="mt-3">
-              A exclusão é uma ação sensível e pode ser irreversível.
+              O servico pode passar por manutencoes, atualizacoes, correcoes,
+              instabilidades ou interrupcoes temporarias.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              7. Alterações destes termos
+              7. Exclusao de conta
             </h2>
 
             <p className="mt-3">
-              Estes Termos de Uso podem ser atualizados para refletir mudanças
-              técnicas, legais, operacionais ou melhorias no serviço. A versão
-              vigente ficará disponível nesta página.
+              O usuario podera solicitar ou realizar a exclusao da propria
+              conta. A exclusao podera remover dados pessoais, registros
+              financeiros, categorias e demais dados vinculados a conta.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              8. Contato
+              8. Alteracoes destes termos
             </h2>
 
             <p className="mt-3">
-              Para dúvidas sobre estes termos, entre em contato pelo canal de
-              suporte informado no aplicativo ou pelo e-mail oficial do serviço.
+              Estes Termos de Uso podem ser atualizados para refletir mudancas
+              tecnicas, legais, operacionais ou melhorias no servico.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-black text-stone-950">
+              9. Contato
+            </h2>
+
+            <p className="mt-3">
+              Para duvidas sobre estes termos, entre em contato pelo canal de
+              suporte informado no aplicativo ou pelo e-mail oficial do servico.
             </p>
           </section>
         </div>

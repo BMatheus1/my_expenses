@@ -21,6 +21,7 @@ from app.auth_service import (
     verify_user_email,
 )
 from app.business_routes import router as business_router
+from app.billing_routes import router as billing_router
 from app.schemas import (
     AuthLoginRequest,
     AuthRegisterRequest,
@@ -84,6 +85,7 @@ from app.subscription_service import (
 from app.subscription_dependencies import require_active_subscription
 
 router = APIRouter()
+router.include_router(billing_router)
 router.include_router(business_router)
 
 

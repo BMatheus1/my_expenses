@@ -31,6 +31,7 @@ os.environ["EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES"] = "1440"
 os.environ["SMTP_ENABLED"] = "false"
 
 from app.business_repository import initialize_business_database
+from app.billing_repository import initialize_billing_database
 from app.email_verification_repository import initialize_email_verification_database
 from app.main import app
 from app.password_reset_repository import initialize_password_reset_database
@@ -42,6 +43,7 @@ TABLES_TO_TRUNCATE = [
     "email_verification_tokens",
     "password_reset_tokens",
     "refresh_tokens",
+    "payment_events",
     "business_sale_materials",
     "business_sales",
     "business_recipe_items",
@@ -52,6 +54,7 @@ TABLES_TO_TRUNCATE = [
     "incomes",
     "expense_categories",
     "user_settings",
+    "user_subscriptions",
     "subscriptions",
     "users",
 ]
@@ -61,6 +64,7 @@ TABLES_TO_TRUNCATE = [
 def client() -> Iterator[TestClient]:
     create_test_database_if_needed()
     initialize_database()
+    initialize_billing_database()
     initialize_business_database()
     initialize_refresh_token_database()
     initialize_password_reset_database()

@@ -8,11 +8,10 @@ import {
 import {
   ApiError,
   getCurrentUser,
-  getSubscriptionStatus,
   logoutCurrentSession,
-  refreshSubscriptionStatus,
   setUnauthorizedHandler,
 } from "../lib/api";
+import { getBillingStatus } from "../lib/billing-api";
 import {
   clearCachedAuthenticatedUser,
   readCachedAuthenticatedUser,
@@ -26,11 +25,11 @@ import {
   SECURITY_SETTINGS_CHANGED_EVENT,
 } from "../lib/security";
 import type { User } from "../types/auth";
-import type { SubscriptionStatusResponse } from "../types/subscription";
+import type { BillingStatusResponse } from "../types/billing";
 import { AuthPage } from "./AuthPage";
 import { PageLoading } from "./AppFeedback";
 import { ExpensesDashboard } from "./ExpensesDashboard";
-import { SubscriptionScreen } from "./SubscriptionScreen";
+import { Paywall } from "./Paywall";
 import { trackEvent } from "../lib/tracking";
 
 const USER_ACTIVITY_EVENTS = [
@@ -84,20 +83,18 @@ export function AuthGate() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [sessionError, setSessionError] = useState(false);
   const [sessionErrorMessage, setSessionErrorMessage] = useState("");
-  const [subscription, setSubscription] =
-    useState<SubscriptionStatusResponse | null>(null);
-  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
+  const [billing, setBilling] = useState<BillingStatusResponse | null>(null);
+  const [isCheckingBilling, setIsCheckingBilling] = useState(false);
   const [securitySettingsVersion, setSecuritySettingsVersion] = useState(0);
-  
+
   const currentUserId = currentUser?.id ?? null;
-  
-  
+
   const handleLogout = useCallback(() => {
     void logoutCurrentSession();
     clearCachedAuthenticatedUser();
     applyDefaultAppAppearance();
     setCurrentUser(null);
-    setSubscription(null);
+    setBilling(null);
   }, []);
 
   const checkSession = useCallback(async () => {
@@ -196,30 +193,29 @@ export function AuthGate() {
 
     let isMounted = true;
 
-    async function loadSubscriptionStatus() {
-      setIsCheckingSubscription(true);
+    async function loadBillingStatus() {
+      setIsCheckingBilling(true);
 
       try {
         const searchParams = new URLSearchParams(window.location.search);
         const shouldRefreshCheckout =
-          searchParams.get("checkout") === "subscription_return";
-        const loadedSubscription = shouldRefreshCheckout
-          ? await refreshSubscriptionStatus()
-          : await getSubscriptionStatus();
+          searchParams.get("checkout") === "billing_return"
+          || searchParams.get("checkout") === "subscription_return";
+        const loadedBilling = await getBillingStatus();
 
         if (!isMounted) {
           return;
         }
 
-        setSubscription(loadedSubscription);
+        setBilling(loadedBilling);
         trackEvent("subscription_status_loaded", {
-          status: loadedSubscription.status,
-          can_access_app: loadedSubscription.can_access_app,
+          status: loadedBilling.status,
+          can_access_app: loadedBilling.is_access_allowed,
         });
 
         if (shouldRefreshCheckout) {
           trackEvent("checkout_returned", {
-            status: loadedSubscription.status,
+            status: loadedBilling.status,
           });
           window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -236,18 +232,17 @@ export function AuthGate() {
         );
       } finally {
         if (isMounted) {
-          setIsCheckingSubscription(false);
+          setIsCheckingBilling(false);
         }
       }
     }
 
-    void loadSubscriptionStatus();
+    void loadBillingStatus();
 
     return () => {
       isMounted = false;
     };
   }, [currentUser]);
-
 
   useEffect(() => {
     void checkSession();
@@ -313,8 +308,8 @@ export function AuthGate() {
 
   if (
     isCheckingSession ||
-    (currentUser && isCheckingSubscription) ||
-    (currentUser && !subscription && !isBrowserOffline())
+    (currentUser && isCheckingBilling) ||
+    (currentUser && !billing && !isBrowserOffline())
   ) {
     return (
       <PageLoading
@@ -361,12 +356,12 @@ export function AuthGate() {
     return <AuthPage onAuthenticated={setCurrentUser} />;
   }
 
-  if (subscription && !subscription.can_access_app) {
+  if (billing && !billing.is_access_allowed) {
     return (
-      <SubscriptionScreen
+      <Paywall
         currentUser={currentUser}
-        subscription={subscription}
-        onSubscriptionChange={setSubscription}
+        billing={billing}
+        onBillingChange={setBilling}
         onLogout={handleLogout}
       />
     );

@@ -7,11 +7,11 @@ export default function PrivacyPolicyPage() {
         </p>
 
         <h1 className="mt-3 text-3xl font-black tracking-tight text-stone-950">
-          Política de Privacidade
+          Politica de Privacidade
         </h1>
 
         <p className="mt-3 text-sm leading-6 text-stone-500">
-          Última atualização: 24 de maio de 2026
+          Ultima atualizacao: 03 de junho de 2026
         </p>
 
         <div className="mt-8 space-y-8 text-sm leading-7 text-stone-700">
@@ -21,130 +21,112 @@ export default function PrivacyPolicyPage() {
             </h2>
 
             <p className="mt-3">
-              Podemos coletar dados necessários para funcionamento da conta,
-              como nome, e-mail, método de autenticação, data de criação da
-              conta, informações de sessão e dados cadastrados pelo usuário.
-            </p>
-
-            <p className="mt-3">
-              Também podemos armazenar registros financeiros informados pelo
-              usuário, como ganhos, gastos, categorias, datas, descrições,
-              negócios, materiais, serviços e demais informações necessárias ao
-              funcionamento do app.
+              Podemos coletar dados necessarios para funcionamento da conta,
+              como nome, e-mail, metodo de autenticacao, data de criacao da
+              conta, informacoes de sessao e dados cadastrados pelo usuario.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              2. Como usamos os dados
+              2. Dados financeiros do app
+            </h2>
+
+            <p className="mt-3">
+              Armazenamos registros financeiros informados pelo usuario, como
+              ganhos, gastos, categorias, datas, descricoes, negocios, materiais
+              e servicos necessarios ao funcionamento do app.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-black text-stone-950">
+              3. Como usamos os dados
             </h2>
 
             <p className="mt-3">
               Usamos os dados para criar e proteger a conta, autenticar o
-              usuário, exibir informações financeiras, gerar resumos, recuperar
-              senha, confirmar e-mail, prevenir abuso, manter a segurança e
-              melhorar a estabilidade do serviço.
+              usuario, exibir informacoes financeiras, gerar resumos, recuperar
+              senha, confirmar e-mail, prevenir abuso e manter a seguranca.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              3. E-mails transacionais
+              4. Compartilhamento com terceiros
             </h2>
 
             <p className="mt-3">
-              Podemos enviar e-mails necessários para funcionamento da conta,
-              como confirmação de e-mail, recuperação de senha e avisos
-              importantes de segurança.
-            </p>
-
-            <p className="mt-3">
-              Esses e-mails são operacionais e não têm finalidade de spam.
+              Nao vendemos dados pessoais. Podemos utilizar provedores
+              necessarios para operar o app, como hospedagem, banco de dados,
+              autenticacao, envio de e-mails, monitoramento e infraestrutura.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              4. Compartilhamento com serviços terceiros
+              5. Pagamentos e Mercado Pago
             </h2>
 
             <p className="mt-3">
-              Não vendemos dados pessoais dos usuários. Podemos utilizar
-              provedores necessários para operar o app, como hospedagem,
-              banco de dados, autenticação, envio de e-mails, monitoramento e
-              infraestrutura.
+              O Mercado Pago e utilizado como processador de pagamento da
+              assinatura do My Expenses. Podemos armazenar identificadores de
+              assinatura, status de pagamento, datas de periodo, eventos de
+              cobranca e informacoes necessarias para liberar ou bloquear acesso.
             </p>
 
             <p className="mt-3">
-              Esses provedores devem ser usados apenas para possibilitar o
-              funcionamento do serviço.
+              O My Expenses nao armazena dados completos de cartao. Os dados
+              financeiros cadastrados no app ficam separados dos dados de
+              pagamento processados pelo Mercado Pago.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              5. Segurança
+              6. Seguranca
             </h2>
 
             <p className="mt-3">
-              Aplicamos medidas de segurança como autenticação, verificação de
-              e-mail, controle de acesso por usuário, tokens seguros, cookies
-              HttpOnly, limitação de requisições, validação de dados e separação
-              entre ambientes.
-            </p>
-
-            <p className="mt-3">
-              Ainda assim, nenhum sistema é totalmente imune a riscos. Por isso,
-              também recomendamos que o usuário utilize senha forte e não
-              compartilhe suas credenciais.
+              Aplicamos autenticacao, verificacao de e-mail, controle de acesso
+              por usuario, tokens seguros, cookies HttpOnly, rate limit,
+              validacao de dados e separacao entre ambientes.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              6. Direitos do usuário
+              7. Direitos do usuario
             </h2>
 
             <p className="mt-3">
-              O usuário pode solicitar informações, correção ou exclusão de seus
-              dados conforme funcionalidades disponíveis no app ou por meio do
+              O usuario pode solicitar informacoes, correcao ou exclusao de seus
+              dados conforme funcionalidades disponiveis no app ou por meio do
               canal oficial de contato.
             </p>
-
-            <p className="mt-3">
-              Algumas informações podem precisar ser mantidas temporariamente
-              por obrigação legal, segurança, auditoria ou prevenção de fraude.
-            </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              7. Retenção e exclusão
+              8. Retencao e exclusao
             </h2>
 
             <p className="mt-3">
               Mantemos os dados enquanto a conta estiver ativa ou enquanto forem
-              necessários para prestação do serviço, segurança, auditoria,
-              cumprimento de obrigações legais ou resolução de problemas
-              técnicos.
-            </p>
-
-            <p className="mt-3">
-              Ao excluir a conta, os dados vinculados ao usuário poderão ser
-              removidos do sistema, exceto quando houver necessidade legítima ou
-              obrigação de retenção.
+              necessarios para prestacao do servico, seguranca, auditoria,
+              cumprimento de obrigacoes legais ou resolucao de problemas.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-black text-stone-950">
-              8. Contato
+              9. Contato
             </h2>
 
             <p className="mt-3">
-              Para solicitações relacionadas à privacidade, use o canal oficial
+              Para solicitacoes relacionadas a privacidade, use o canal oficial
               informado no aplicativo ou o e-mail de suporte definido pelo
-              responsável pelo serviço.
+              responsavel pelo servico.
             </p>
           </section>
         </div>

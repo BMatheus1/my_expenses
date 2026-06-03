@@ -1,5 +1,9 @@
 from fastapi.testclient import TestClient
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
+from app.billing_repository import upsert_user_subscription
+from app.billing_schemas import UserSubscriptionRecord
 from app.email_verification_repository import mark_user_email_as_verified
 from app.storage import get_user_record_by_email
 
@@ -468,12 +472,7 @@ def register_verified_credentials_user(
 
     access_token = login_response.json()["access_token"]
 
-    trial_response = client.post(
-        f"{API_PREFIX}/subscription/start-trial",
-        headers=auth_headers(access_token),
-    )
-
-    assert trial_response.status_code == 200, trial_response.text
+    grant_billing_trial_access(user.id)
 
     return access_token
 
@@ -482,6 +481,32 @@ def auth_headers(access_token: str) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {access_token}",
     }
+
+
+def grant_billing_trial_access(user_id: str) -> None:
+    now = datetime.now(timezone.utc)
+
+    upsert_user_subscription(
+        UserSubscriptionRecord(
+            id=str(uuid4()),
+            user_id=user_id,
+            provider="mercado_pago",
+            provider_subscription_id=None,
+            provider_payment_id=None,
+            status="trialing",
+            plan_name="My Expenses Premium",
+            amount=8.99,
+            currency="BRL",
+            trial_starts_at=now,
+            trial_ends_at=now + timedelta(days=30),
+            current_period_starts_at=None,
+            current_period_ends_at=None,
+            canceled_at=None,
+            checkout_url=None,
+            created_at=now,
+            updated_at=now,
+        )
+    )
 
 
 def mock_google_credential(monkeypatch, email: str, name: str) -> None:

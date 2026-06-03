@@ -5,7 +5,7 @@ from app.billing_service import user_has_paid_access
 from app.schemas import UserResponse
 
 
-def require_active_subscription(
+def require_billing_access(
     current_user: UserResponse = Depends(get_current_user),
 ) -> UserResponse:
     if not user_has_paid_access(current_user.id):

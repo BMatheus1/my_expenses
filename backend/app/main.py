@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.billing_repository import initialize_billing_database
 from app.business_repository import initialize_business_database
 from app.config import settings
 from app.email_verification_repository import initialize_email_verification_database
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     try:
         initialize_database()
+        initialize_billing_database()
         initialize_business_database()
         initialize_refresh_token_database()
         initialize_password_reset_database()

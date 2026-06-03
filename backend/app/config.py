@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     mercado_pago_access_token: str = ""
     mercado_pago_webhook_secret: str = ""
     mercado_pago_api_base_url: str = "https://api.mercadopago.com"
+    mercado_pago_base_url: str = "https://api.mercadopago.com"
+    app_public_url: str = "https://myexpensesfinance.com"
+    app_price_brl: float = 8.99
+    app_trial_days: int = 30
     subscription_monthly_price: float = 8.99
     subscription_trial_days: int = 30
     subscription_currency_id: str = "BRL"
@@ -209,11 +213,27 @@ class Settings(BaseSettings):
 
         return round(value, 2)
 
+    @field_validator("app_price_brl")
+    @classmethod
+    def validate_app_price_brl(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("APP_PRICE_BRL precisa ser maior que zero.")
+
+        return round(value, 2)
+
     @field_validator("subscription_trial_days")
     @classmethod
     def validate_subscription_trial_days(cls, value: int) -> int:
         if value < 0 or value > 90:
             raise ValueError("SUBSCRIPTION_TRIAL_DAYS deve ficar entre 0 e 90.")
+
+        return value
+
+    @field_validator("app_trial_days")
+    @classmethod
+    def validate_app_trial_days(cls, value: int) -> int:
+        if value < 0 or value > 90:
+            raise ValueError("APP_TRIAL_DAYS deve ficar entre 0 e 90.")
 
         return value
 

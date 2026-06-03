@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 BillingStatus = Literal[
+    "none",
     "trialing",
     "active",
     "pending",

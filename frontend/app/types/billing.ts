@@ -1,4 +1,5 @@
 export type BillingStatus =
+  | "none"
   | "trialing"
   | "active"
   | "pending"

@@ -273,3 +273,92 @@ def insert_payment_event_once(
         return None
 
     return PaymentEventRecord.model_validate(row)
+
+
+def list_user_subscriptions_by_status(
+    subscription_status: str,
+) -> list[UserSubscriptionRecord]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                provider,
+                provider_subscription_id,
+                provider_payment_id,
+                status,
+                plan_name,
+                amount,
+                currency,
+                trial_starts_at,
+                trial_ends_at,
+                current_period_starts_at,
+                current_period_ends_at,
+                canceled_at,
+                checkout_url,
+                created_at,
+                updated_at
+            FROM user_subscriptions
+            WHERE status = %s
+            ORDER BY updated_at DESC
+            """,
+            (subscription_status,),
+        ).fetchall()
+
+    return [UserSubscriptionRecord.model_validate(row) for row in rows]
+
+
+def list_trials_ending_within(days: int = 7) -> list[UserSubscriptionRecord]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                provider,
+                provider_subscription_id,
+                provider_payment_id,
+                status,
+                plan_name,
+                amount,
+                currency,
+                trial_starts_at,
+                trial_ends_at,
+                current_period_starts_at,
+                current_period_ends_at,
+                canceled_at,
+                checkout_url,
+                created_at,
+                updated_at
+            FROM user_subscriptions
+            WHERE
+                status = 'trialing'
+                AND trial_ends_at > NOW()
+                AND trial_ends_at <= NOW() + (%s * INTERVAL '1 day')
+            ORDER BY trial_ends_at ASC
+            """,
+            (days,),
+        ).fetchall()
+
+    return [UserSubscriptionRecord.model_validate(row) for row in rows]
+
+
+def list_users_without_subscription() -> list[dict]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                users.id,
+                users.name,
+                users.email,
+                users.created_at
+            FROM users
+            LEFT JOIN user_subscriptions
+                ON user_subscriptions.user_id = users.id
+            WHERE user_subscriptions.id IS NULL
+            ORDER BY users.created_at DESC
+            """
+        ).fetchall()
+
+    return [dict(row) for row in rows]

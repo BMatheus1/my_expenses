@@ -8,6 +8,7 @@ type BillingStatusCardProps = {
 };
 
 const STATUS_LABELS: Record<BillingStatusResponse["status"], string> = {
+  none: "Sem assinatura ativa",
   trialing: "Teste grátis ativo",
   active: "Assinatura ativa",
   pending: "Pagamento pendente",

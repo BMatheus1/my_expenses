@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.billing_repository import upsert_user_subscription
@@ -12,36 +13,88 @@ from app.storage import get_user_record_by_email
 API_PREFIX = "/api"
 
 
-def test_user_without_billing_cannot_access_app_data(client: TestClient) -> None:
-    token, _user_id = register_user(client, "no-billing@test.com")
+@pytest.mark.parametrize(
+    ("billing_status", "trial_days", "expected_access"),
+    [
+        ("pending", None, False),
+        ("past_due", None, False),
+        ("canceled", None, False),
+        ("expired", None, False),
+        ("unknown", None, False),
+        ("trialing", None, False),
+        ("trialing", -1, False),
+        ("trialing", 30, True),
+        ("active", None, True),
+    ],
+)
+def test_user_has_paid_access_for_billing_statuses(
+    client: TestClient,
+    billing_status: str,
+    trial_days: int | None,
+    expected_access: bool,
+) -> None:
+    _token, user_id = register_user(
+        client,
+        f"{billing_status}-{trial_days or 'none'}@test.com",
+    )
+    save_subscription(user_id, billing_status, trial_days=trial_days)
+
+    assert user_has_paid_access(user_id) is expected_access
+
+
+def test_user_without_subscription_has_no_paid_access(client: TestClient) -> None:
+    _token, user_id = register_user(client, "no-subscription@test.com")
+
+    assert user_has_paid_access(user_id) is False
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/expenses",
+        "/incomes",
+        "/credit-cards",
+        "/businesses",
+    ],
+)
+def test_user_without_billing_cannot_access_main_routes(
+    client: TestClient,
+    path: str,
+) -> None:
+    token, _user_id = register_user(client, f"blocked-{path.strip('/')}@test.com")
 
     response = client.get(
-        f"{API_PREFIX}/expenses",
+        f"{API_PREFIX}{path}",
         headers=auth_headers(token),
     )
 
     assert response.status_code == 402
 
 
-def test_trialing_user_with_valid_trial_has_access(client: TestClient) -> None:
-    _token, user_id = register_user(client, "trialing@test.com")
+def test_trialing_user_with_valid_trial_can_access_main_route(
+    client: TestClient,
+) -> None:
+    token, user_id = register_user(client, "trial-main-route@test.com")
     save_subscription(user_id, "trialing", trial_days=30)
 
-    assert user_has_paid_access(user_id) is True
+    response = client.get(
+        f"{API_PREFIX}/expenses",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
 
 
-def test_expired_trialing_user_loses_access(client: TestClient) -> None:
-    _token, user_id = register_user(client, "expired-trial@test.com")
-    save_subscription(user_id, "trialing", trial_days=-1)
-
-    assert user_has_paid_access(user_id) is False
-
-
-def test_active_user_has_access(client: TestClient) -> None:
-    _token, user_id = register_user(client, "active-billing@test.com")
+def test_active_user_can_access_main_route(client: TestClient) -> None:
+    token, user_id = register_user(client, "active-main-route@test.com")
     save_subscription(user_id, "active")
 
-    assert user_has_paid_access(user_id) is True
+    response = client.get(
+        f"{API_PREFIX}/expenses",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
 
 
 def test_checkout_requires_authenticated_user(client: TestClient) -> None:
@@ -54,6 +107,76 @@ def test_cancel_requires_authenticated_user(client: TestClient) -> None:
     response = client.post(f"{API_PREFIX}/billing/cancel")
 
     assert response.status_code in {401, 403}
+
+
+def test_checkout_does_not_grant_access_automatically(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    token, user_id = register_user(client, "checkout-pending@test.com")
+
+    def fake_create_preapproval(payload: dict) -> dict:
+        return {
+            "id": "preapproval-pending",
+            "init_point": "https://www.mercadopago.com.br/checkout",
+            "status": "pending",
+        }
+
+    monkeypatch.setattr(
+        "app.billing_service.create_preapproval",
+        fake_create_preapproval,
+    )
+
+    checkout_response = client.post(
+        f"{API_PREFIX}/billing/checkout",
+        headers=auth_headers(token),
+    )
+    billing_response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+
+    assert checkout_response.status_code == 200, checkout_response.text
+    assert checkout_response.json()["status"] == "pending"
+    assert user_has_paid_access(user_id) is False
+    assert billing_response.json()["status"] == "pending"
+    assert billing_response.json()["is_access_allowed"] is False
+
+
+def test_billing_me_statuses(client: TestClient) -> None:
+    token, user_id = register_user(client, "billing-me-none@test.com")
+
+    empty_response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+    assert empty_response.status_code == 200
+    assert empty_response.json()["status"] == "none"
+    assert empty_response.json()["is_access_allowed"] is False
+
+    save_subscription(user_id, "trialing", trial_days=30)
+    trial_response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+    assert trial_response.json()["status"] == "trialing"
+    assert trial_response.json()["is_access_allowed"] is True
+
+    save_subscription(user_id, "active")
+    active_response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+    assert active_response.json()["status"] == "active"
+    assert active_response.json()["is_access_allowed"] is True
+
+    save_subscription(user_id, "trialing", trial_days=-1)
+    expired_response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+    assert expired_response.json()["status"] == "expired"
+    assert expired_response.json()["is_access_allowed"] is False
 
 
 def test_billing_webhook_duplicate_is_idempotent(client: TestClient) -> None:
@@ -81,7 +204,7 @@ def register_user(client: TestClient, email: str) -> tuple[str, str]:
     response = client.post(
         f"{API_PREFIX}/auth/register",
         json={
-            "name": "Usuário Billing",
+            "name": "Usuario Billing",
             "email": email,
             "password": "Senha12345",
             "confirm_password": "Senha12345",

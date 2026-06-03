@@ -9,6 +9,9 @@ from app.billing_repository import (
     get_user_subscription,
     get_user_subscription_by_provider_subscription_id,
     insert_payment_event_once,
+    list_trials_ending_within,
+    list_user_subscriptions_by_status,
+    list_users_without_subscription,
     upsert_user_subscription,
 )
 from app.billing_schemas import (
@@ -70,23 +73,16 @@ def create_checkout(user: UserResponse) -> BillingCheckoutResponse:
         )
 
     now = datetime.now(timezone.utc)
-    should_start_trial = subscription.trial_starts_at is None
-    trial_ends_at = (
-        now + timedelta(days=settings.app_trial_days) if should_start_trial else None
-    )
-    next_status: BillingStatus = "trialing" if should_start_trial else "pending"
 
     saved_subscription = upsert_user_subscription(
         subscription.model_copy(
             update={
                 "provider": MERCADO_PAGO_PROVIDER,
                 "provider_subscription_id": provider_subscription_id,
-                "status": next_status,
+                "status": "pending",
                 "plan_name": PLAN_NAME,
                 "amount": settings.app_price_brl,
                 "currency": "BRL",
-                "trial_starts_at": now if should_start_trial else subscription.trial_starts_at,
-                "trial_ends_at": trial_ends_at or subscription.trial_ends_at,
                 "checkout_url": checkout_url,
                 "updated_at": now,
             },
@@ -182,6 +178,18 @@ def user_has_paid_access(user_id: str) -> bool:
     )
 
 
+def get_billing_admin_lists() -> dict:
+    return {
+        "trialing": list_user_subscriptions_by_status("trialing"),
+        "trials_ending_soon": list_trials_ending_within(days=7),
+        "without_subscription": list_users_without_subscription(),
+        "pending": list_user_subscriptions_by_status("pending"),
+        "past_due": list_user_subscriptions_by_status("past_due"),
+        "canceled": list_user_subscriptions_by_status("canceled"),
+        "active": list_user_subscriptions_by_status("active"),
+    }
+
+
 def create_pending_subscription(user_id: str) -> UserSubscriptionRecord:
     now = datetime.now(timezone.utc)
 
@@ -265,6 +273,14 @@ def update_subscription_from_provider_response(
     now = datetime.now(timezone.utc)
     provider_status = str(response_data.get("status") or "")
     next_status = forced_status or map_provider_status(provider_status, subscription)
+    trial_starts_at = subscription.trial_starts_at
+    trial_ends_at = subscription.trial_ends_at
+
+    if next_status == "trialing" and trial_ends_at is None:
+        trial_starts_at = now
+        trial_ends_at = parse_provider_datetime(
+            response_data.get("next_payment_date"),
+        ) or now + timedelta(days=settings.app_trial_days)
 
     return upsert_user_subscription(
         subscription.model_copy(
@@ -282,6 +298,8 @@ def update_subscription_from_provider_response(
                 "plan_name": PLAN_NAME,
                 "amount": settings.app_price_brl,
                 "currency": "BRL",
+                "trial_starts_at": trial_starts_at,
+                "trial_ends_at": trial_ends_at,
                 "current_period_starts_at": parse_provider_datetime(
                     response_data.get("date_created"),
                 )
@@ -306,6 +324,9 @@ def map_provider_status(
     normalized_status = provider_status.strip().lower()
 
     if normalized_status in {"authorized", "active"}:
+        if subscription.trial_starts_at is None and settings.app_trial_days > 0:
+            return "trialing"
+
         return "active"
 
     if normalized_status in {"pending", "in_process"}:
@@ -353,18 +374,19 @@ def to_billing_status_response(
 
 def build_empty_billing_status() -> BillingStatusResponse:
     return BillingStatusResponse(
-        status="pending",
+        status="none",
         plan_name=PLAN_NAME,
         amount=settings.app_price_brl,
         currency="BRL",
         is_access_allowed=False,
         can_cancel=False,
-        message=get_billing_message("pending"),
+        message=get_billing_message("none"),
     )
 
 
 def get_billing_message(billing_status: BillingStatus) -> str:
     messages = {
+        "none": "Comece seu teste gratis de 1 mes. Depois, R$ 8,99/mes.",
         "trialing": "Teste grátis ativo.",
         "active": "Assinatura ativa.",
         "pending": "Comece seu teste grátis para usar o My Expenses completo.",

@@ -42,8 +42,17 @@ export function Paywall({
       return {
         title: "Seu teste grátis terminou",
         description:
-          "Seu teste grátis terminou. Para continuar usando o My Expenses, assine por R$ 8,99/mês.",
+          "Seu teste grátis terminou ou sua assinatura ainda não foi ativada. Para continuar usando o My Expenses, confirme sua assinatura por R$ 8,99/mês após 1 mês grátis.",
         primaryLabel: "Assinar por R$ 8,99/mês",
+      };
+    }
+
+    if (billing.status === "pending") {
+      return {
+        title: "Aguardando confirmação",
+        description:
+          "Estamos aguardando a confirmação da sua assinatura. Se você já concluiu o pagamento, aguarde alguns instantes e tente novamente.",
+        primaryLabel: "Abrir Mercado Pago",
       };
     }
 
@@ -59,7 +68,7 @@ export function Paywall({
     return {
       title: "Começar teste grátis",
       description:
-        "Use o My Expenses completo por 1 mês grátis. Depois, R$ 8,99/mês.",
+        "Comece seu teste grátis de 1 mês. Depois, R$ 8,99/mês.",
       primaryLabel: "Começar teste grátis",
     };
   }, [billing.status]);

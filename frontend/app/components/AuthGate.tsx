@@ -11,14 +11,12 @@ import {
   logoutCurrentSession,
   setUnauthorizedHandler,
 } from "../lib/api";
-import { getBillingStatus } from "../lib/billing-api";
 import {
   clearCachedAuthenticatedUser,
-  readCachedAuthenticatedUser,
   saveCachedAuthenticatedUser,
 } from "../lib/auth-session-cache";
-import { readDashboardCache } from "../lib/dashboard-cache";
 import { requestInstallNotificationPermissionOnce } from "../lib/notification-service";
+import { resolvePostAuthDestination } from "../lib/post-auth";
 import {
   getAutoLogoutEnabled,
   getAutoLogoutMilliseconds,
@@ -67,17 +65,6 @@ function hasExplicitAuthMode() {
   return authMode === "login" || authMode === "register";
 }
 
-function canOpenOfflineDashboard() {
-  const cachedUser = readCachedAuthenticatedUser();
-  const cachedDashboard = readDashboardCache();
-
-  if (!cachedUser || !cachedDashboard) {
-    return null;
-  }
-
-  return cachedUser;
-}
-
 export function AuthGate() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -109,20 +96,12 @@ export function AuthGate() {
     }
 
     if (isBrowserOffline()) {
-      const cachedUser = canOpenOfflineDashboard();
-
-      if (cachedUser) {
-        setCurrentUser(cachedUser);
-        setSessionError(false);
-        setSessionErrorMessage("");
-      } else {
-        setCurrentUser(null);
-        setSessionError(true);
-        setSessionErrorMessage(
-          "Você está offline e ainda não há dados salvos neste aparelho. Conecte-se à internet para entrar no app.",
-        );
-      }
-
+      setCurrentUser(null);
+      setBilling(null);
+      setSessionError(true);
+      setSessionErrorMessage(
+        "Conecte-se à internet para validar sua assinatura antes de entrar no app.",
+      );
       setIsCheckingSession(false);
       return;
     }
@@ -138,17 +117,6 @@ export function AuthGate() {
       setSessionErrorMessage("");
     } catch (error) {
       if (error instanceof ApiError && error.statusCode === 0) {
-        const cachedUser = isBrowserOffline()
-          ? canOpenOfflineDashboard()
-          : null;
-
-        if (cachedUser) {
-          setCurrentUser(cachedUser);
-          setSessionError(false);
-          setSessionErrorMessage("");
-          return;
-        }
-
         setSessionError(true);
         setSessionErrorMessage(
           "Não conseguimos conectar agora. Verifique sua internet ou tente novamente em alguns segundos.",
@@ -187,7 +155,17 @@ export function AuthGate() {
   }, [currentUserId, isCheckingSession]);
 
   useEffect(() => {
-    if (!currentUser || isBrowserOffline()) {
+    if (!currentUser) {
+      return;
+    }
+
+    if (isBrowserOffline()) {
+      setBilling(null);
+      setSessionError(true);
+      setSessionErrorMessage(
+        "Conecte-se à internet para validar sua assinatura antes de entrar no app.",
+      );
+      setIsCheckingBilling(false);
       return;
     }
 
@@ -201,21 +179,22 @@ export function AuthGate() {
         const shouldRefreshCheckout =
           searchParams.get("checkout") === "billing_return"
           || searchParams.get("checkout") === "subscription_return";
-        const loadedBilling = await getBillingStatus();
+        const postAuth = await resolvePostAuthDestination();
 
         if (!isMounted) {
           return;
         }
 
-        setBilling(loadedBilling);
+        setBilling(postAuth.billing);
         trackEvent("subscription_status_loaded", {
-          status: loadedBilling.status,
-          can_access_app: loadedBilling.is_access_allowed,
+          status: postAuth.billing.status,
+          can_access_app: postAuth.billing.is_access_allowed,
+          destination: postAuth.destination,
         });
 
         if (shouldRefreshCheckout) {
           trackEvent("checkout_returned", {
-            status: loadedBilling.status,
+            status: postAuth.billing.status,
           });
           window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -309,7 +288,7 @@ export function AuthGate() {
   if (
     isCheckingSession ||
     (currentUser && isCheckingBilling) ||
-    (currentUser && !billing && !isBrowserOffline())
+    (currentUser && !billing)
   ) {
     return (
       <PageLoading

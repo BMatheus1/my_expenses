@@ -39,14 +39,14 @@ from app.business_services import (
 )
 from app.security import write_rate_limit
 from app.schemas import UserResponse
-from app.subscription_dependencies import require_active_subscription
+from app.billing_dependencies import require_paid_access
 
 router = APIRouter(prefix="/businesses", tags=["Businesses"])
 
 
 @router.get("", response_model=list[BusinessResponse])
 def get_businesses(
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return get_user_businesses(current_user.id)
 
@@ -59,7 +59,7 @@ def get_businesses(
 )
 def add_business(
     business_data: BusinessCreate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return create_user_business(business_data, current_user.id)
 
@@ -72,7 +72,7 @@ def add_business(
 def edit_business(
     business_id: str,
     business_data: BusinessUpdate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return update_user_business(business_id, business_data, current_user.id)
 
@@ -85,7 +85,7 @@ def edit_business(
 def remove_business(
     business_id: str,
     confirmation_data: BusinessDeleteConfirmation,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     delete_user_business(
         business_id=business_id,
@@ -102,7 +102,7 @@ def remove_business(
 )
 def get_business_dashboard(
     business_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return get_user_business_dashboard(business_id, current_user.id)
 
@@ -113,7 +113,7 @@ def get_business_dashboard(
 )
 def get_business_materials(
     business_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return get_user_business_materials(business_id, current_user.id)
 
@@ -127,7 +127,7 @@ def get_business_materials(
 def add_business_material(
     business_id: str,
     material_data: BusinessMaterialCreate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return create_user_business_material(
         business_id=business_id,
@@ -145,7 +145,7 @@ def edit_business_material(
     business_id: str,
     material_id: str,
     material_data: BusinessMaterialUpdate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return update_user_business_material(
         business_id=business_id,
@@ -163,7 +163,7 @@ def edit_business_material(
 def remove_business_material(
     business_id: str,
     material_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     delete_user_business_material(business_id, material_id, current_user.id)
 
@@ -176,7 +176,7 @@ def remove_business_material(
 )
 def get_business_services(
     business_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return get_user_business_services(business_id, current_user.id)
 
@@ -190,7 +190,7 @@ def get_business_services(
 def add_business_service(
     business_id: str,
     service_data: BusinessServiceCreate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return create_user_business_service(
         business_id=business_id,
@@ -208,7 +208,7 @@ def edit_business_service(
     business_id: str,
     service_id: str,
     service_data: BusinessServiceUpdate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return update_user_business_service(
         business_id=business_id,
@@ -226,7 +226,7 @@ def edit_business_service(
 def remove_business_service(
     business_id: str,
     service_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     delete_user_business_service(business_id, service_id, current_user.id)
 
@@ -243,7 +243,7 @@ def add_material_to_service(
     business_id: str,
     service_id: str,
     recipe_data: BusinessRecipeItemCreate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return add_material_to_user_service(
         business_id=business_id,
@@ -263,7 +263,7 @@ def edit_service_material(
     service_id: str,
     recipe_item_id: str,
     recipe_data: BusinessRecipeItemUpdate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return update_user_service_material(
         business_id=business_id,
@@ -283,7 +283,7 @@ def remove_service_material(
     business_id: str,
     service_id: str,
     recipe_item_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return delete_user_service_material(
         business_id=business_id,
@@ -299,7 +299,7 @@ def remove_service_material(
 )
 def get_business_sales(
     business_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return get_user_business_sales(business_id, current_user.id)
 
@@ -313,7 +313,7 @@ def get_business_sales(
 def add_business_sale(
     business_id: str,
     sale_data: BusinessSaleCreate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return create_user_business_sale(
         business_id=business_id,

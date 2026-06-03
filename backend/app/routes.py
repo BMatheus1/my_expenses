@@ -82,7 +82,7 @@ from app.subscription_service import (
     refresh_subscription_from_provider,
     start_trial,
 )
-from app.subscription_dependencies import require_active_subscription
+from app.billing_dependencies import require_paid_access
 
 router = APIRouter()
 router.include_router(billing_router)
@@ -343,7 +343,7 @@ def delete_account(
     tags=["Expense Categories"],
 )
 def get_expense_categories(
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return list_expense_categories(current_user.id)
 
@@ -357,7 +357,7 @@ def get_expense_categories(
 )
 def add_expense_category(
     category_data: ExpenseCategoryCreate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return create_expense_category(category_data, current_user.id)
 
@@ -371,7 +371,7 @@ def add_expense_category(
 def edit_expense_category(
     category_id: str,
     category_data: ExpenseCategoryUpdate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return update_expense_category(
         category_id=category_id,
@@ -388,7 +388,7 @@ def edit_expense_category(
 )
 def remove_expense_category(
     category_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     delete_expense_category(category_id, current_user.id)
 
@@ -401,7 +401,7 @@ def remove_expense_category(
     tags=["Credit Cards"],
 )
 def get_credit_cards(
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return list_credit_cards(current_user.id)
 
@@ -415,7 +415,7 @@ def get_credit_cards(
 )
 def add_credit_card(
     card_data: CreditCardCreate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return create_credit_card(card_data, current_user.id)
 
@@ -429,7 +429,7 @@ def add_credit_card(
 def edit_credit_card(
     card_id: str,
     card_data: CreditCardUpdate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return update_credit_card(card_id, card_data, current_user.id)
 
@@ -443,7 +443,7 @@ def edit_credit_card(
 def remove_credit_card(
     card_id: str,
     delete_linked_expenses: bool = Query(default=False),
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     delete_credit_card(
         card_id=card_id,
@@ -459,7 +459,7 @@ def remove_credit_card(
     tags=["Expenses"],
 )
 def get_expenses(
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return list_expenses(current_user.id)
 
@@ -473,7 +473,7 @@ def get_expenses(
 )
 def add_expense(
     expense_data: ExpenseCreate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return create_expense(expense_data, current_user.id)
 
@@ -487,7 +487,7 @@ def add_expense(
 def edit_expense(
     expense_id: str,
     expense_data: ExpenseUpdate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return update_expense(expense_id, expense_data, current_user.id)
 
@@ -500,7 +500,7 @@ def edit_expense(
 )
 def remove_expense(
     expense_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     delete_expense(expense_id, current_user.id)
 
@@ -513,7 +513,7 @@ def remove_expense(
     tags=["Incomes"],
 )
 def get_incomes(
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return list_incomes(current_user.id)
 
@@ -527,7 +527,7 @@ def get_incomes(
 )
 def add_income(
     income_data: IncomeCreate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return create_income(income_data, current_user.id)
 
@@ -541,7 +541,7 @@ def add_income(
 def edit_income(
     income_id: str,
     income_data: IncomeUpdate,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     return update_income(income_id, income_data, current_user.id)
 
@@ -554,7 +554,7 @@ def edit_income(
 )
 def remove_income(
     income_id: str,
-    current_user: UserResponse = Depends(require_active_subscription),
+    current_user: UserResponse = Depends(require_paid_access),
 ):
     delete_income(income_id, current_user.id)
 

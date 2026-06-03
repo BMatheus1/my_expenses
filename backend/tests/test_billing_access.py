@@ -179,6 +179,65 @@ def test_billing_me_statuses(client: TestClient) -> None:
     assert expired_response.json()["is_access_allowed"] is False
 
 
+def test_google_login_without_subscription_is_blocked(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    token, _user_id = login_google_user(
+        client,
+        monkeypatch,
+        "google-no-subscription@test.com",
+    )
+
+    billing_response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+    expenses_response = client.get(
+        f"{API_PREFIX}/expenses",
+        headers=auth_headers(token),
+    )
+
+    assert billing_response.json()["is_access_allowed"] is False
+    assert expenses_response.status_code == 402
+
+
+@pytest.mark.parametrize(
+    ("billing_status", "trial_days", "expected_access"),
+    [
+        ("trialing", 30, True),
+        ("active", None, True),
+        ("canceled", None, False),
+        ("trialing", -1, False),
+    ],
+)
+def test_google_login_uses_same_billing_access_rule(
+    client: TestClient,
+    monkeypatch,
+    billing_status: str,
+    trial_days: int | None,
+    expected_access: bool,
+) -> None:
+    token, user_id = login_google_user(
+        client,
+        monkeypatch,
+        f"google-{billing_status}-{trial_days or 'none'}@test.com",
+    )
+    save_subscription(user_id, billing_status, trial_days=trial_days)
+
+    billing_response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+    expenses_response = client.get(
+        f"{API_PREFIX}/expenses",
+        headers=auth_headers(token),
+    )
+
+    assert billing_response.json()["is_access_allowed"] is expected_access
+    assert expenses_response.status_code == (200 if expected_access else 402)
+
+
 def test_billing_webhook_duplicate_is_idempotent(client: TestClient) -> None:
     payload = {
         "id": "evt-test-duplicate",
@@ -230,6 +289,41 @@ def register_user(client: TestClient, email: str) -> tuple[str, str]:
     assert login_response.status_code == 200, login_response.text
 
     return login_response.json()["access_token"], user.id
+
+
+def login_google_user(
+    client: TestClient,
+    monkeypatch,
+    email: str,
+) -> tuple[str, str]:
+    mock_google_credential(monkeypatch, email=email)
+
+    response = client.post(
+        f"{API_PREFIX}/auth/google",
+        json={"credential": "fake-google-login-token"},
+    )
+
+    assert response.status_code == 200, response.text
+
+    user = get_user_record_by_email(email)
+    assert user is not None
+
+    return response.json()["access_token"], user.id
+
+
+def mock_google_credential(monkeypatch, email: str) -> None:
+    def fake_verify_google_credential(credential: str) -> dict:
+        return {
+            "email": email,
+            "name": "Usuario Google",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+        }
+
+    monkeypatch.setattr(
+        "app.auth_service.verify_google_credential",
+        fake_verify_google_credential,
+    )
 
 
 def auth_headers(token: str) -> dict[str, str]:

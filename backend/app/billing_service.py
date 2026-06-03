@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -32,6 +33,7 @@ from app.schemas import UserResponse
 MERCADO_PAGO_PROVIDER = "mercado_pago"
 PLAN_NAME = "My Expenses Premium"
 ACCESS_STATUSES = {"trialing", "active"}
+logger = logging.getLogger(__name__)
 
 
 def get_billing_status(user: UserResponse) -> BillingStatusResponse:
@@ -114,6 +116,50 @@ def cancel_subscription(user: UserResponse) -> BillingStatusResponse:
     )
 
     return to_billing_status_response(updated_subscription)
+
+
+def sync_billing_status(user: UserResponse) -> BillingStatusResponse:
+    subscription = get_user_subscription(user.id)
+
+    if subscription is None:
+        logger.info(
+            "Billing sync without local subscription",
+            extra={
+                "user_id": user.id,
+                "provider_subscription_id_present": False,
+                "mercado_pago_status": None,
+                "internal_status": "none",
+                "is_access_allowed": False,
+            },
+        )
+        return build_empty_billing_status()
+
+    subscription = refresh_time_based_status(subscription)
+    provider_status = None
+
+    if subscription.provider_subscription_id:
+        response_data = fetch_preapproval(subscription.provider_subscription_id)
+        provider_status = str(response_data.get("status") or "")
+        subscription = update_subscription_from_provider_response(
+            subscription,
+            response_data,
+        )
+
+    billing_status = to_billing_status_response(subscription)
+    logger.info(
+        "Billing sync completed",
+        extra={
+            "user_id": user.id,
+            "provider_subscription_id_present": bool(
+                subscription.provider_subscription_id,
+            ),
+            "mercado_pago_status": provider_status,
+            "internal_status": billing_status.status,
+            "is_access_allowed": billing_status.is_access_allowed,
+        },
+    )
+
+    return billing_status
 
 
 def handle_mercado_pago_webhook(
@@ -259,7 +305,9 @@ def build_preapproval_payload(
         "reason": PLAN_NAME,
         "external_reference": user.id,
         "payer_email": user.email,
-        "back_url": f"{settings.frontend_url}/app?checkout=billing_return",
+        "back_url": (
+            f"{settings.frontend_url}/pagamento/retorno?provider=mercado_pago"
+        ),
         "auto_recurring": auto_recurring,
         "status": "pending",
     }
@@ -362,6 +410,7 @@ def to_billing_status_response(
         currency=subscription.currency,
         trial_ends_at=subscription.trial_ends_at,
         current_period_ends_at=subscription.current_period_ends_at,
+        provider_subscription_id=subscription.provider_subscription_id,
         is_access_allowed=is_access_allowed,
         can_cancel=bool(
             subscription.provider_subscription_id

@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   cancelSubscription,
   createCheckout,
+  getBillingStatus,
+  syncBillingStatus,
 } from "../lib/billing-api";
 import { trackEvent } from "../lib/tracking";
 import type { BillingStatusResponse } from "../types/billing";
@@ -34,6 +37,7 @@ export function Paywall({
   onBillingChange,
   onLogout,
 }: PaywallProps) {
+  const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -110,6 +114,24 @@ export function Paywall({
     }
   }
 
+  async function handleVerifyPayment() {
+    try {
+      setIsProcessing(true);
+      setErrorMessage("");
+      await syncBillingStatus();
+      const updatedBilling = await getBillingStatus();
+      onBillingChange(updatedBilling);
+
+      if (updatedBilling.is_access_allowed) {
+        router.replace("/app");
+      }
+    } catch (error) {
+      setErrorMessage(getBillingErrorMessage(error));
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-4 py-6 text-[var(--app-text)]">
       <section className="w-full max-w-2xl rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-sm sm:p-7">
@@ -179,6 +201,19 @@ export function Paywall({
             {content.primaryLabel}
           </LoadingButton>
         </div>
+
+        {billing.status === "pending" ? (
+          <div className="mt-3">
+            <LoadingButton
+              isLoading={isProcessing}
+              loadingLabel="Verificando..."
+              onClick={handleVerifyPayment}
+              className="app-button-secondary touch-button w-full justify-center"
+            >
+              Ja confirmei, verificar assinatura
+            </LoadingButton>
+          </div>
+        ) : null}
       </section>
     </main>
   );

@@ -11,6 +11,7 @@ from app.billing_service import (
     create_checkout,
     get_billing_status,
     handle_mercado_pago_webhook,
+    sync_billing_status,
 )
 from app.schemas import UserResponse
 from app.security import write_rate_limit
@@ -45,6 +46,17 @@ def cancel_billing_subscription(
     current_user: UserResponse = Depends(get_current_user),
 ):
     return cancel_subscription(current_user)
+
+
+@router.post(
+    "/sync",
+    response_model=BillingStatusResponse,
+    dependencies=[Depends(write_rate_limit)],
+)
+def sync_billing_subscription(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    return sync_billing_status(current_user)
 
 
 @router.post(

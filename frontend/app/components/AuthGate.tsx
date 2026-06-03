@@ -15,6 +15,7 @@ import {
   clearCachedAuthenticatedUser,
   saveCachedAuthenticatedUser,
 } from "../lib/auth-session-cache";
+import { syncBillingStatus } from "../lib/billing-api";
 import { requestInstallNotificationPermissionOnce } from "../lib/notification-service";
 import { resolvePostAuthDestination } from "../lib/post-auth";
 import {
@@ -179,6 +180,11 @@ export function AuthGate() {
         const shouldRefreshCheckout =
           searchParams.get("checkout") === "billing_return"
           || searchParams.get("checkout") === "subscription_return";
+
+        if (shouldRefreshCheckout) {
+          await syncBillingStatus();
+        }
+
         const postAuth = await resolvePostAuthDestination();
 
         if (!isMounted) {

@@ -15,6 +15,7 @@ export type BillingStatusResponse = {
   currency: string;
   trial_ends_at: string | null;
   current_period_ends_at: string | null;
+  provider_subscription_id: string | null;
   is_access_allowed: boolean;
   can_cancel: boolean;
   checkout_url: string | null;

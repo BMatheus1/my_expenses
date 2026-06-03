@@ -109,13 +109,21 @@ def test_cancel_requires_authenticated_user(client: TestClient) -> None:
     assert response.status_code in {401, 403}
 
 
+def test_sync_requires_authenticated_user(client: TestClient) -> None:
+    response = client.post(f"{API_PREFIX}/billing/sync")
+
+    assert response.status_code in {401, 403}
+
+
 def test_checkout_does_not_grant_access_automatically(
     client: TestClient,
     monkeypatch,
 ) -> None:
     token, user_id = register_user(client, "checkout-pending@test.com")
+    captured_payload: dict = {}
 
     def fake_create_preapproval(payload: dict) -> dict:
+        captured_payload.update(payload)
         return {
             "id": "preapproval-pending",
             "init_point": "https://www.mercadopago.com.br/checkout",
@@ -138,9 +146,135 @@ def test_checkout_does_not_grant_access_automatically(
 
     assert checkout_response.status_code == 200, checkout_response.text
     assert checkout_response.json()["status"] == "pending"
+    assert captured_payload["external_reference"] == user_id
+    assert captured_payload["back_url"].endswith(
+        "/pagamento/retorno?provider=mercado_pago",
+    )
     assert user_has_paid_access(user_id) is False
     assert billing_response.json()["status"] == "pending"
     assert billing_response.json()["is_access_allowed"] is False
+
+
+def test_billing_sync_without_subscription_returns_blocked_none(
+    client: TestClient,
+) -> None:
+    token, _user_id = register_user(client, "sync-no-subscription@test.com")
+
+    response = client.post(
+        f"{API_PREFIX}/billing/sync",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "none"
+    assert response.json()["is_access_allowed"] is False
+
+
+def test_billing_sync_pending_consults_mercado_pago(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    token, user_id = register_user(client, "sync-pending@test.com")
+    provider_subscription_id = "preapproval-sync-pending"
+    save_subscription(
+        user_id,
+        "pending",
+        provider_subscription_id=provider_subscription_id,
+    )
+    fetched_provider_ids = []
+
+    def fake_fetch_preapproval(provider_id: str) -> dict:
+        fetched_provider_ids.append(provider_id)
+        return {
+            "id": provider_id,
+            "external_reference": user_id,
+            "status": "pending",
+        }
+
+    monkeypatch.setattr(
+        "app.billing_service.fetch_preapproval",
+        fake_fetch_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/sync",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert fetched_provider_ids == [provider_subscription_id]
+    assert response.json()["status"] == "pending"
+    assert response.json()["provider_subscription_id"] == provider_subscription_id
+    assert response.json()["is_access_allowed"] is False
+
+
+def test_billing_sync_valid_provider_status_grants_trial_access(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    token, user_id = register_user(client, "sync-valid@test.com")
+    provider_subscription_id = "preapproval-sync-valid"
+    save_subscription(
+        user_id,
+        "pending",
+        provider_subscription_id=provider_subscription_id,
+    )
+
+    def fake_fetch_preapproval(provider_id: str) -> dict:
+        return {
+            "id": provider_id,
+            "external_reference": user_id,
+            "status": "authorized",
+        }
+
+    monkeypatch.setattr(
+        "app.billing_service.fetch_preapproval",
+        fake_fetch_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/sync",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "trialing"
+    assert response.json()["is_access_allowed"] is True
+    assert response.json()["trial_ends_at"] is not None
+
+
+def test_billing_sync_unknown_provider_status_stays_blocked(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    token, user_id = register_user(client, "sync-unknown@test.com")
+    provider_subscription_id = "preapproval-sync-unknown"
+    save_subscription(
+        user_id,
+        "pending",
+        provider_subscription_id=provider_subscription_id,
+    )
+
+    def fake_fetch_preapproval(provider_id: str) -> dict:
+        return {
+            "id": provider_id,
+            "external_reference": user_id,
+            "status": "surprising_status",
+        }
+
+    monkeypatch.setattr(
+        "app.billing_service.fetch_preapproval",
+        fake_fetch_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/sync",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "unknown"
+    assert response.json()["is_access_allowed"] is False
 
 
 def test_billing_me_statuses(client: TestClient) -> None:
@@ -336,6 +470,7 @@ def save_subscription(
     user_id: str,
     billing_status: str,
     trial_days: int | None = None,
+    provider_subscription_id: str | None = None,
 ) -> None:
     now = datetime.now(timezone.utc)
     trial_starts_at = now if trial_days is not None else None
@@ -348,7 +483,7 @@ def save_subscription(
             id=str(uuid4()),
             user_id=user_id,
             provider="mercado_pago",
-            provider_subscription_id=None,
+            provider_subscription_id=provider_subscription_id,
             provider_payment_id=None,
             status=billing_status,
             plan_name="My Expenses Premium",

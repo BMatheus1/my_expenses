@@ -56,6 +56,7 @@ class BillingStatusResponse(BaseModel):
     currency: str = "BRL"
     trial_ends_at: datetime | None = None
     current_period_ends_at: datetime | None = None
+    provider_subscription_id: str | None = None
     is_access_allowed: bool
     can_cancel: bool = False
     checkout_url: str | None = None

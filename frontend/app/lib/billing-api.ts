@@ -14,6 +14,12 @@ export function createCheckout(): Promise<BillingCheckoutResponse> {
   });
 }
 
+export function syncBillingStatus(): Promise<BillingStatusResponse> {
+  return apiRequest<BillingStatusResponse>("/billing/sync", {
+    method: "POST",
+  });
+}
+
 export function cancelSubscription(): Promise<BillingStatusResponse> {
   return apiRequest<BillingStatusResponse>("/billing/cancel", {
     method: "POST",

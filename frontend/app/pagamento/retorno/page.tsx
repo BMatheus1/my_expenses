@@ -11,7 +11,7 @@ import {
 import type { BillingStatusResponse } from "../../types/billing";
 import { LoadingButton, Spinner } from "../../components/AppFeedback";
 
-const MAX_SYNC_ATTEMPTS = 5;
+const MAX_SYNC_ATTEMPTS = 8;
 const SYNC_RETRY_DELAY_MS = 2000;
 
 type ReturnState =
@@ -67,7 +67,7 @@ export default function PaymentReturnPage() {
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : "Nao foi possivel confirmar sua assinatura agora.",
+            : "Não foi possível confirmar sua assinatura agora.",
         );
         setReturnState("error");
         return;
@@ -96,22 +96,22 @@ export default function PaymentReturnPage() {
     returnState === "unauthenticated"
       ? "Entre para confirmar assinatura"
       : returnState === "pending"
-        ? "Assinatura em confirmacao"
+        ? "Assinatura em confirmação"
         : returnState === "blocked"
-          ? "Assinatura nao liberada"
+          ? "Assinatura não liberada"
           : returnState === "error"
-            ? "Nao foi possivel confirmar"
-            : "Estamos confirmando sua assinatura...";
+            ? "Não foi possível confirmar"
+            : "Verificando sua assinatura...";
   const description =
     returnState === "unauthenticated"
-      ? "Para concluir a verificacao, entre com a mesma conta usada no checkout."
+      ? "Para concluir a verificação, entre com a mesma conta usada no checkout."
       : returnState === "pending"
-        ? "Sua assinatura ainda esta sendo confirmada. Aguarde alguns instantes e tente novamente."
+        ? "Sua assinatura ainda está sendo confirmada. Aguarde alguns instantes e tente novamente."
         : returnState === "blocked"
-          ? billing?.message || "Ainda nao encontramos uma assinatura ativa para esta conta."
+          ? billing?.message || "Ainda não encontramos uma assinatura ativa para esta conta."
           : returnState === "error"
             ? errorMessage
-            : `Sincronizando com o Mercado Pago. Tentativa ${attempt} de ${MAX_SYNC_ATTEMPTS}.`;
+            : `Estamos preparando seu ambiente. Isso leva só alguns instantes. Tentativa ${attempt} de ${MAX_SYNC_ATTEMPTS}.`;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-4 py-6 text-[var(--app-text)]">

@@ -55,7 +55,7 @@ export function Paywall({
       return {
         title: "Aguardando confirmação",
         description:
-          "Estamos aguardando a confirmação da sua assinatura. Se você já concluiu o pagamento, aguarde alguns instantes e tente novamente.",
+          "Estamos aguardando a confirmação da sua assinatura.",
         primaryLabel: "Abrir Mercado Pago",
       };
     }
@@ -210,7 +210,7 @@ export function Paywall({
               onClick={handleVerifyPayment}
               className="app-button-secondary touch-button w-full justify-center"
             >
-              Ja confirmei, verificar assinatura
+              Já confirmei, verificar assinatura
             </LoadingButton>
           </div>
         ) : null}

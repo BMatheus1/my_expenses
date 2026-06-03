@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   createSubscriptionCheckout,
+  startSubscriptionTrial,
 } from "../lib/api";
 import { trackEvent } from "../lib/tracking";
 import type { SubscriptionStatusResponse } from "../types/subscription";
@@ -29,8 +30,10 @@ const BENEFITS = [
 export function SubscriptionScreen({
   currentUser,
   subscription,
+  onSubscriptionChange,
   onLogout,
 }: SubscriptionScreenProps) {
+  const [isStartingTrial, setIsStartingTrial] = useState(false);
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -80,9 +83,32 @@ export function SubscriptionScreen({
     }
   }, [subscription.status]);
 
+  async function handlePrimaryAction() {
+    setErrorMessage("");
+
+    if (subscription.can_start_trial) {
+      try {
+        setIsStartingTrial(true);
+        trackEvent("trial_start_clicked", {
+          user_id: currentUser.id,
+        });
+
+        const updatedSubscription = await startSubscriptionTrial();
+        onSubscriptionChange(updatedSubscription);
+      } catch (error) {
+        setErrorMessage(getSubscriptionErrorMessage(error));
+      } finally {
+        setIsStartingTrial(false);
+      }
+
+      return;
+    }
+
+    await handleCheckout();
+  }
+
   async function handleCheckout() {
     try {
-      setErrorMessage("");
       setIsStartingCheckout(true);
       trackEvent("checkout_started", {
         user_id: currentUser.id,
@@ -98,7 +124,7 @@ export function SubscriptionScreen({
     }
   }
 
-  const isLoading = isStartingCheckout;
+  const isLoading = isStartingTrial || isStartingCheckout;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-4 py-6 text-[var(--app-text)]">
@@ -158,7 +184,7 @@ export function SubscriptionScreen({
           <LoadingButton
             isLoading={isLoading}
             loadingLabel="Preparando..."
-            onClick={handleCheckout}
+            onClick={handlePrimaryAction}
             className="app-button-primary touch-button w-full justify-center"
           >
             {content.primaryLabel}

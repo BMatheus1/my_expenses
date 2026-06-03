@@ -459,6 +459,12 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatusRespons
   return apiFetch<SubscriptionStatusResponse>("/subscription/status");
 }
 
+export async function startSubscriptionTrial(): Promise<SubscriptionStatusResponse> {
+  return apiFetch<SubscriptionStatusResponse>("/subscription/start-trial", {
+    method: "POST",
+  });
+}
+
 export async function createSubscriptionCheckout(): Promise<SubscriptionCheckoutResponse> {
   return apiFetch<SubscriptionCheckoutResponse>("/subscription/checkout", {
     method: "POST",

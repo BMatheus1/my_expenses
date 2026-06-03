@@ -13,9 +13,7 @@ USER_A = {
 }
 
 
-def test_start_trial_endpoint_does_not_grant_access_directly(
-    client: TestClient,
-) -> None:
+def test_user_can_start_trial_once(client: TestClient) -> None:
     token = register_user(client, USER_A)
 
     initial_response = client.get(
@@ -30,20 +28,18 @@ def test_start_trial_endpoint_does_not_grant_access_directly(
         f"{API_PREFIX}/subscription/start-trial",
         headers=auth_headers(token),
     )
-    final_response = client.get(
-        f"{API_PREFIX}/subscription/status",
-        headers=auth_headers(token),
-    )
 
     assert initial_response.status_code == 200, initial_response.text
     assert initial_response.json()["status"] == "inactive"
     assert initial_response.json()["can_access_app"] is False
     assert initial_response.json()["can_start_trial"] is True
 
-    assert trial_response.status_code == 409
+    assert trial_response.status_code == 200, trial_response.text
+    assert trial_response.json()["status"] == "trial_active"
+    assert trial_response.json()["can_access_app"] is True
+    assert trial_response.json()["trial_days_remaining"] in {29, 30}
+
     assert second_trial_response.status_code == 409
-    assert final_response.json()["status"] == "inactive"
-    assert final_response.json()["can_access_app"] is False
 
 
 def test_checkout_requires_mercado_pago_credentials(client: TestClient) -> None:

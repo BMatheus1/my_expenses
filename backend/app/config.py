@@ -50,6 +50,7 @@ class Settings(BaseSettings):
 
     mercado_pago_access_token: str = ""
     mercado_pago_webhook_secret: str = ""
+    mercado_pago_test_payer_email: str = ""
     mercado_pago_api_base_url: str = "https://api.mercadopago.com"
     mercado_pago_base_url: str = "https://api.mercadopago.com"
     app_public_url: str = "https://myexpensesfinance.com"

@@ -7,7 +7,9 @@ from fastapi.testclient import TestClient
 from app.billing_repository import upsert_user_subscription
 from app.billing_schemas import UserSubscriptionRecord
 from app.billing_service import user_has_paid_access
+from app.config import settings
 from app.email_verification_repository import mark_user_email_as_verified
+from app.mercado_pago_client import build_mercado_pago_headers
 from app.storage import get_user_record_by_email
 
 API_PREFIX = "/api"
@@ -141,6 +143,88 @@ def test_checkout_does_not_grant_access_automatically(
     assert user_has_paid_access(user_id) is False
     assert billing_response.json()["status"] == "pending"
     assert billing_response.json()["is_access_allowed"] is False
+
+
+def test_test_mode_checkout_uses_test_payer_email_and_real_external_reference(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    user_email = "checkout-test-mode@test.com"
+    test_payer_email = "comprador-teste@mercadopago.test"
+    token, user_id = register_user(client, user_email)
+    captured_payload: dict = {}
+
+    monkeypatch.setattr(settings, "mercado_pago_access_token", "TEST-token")
+    monkeypatch.setattr(
+        settings,
+        "mercado_pago_test_payer_email",
+        test_payer_email,
+    )
+
+    def fake_create_preapproval(payload: dict) -> dict:
+        captured_payload.update(payload)
+        return {
+            "id": "preapproval-test-mode",
+            "init_point": "https://www.mercadopago.com.br/checkout",
+            "status": "pending",
+        }
+
+    monkeypatch.setattr(
+        "app.billing_service.create_preapproval",
+        fake_create_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/checkout",
+        headers=auth_headers(token),
+    )
+    user = get_user_record_by_email(user_email)
+
+    assert response.status_code == 200, response.text
+    assert captured_payload["payer_email"] == test_payer_email
+    assert captured_payload["external_reference"] == user_id
+    assert user is not None
+    assert user.email == user_email
+    assert build_mercado_pago_headers()["X-scope"] == "stage"
+
+
+def test_production_checkout_uses_user_email_and_no_stage_header(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    user_email = "checkout-production@test.com"
+    token, user_id = register_user(client, user_email)
+    captured_payload: dict = {}
+
+    monkeypatch.setattr(settings, "mercado_pago_access_token", "APP_USR-token")
+    monkeypatch.setattr(
+        settings,
+        "mercado_pago_test_payer_email",
+        "comprador-teste@mercadopago.test",
+    )
+
+    def fake_create_preapproval(payload: dict) -> dict:
+        captured_payload.update(payload)
+        return {
+            "id": "preapproval-production",
+            "init_point": "https://www.mercadopago.com.br/checkout",
+            "status": "pending",
+        }
+
+    monkeypatch.setattr(
+        "app.billing_service.create_preapproval",
+        fake_create_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/checkout",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert captured_payload["payer_email"] == user_email
+    assert captured_payload["external_reference"] == user_id
+    assert "X-scope" not in build_mercado_pago_headers()
 
 
 def test_billing_me_statuses(client: TestClient) -> None:

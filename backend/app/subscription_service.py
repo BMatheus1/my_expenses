@@ -1,13 +1,19 @@
 import hashlib
 import hmac
 import json
-from datetime import datetime, timedelta, timezone
+import logging
+from datetime import datetime, timezone
 from urllib import error, request
 from uuid import uuid4
 
 from fastapi import HTTPException, status
 
 from app.config import settings
+from app.mercado_pago_client import (
+    build_mercado_pago_headers,
+    build_safe_mercado_pago_checkout_log_context,
+    get_mercado_pago_payer_email,
+)
 from app.schemas import (
     SubscriptionCheckoutResponse,
     SubscriptionRecord,
@@ -22,6 +28,7 @@ from app.storage import (
 
 ACCESS_STATUSES = {"trial_active", "active"}
 MERCADO_PAGO_PROVIDER = "mercado_pago"
+logger = logging.getLogger(__name__)
 
 
 def get_subscription_status(user: UserResponse) -> SubscriptionStatusResponse:
@@ -32,30 +39,15 @@ def get_subscription_status(user: UserResponse) -> SubscriptionStatusResponse:
 
 
 def start_trial(user: UserResponse) -> SubscriptionStatusResponse:
-    subscription = get_or_create_subscription_record(user.id)
+    get_or_create_subscription_record(user.id)
 
-    if subscription.trial_start_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Este teste grátis já foi iniciado nesta conta.",
-        )
-
-    now = datetime.now(timezone.utc)
-    trial_end_at = now + timedelta(days=settings.subscription_trial_days)
-
-    subscription = subscription.model_copy(
-        update={
-            "trial_start_at": now,
-            "trial_end_at": trial_end_at,
-            "subscription_status": "trial_active",
-            "updated_at": now,
-        },
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=(
+            "O teste gratis deve ser iniciado pelo checkout do Mercado Pago. "
+            "Acesso liberado somente apos confirmacao da assinatura."
+        ),
     )
-
-    saved_subscription = upsert_subscription_record(subscription)
-
-    return to_subscription_status_response(saved_subscription)
-
 
 def create_subscription_checkout(user: UserResponse) -> SubscriptionCheckoutResponse:
     subscription = refresh_time_based_status(get_or_create_subscription_record(user.id))
@@ -78,6 +70,13 @@ def create_subscription_checkout(user: UserResponse) -> SubscriptionCheckoutResp
             ),
         )
 
+    logger.info(
+        "Creating Mercado Pago subscription checkout",
+        extra=build_safe_mercado_pago_checkout_log_context(
+            external_reference=user.id,
+            endpoint="/preapproval",
+        ),
+    )
     response_data = create_mercado_pago_preapproval(
         user,
         include_free_trial=subscription.trial_start_at is None,
@@ -266,7 +265,7 @@ def create_mercado_pago_preapproval(
     payload = {
         "reason": "My Expenses - assinatura mensal",
         "external_reference": user.id,
-        "payer_email": user.email,
+        "payer_email": get_mercado_pago_payer_email(user.email),
         "back_url": f"{settings.frontend_url}/app?checkout=subscription_return",
         "auto_recurring": auto_recurring,
         "status": "pending",
@@ -289,10 +288,7 @@ def mercado_pago_request(
         f"{settings.mercado_pago_api_base_url.rstrip('/')}{path}",
         data=request_body,
         method=method,
-        headers={
-            "Authorization": f"Bearer {settings.mercado_pago_access_token}",
-            "Content-Type": "application/json",
-        },
+        headers=build_mercado_pago_headers(),
     )
 
     try:

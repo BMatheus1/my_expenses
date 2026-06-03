@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -23,15 +24,18 @@ from app.billing_schemas import (
 )
 from app.config import settings
 from app.mercado_pago_client import (
+    build_safe_mercado_pago_checkout_log_context,
     cancel_preapproval,
     create_preapproval,
     fetch_preapproval,
+    get_mercado_pago_payer_email,
 )
 from app.schemas import UserResponse
 
 MERCADO_PAGO_PROVIDER = "mercado_pago"
 PLAN_NAME = "My Expenses Premium"
 ACCESS_STATUSES = {"trialing", "active"}
+logger = logging.getLogger(__name__)
 
 
 def get_billing_status(user: UserResponse) -> BillingStatusResponse:
@@ -58,6 +62,13 @@ def create_checkout(user: UserResponse) -> BillingCheckoutResponse:
             message="Seu acesso já está liberado.",
         )
 
+    logger.info(
+        "Creating Mercado Pago billing checkout",
+        extra=build_safe_mercado_pago_checkout_log_context(
+            external_reference=user.id,
+            endpoint="/preapproval",
+        ),
+    )
     response_data = create_preapproval(build_preapproval_payload(user, subscription))
     provider_subscription_id = str(response_data.get("id") or "")
     checkout_url = str(
@@ -258,7 +269,7 @@ def build_preapproval_payload(
     return {
         "reason": PLAN_NAME,
         "external_reference": user.id,
-        "payer_email": user.email,
+        "payer_email": get_mercado_pago_payer_email(user.email),
         "back_url": f"{settings.frontend_url}/app?checkout=billing_return",
         "auto_recurring": auto_recurring,
         "status": "pending",

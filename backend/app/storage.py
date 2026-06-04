@@ -95,10 +95,18 @@ def create_users_table(connection: Connection) -> None:
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT,
             provider TEXT NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL
+            created_at TIMESTAMPTZ NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            last_login_at TIMESTAMPTZ,
+            status TEXT NOT NULL DEFAULT 'active',
+            role TEXT NOT NULL DEFAULT 'user'
         )
         """
     )
+    connection.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()")
+    connection.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ")
+    connection.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'")
+    connection.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'")
 
 
 def create_subscriptions_table(connection: Connection) -> None:

@@ -13,6 +13,7 @@ const STATUS_LABELS: Record<BillingStatusResponse["status"], string> = {
   active: "Assinatura ativa",
   pending: "Pagamento pendente",
   past_due: "Pagamento pendente",
+  blocked: "Assinatura pausada",
   canceled: "Assinatura cancelada",
   expired: "Teste expirado",
   unknown: "Status em análise",

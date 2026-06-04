@@ -32,7 +32,7 @@ from app.schemas import UserResponse
 
 MERCADO_PAGO_PROVIDER = "mercado_pago"
 PLAN_NAME = "My Expenses Premium"
-ACCESS_STATUSES = {"trialing", "active"}
+GRACE_PERIOD_DAYS = 2
 logger = logging.getLogger(__name__)
 
 
@@ -82,6 +82,7 @@ def create_checkout(user: UserResponse) -> BillingCheckoutResponse:
                 "provider": MERCADO_PAGO_PROVIDER,
                 "provider_subscription_id": provider_subscription_id,
                 "status": "pending",
+                "payment_status": "pending",
                 "plan_name": PLAN_NAME,
                 "amount": settings.app_price_brl,
                 "currency": "BRL",
@@ -287,14 +288,7 @@ def user_has_paid_access(user_id: str) -> bool:
 
     subscription = refresh_time_based_status(subscription)
 
-    if subscription.status == "active":
-        return True
-
-    return (
-        subscription.status == "trialing"
-        and subscription.trial_ends_at is not None
-        and subscription.trial_ends_at > datetime.now(timezone.utc)
-    )
+    return subscription_allows_access(subscription)
 
 
 def get_billing_admin_lists() -> dict:
@@ -304,6 +298,7 @@ def get_billing_admin_lists() -> dict:
         "without_subscription": list_users_without_subscription(),
         "pending": list_user_subscriptions_by_status("pending"),
         "past_due": list_user_subscriptions_by_status("past_due"),
+        "blocked": list_user_subscriptions_by_status("blocked"),
         "canceled": list_user_subscriptions_by_status("canceled"),
         "active": list_user_subscriptions_by_status("active"),
     }
@@ -320,6 +315,7 @@ def create_pending_subscription(user_id: str) -> UserSubscriptionRecord:
             provider_subscription_id=None,
             provider_payment_id=None,
             status="pending",
+            payment_status="pending",
             plan_name=PLAN_NAME,
             amount=settings.app_price_brl,
             currency="BRL",
@@ -354,7 +350,67 @@ def refresh_time_based_status(
             )
         )
 
+    if subscription.status == "past_due":
+        return apply_payment_delay_policy(subscription, now=now)
+
     return subscription
+
+
+def apply_payment_delay_policy(
+    subscription: UserSubscriptionRecord,
+    now: datetime | None = None,
+) -> UserSubscriptionRecord:
+    now = now or datetime.now(timezone.utc)
+    overdue_since = subscription.overdue_since or now
+    grace_period_ends_at = (
+        subscription.grace_period_ends_at
+        or overdue_since + timedelta(days=GRACE_PERIOD_DAYS)
+    )
+
+    if now >= grace_period_ends_at:
+        return upsert_user_subscription(
+            subscription.model_copy(
+                update={
+                    "status": "blocked",
+                    "payment_status": "overdue",
+                    "overdue_since": overdue_since,
+                    "grace_period_ends_at": grace_period_ends_at,
+                    "blocked_at": subscription.blocked_at or now,
+                    "block_reason": subscription.block_reason or "payment_overdue",
+                    "updated_at": now,
+                },
+            )
+        )
+
+    return upsert_user_subscription(
+        subscription.model_copy(
+            update={
+                "status": "past_due",
+                "payment_status": "overdue",
+                "overdue_since": overdue_since,
+                "grace_period_ends_at": grace_period_ends_at,
+                "updated_at": now,
+            },
+        )
+    )
+
+
+def subscription_allows_access(subscription: UserSubscriptionRecord) -> bool:
+    now = datetime.now(timezone.utc)
+
+    if subscription.status == "active":
+        return True
+
+    if subscription.status == "trialing":
+        return subscription.trial_ends_at is not None and subscription.trial_ends_at > now
+
+    if subscription.status == "past_due":
+        return (
+            subscription.grace_period_ends_at is not None
+            and subscription.grace_period_ends_at > now
+        )
+
+    return False
 
 
 def build_preapproval_payload(
@@ -394,48 +450,79 @@ def update_subscription_from_provider_response(
     now = datetime.now(timezone.utc)
     provider_status = str(response_data.get("status") or "")
     next_status = forced_status or map_provider_status(provider_status, subscription)
+    payment_status = map_provider_payment_status(provider_status, next_status)
     trial_starts_at = subscription.trial_starts_at
     trial_ends_at = subscription.trial_ends_at
+    next_payment_at = parse_provider_datetime(response_data.get("next_payment_date"))
+    last_payment_at = parse_provider_datetime(
+        response_data.get("last_charged_date"),
+    )
 
     if next_status == "trialing" and trial_ends_at is None:
         trial_starts_at = now
-        trial_ends_at = parse_provider_datetime(
-            response_data.get("next_payment_date"),
-        ) or now + timedelta(days=settings.app_trial_days)
+        trial_ends_at = next_payment_at or now + timedelta(days=settings.app_trial_days)
 
-    return upsert_user_subscription(
-        subscription.model_copy(
-            update={
-                "provider": MERCADO_PAGO_PROVIDER,
-                "provider_subscription_id": str(
-                    response_data.get("id") or subscription.provider_subscription_id or "",
-                )
-                or None,
-                "provider_payment_id": stringify_optional(
-                    response_data.get("last_charged_date")
-                    or response_data.get("payment_id"),
-                ),
-                "status": next_status,
-                "plan_name": PLAN_NAME,
-                "amount": settings.app_price_brl,
-                "currency": "BRL",
-                "trial_starts_at": trial_starts_at,
-                "trial_ends_at": trial_ends_at,
-                "current_period_starts_at": parse_provider_datetime(
-                    response_data.get("date_created"),
-                )
-                or subscription.current_period_starts_at,
-                "current_period_ends_at": parse_provider_datetime(
-                    response_data.get("next_payment_date"),
-                )
-                or subscription.current_period_ends_at,
-                "canceled_at": now if next_status == "canceled" else subscription.canceled_at,
-                "checkout_url": stringify_optional(response_data.get("init_point"))
-                or subscription.checkout_url,
-                "updated_at": now,
+    update_data = {
+        "provider": MERCADO_PAGO_PROVIDER,
+        "provider_subscription_id": str(
+            response_data.get("id") or subscription.provider_subscription_id or "",
+        )
+        or None,
+        "provider_payment_id": stringify_optional(
+            response_data.get("payment_id") or response_data.get("last_charged_date"),
+        ),
+        "status": next_status,
+        "payment_status": payment_status,
+        "plan_name": PLAN_NAME,
+        "amount": settings.app_price_brl,
+        "currency": "BRL",
+        "trial_starts_at": trial_starts_at,
+        "trial_ends_at": trial_ends_at,
+        "current_period_starts_at": parse_provider_datetime(
+            response_data.get("date_created"),
+        )
+        or subscription.current_period_starts_at,
+        "current_period_ends_at": next_payment_at or subscription.current_period_ends_at,
+        "next_payment_at": next_payment_at or subscription.next_payment_at,
+        "last_payment_at": last_payment_at or subscription.last_payment_at,
+        "last_payment_status": provider_status or subscription.last_payment_status,
+        "canceled_at": now if next_status == "canceled" else subscription.canceled_at,
+        "cancel_reason": (
+            "user_requested" if forced_status == "canceled" else subscription.cancel_reason
+        ),
+        "checkout_url": stringify_optional(response_data.get("init_point"))
+        or subscription.checkout_url,
+        "updated_at": now,
+    }
+
+    if next_status in {"active", "trialing"}:
+        update_data.update(
+            {
+                "payment_status": "paid",
+                "overdue_since": None,
+                "grace_period_ends_at": None,
+                "blocked_at": None,
+                "block_reason": None,
             },
         )
+
+    if next_status == "canceled":
+        update_data.update(
+            {
+                "payment_status": "canceled",
+                "blocked_at": None,
+                "block_reason": None,
+            },
+        )
+
+    updated_subscription = upsert_user_subscription(
+        subscription.model_copy(update=update_data),
     )
+
+    if updated_subscription.status == "past_due":
+        return apply_payment_delay_policy(updated_subscription, now=now)
+
+    return updated_subscription
 
 
 def map_provider_status(
@@ -453,14 +540,41 @@ def map_provider_status(
     if normalized_status in {"pending", "in_process"}:
         return "pending" if subscription.status != "trialing" else "trialing"
 
-    if normalized_status in {"paused", "past_due", "rejected"}:
+    if normalized_status in {"paused", "past_due", "rejected", "failed", "charged_back"}:
         return "past_due"
 
     if normalized_status in {"cancelled", "canceled"}:
         return "canceled"
 
-    if subscription.status in {"trialing", "active", "expired"}:
+    if subscription.status in {"trialing", "active", "expired", "blocked"}:
         return subscription.status
+
+    return "unknown"
+
+
+def map_provider_payment_status(
+    provider_status: str,
+    billing_status: BillingStatus,
+) -> str:
+    normalized_status = provider_status.strip().lower()
+
+    if billing_status in {"active", "trialing"}:
+        return "paid"
+
+    if billing_status == "pending":
+        return "pending"
+
+    if billing_status in {"past_due", "blocked"}:
+        return "overdue"
+
+    if billing_status == "canceled":
+        return "canceled"
+
+    if normalized_status in {"refunded"}:
+        return "refunded"
+
+    if normalized_status in {"rejected", "failed", "charged_back"}:
+        return "failed"
 
     return "unknown"
 
@@ -468,21 +582,33 @@ def map_provider_status(
 def to_billing_status_response(
     subscription: UserSubscriptionRecord,
 ) -> BillingStatusResponse:
-    is_access_allowed = subscription.status in ACCESS_STATUSES and (
-        subscription.status == "active"
-        or (
-            subscription.trial_ends_at is not None
-            and subscription.trial_ends_at > datetime.now(timezone.utc)
-        )
+    subscription = refresh_time_based_status(subscription)
+    is_access_allowed = subscription_allows_access(subscription)
+    days_until_block = (
+        calculate_days_until(subscription.grace_period_ends_at)
+        if subscription.status == "past_due"
+        else None
     )
 
     return BillingStatusResponse(
         status=subscription.status,
+        payment_status=subscription.payment_status,
         plan_name=subscription.plan_name,
         amount=float(subscription.amount),
         currency=subscription.currency,
+        trial_starts_at=subscription.trial_starts_at,
         trial_ends_at=subscription.trial_ends_at,
+        days_left_in_trial=calculate_days_until(subscription.trial_ends_at),
+        current_period_starts_at=subscription.current_period_starts_at,
         current_period_ends_at=subscription.current_period_ends_at,
+        next_payment_at=subscription.next_payment_at,
+        last_payment_at=subscription.last_payment_at,
+        overdue_since=subscription.overdue_since,
+        grace_period_ends_at=subscription.grace_period_ends_at,
+        days_until_block=days_until_block,
+        blocked_at=subscription.blocked_at,
+        block_reason=subscription.block_reason,
+        canceled_at=subscription.canceled_at,
         provider_subscription_id=subscription.provider_subscription_id,
         is_access_allowed=is_access_allowed,
         can_cancel=bool(
@@ -490,35 +616,59 @@ def to_billing_status_response(
             and subscription.status in {"trialing", "active", "pending", "past_due"}
         ),
         checkout_url=subscription.checkout_url,
-        message=get_billing_message(subscription.status),
+        message=get_billing_message(subscription),
     )
 
 
 def build_empty_billing_status() -> BillingStatusResponse:
     return BillingStatusResponse(
         status="none",
+        payment_status="pending",
         plan_name=PLAN_NAME,
         amount=settings.app_price_brl,
         currency="BRL",
         is_access_allowed=False,
         can_cancel=False,
-        message=get_billing_message("none"),
+        message="Comece seu teste grátis de 1 mês. Depois, R$ 8,99/mês.",
     )
 
 
-def get_billing_message(billing_status: BillingStatus) -> str:
+def get_billing_message(subscription: UserSubscriptionRecord) -> str:
+    if subscription.status == "trialing":
+        days_left = calculate_days_until(subscription.trial_ends_at) or 0
+        return f"Você está no teste grátis. Faltam {days_left} dias."
+
+    if subscription.status == "active":
+        return "Sua assinatura está ativa."
+
+    if subscription.status == "past_due":
+        days_until_block = calculate_days_until(subscription.grace_period_ends_at) or 0
+        return (
+            "Não conseguimos confirmar seu pagamento. Você ainda pode usar o app "
+            f"por {days_until_block} dias enquanto regulariza."
+        )
+
     messages = {
-        "none": "Comece seu teste gratis de 1 mes. Depois, R$ 8,99/mes.",
-        "trialing": "Teste grátis ativo.",
-        "active": "Assinatura ativa.",
-        "pending": "Comece seu teste grátis para usar o My Expenses completo.",
-        "past_due": "Há uma pendência no pagamento.",
-        "canceled": "Assinatura cancelada.",
+        "pending": "Estamos aguardando a confirmação da sua assinatura.",
+        "blocked": "Sua assinatura está pausada por pagamento pendente. Regularize para continuar usando o My Expenses.",
+        "canceled": "Sua assinatura foi cancelada.",
         "expired": "Seu teste grátis terminou.",
         "unknown": "Não foi possível confirmar sua assinatura.",
     }
 
-    return messages[billing_status]
+    return messages[subscription.status]
+
+
+def calculate_days_until(value: datetime | None) -> int | None:
+    if value is None:
+        return None
+
+    remaining_seconds = (value - datetime.now(timezone.utc)).total_seconds()
+
+    if remaining_seconds <= 0:
+        return 0
+
+    return max(1, int((remaining_seconds + 86399) // 86400))
 
 
 def extract_provider_subscription_id(payload: dict, query: dict[str, str]) -> str:

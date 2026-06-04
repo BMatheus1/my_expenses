@@ -18,7 +18,8 @@ API_PREFIX = "/api"
     ("billing_status", "trial_days", "expected_access"),
     [
         ("pending", None, False),
-        ("past_due", None, False),
+        ("past_due", None, True),
+        ("blocked", None, False),
         ("canceled", None, False),
         ("expired", None, False),
         ("unknown", None, False),
@@ -520,6 +521,80 @@ def test_billing_me_returns_only_current_user_subscription(
     assert response_b.json()["is_access_allowed"] is False
 
 
+def test_billing_me_calculates_trial_days_left(client: TestClient) -> None:
+    token, user_id = register_user(client, "billing-trial-days@test.com")
+    save_subscription(user_id, "trialing", trial_days=5)
+
+    response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "trialing"
+    assert response.json()["is_access_allowed"] is True
+    assert response.json()["days_left_in_trial"] in {4, 5}
+    assert "teste grátis" in response.json()["message"]
+
+
+def test_past_due_within_grace_period_allows_access_with_warning(
+    client: TestClient,
+) -> None:
+    token, user_id = register_user(client, "billing-past-due-grace@test.com")
+    save_subscription(user_id, "past_due", overdue_days=1)
+
+    response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "past_due"
+    assert response.json()["payment_status"] == "overdue"
+    assert response.json()["is_access_allowed"] is True
+    assert response.json()["days_until_block"] in {0, 1}
+    assert "regulariza" in response.json()["message"]
+
+
+def test_past_due_after_grace_period_becomes_blocked(
+    client: TestClient,
+) -> None:
+    token, user_id = register_user(client, "billing-past-due-blocked@test.com")
+    save_subscription(user_id, "past_due", overdue_days=3)
+
+    response = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token),
+    )
+    stored_subscription = get_user_subscription(user_id)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "blocked"
+    assert response.json()["payment_status"] == "overdue"
+    assert response.json()["is_access_allowed"] is False
+    assert response.json()["blocked_at"] is not None
+    assert response.json()["block_reason"] == "payment_overdue"
+    assert stored_subscription is not None
+    assert stored_subscription.status == "blocked"
+
+
+def test_billing_sync_blocks_after_grace_period(
+    client: TestClient,
+) -> None:
+    token, user_id = register_user(client, "billing-sync-blocked@test.com")
+    save_subscription(user_id, "past_due", overdue_days=3)
+
+    response = client.post(
+        f"{API_PREFIX}/billing/sync",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "blocked"
+    assert response.json()["is_access_allowed"] is False
+    assert response.json()["block_reason"] == "payment_overdue"
+
+
 def test_google_login_without_subscription_is_blocked(
     client: TestClient,
     monkeypatch,
@@ -600,6 +675,48 @@ def test_billing_webhook_duplicate_is_idempotent(client: TestClient) -> None:
     assert second_response.json()["duplicate"] is True
 
 
+def test_billing_webhook_failed_payment_marks_past_due(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    _token, user_id = register_user(client, "webhook-failed-payment@test.com")
+    provider_subscription_id = "preapproval-webhook-failed"
+    save_subscription(
+        user_id,
+        "active",
+        provider_subscription_id=provider_subscription_id,
+    )
+
+    def fake_fetch_preapproval(provider_id: str) -> dict:
+        return {
+            "id": provider_id,
+            "external_reference": user_id,
+            "status": "rejected",
+        }
+
+    monkeypatch.setattr(
+        "app.billing_service.fetch_preapproval",
+        fake_fetch_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/webhook/mercado-pago",
+        json={
+            "id": "evt-webhook-failed-payment",
+            "type": "preapproval",
+            "data": {"id": provider_subscription_id},
+        },
+    )
+    stored_subscription = get_user_subscription(user_id)
+
+    assert response.status_code == 200, response.text
+    assert stored_subscription is not None
+    assert stored_subscription.status == "past_due"
+    assert stored_subscription.payment_status == "overdue"
+    assert stored_subscription.overdue_since is not None
+    assert stored_subscription.grace_period_ends_at is not None
+
+
 def register_user(client: TestClient, email: str) -> tuple[str, str]:
     response = client.post(
         f"{API_PREFIX}/auth/register",
@@ -678,11 +795,18 @@ def save_subscription(
     billing_status: str,
     trial_days: int | None = None,
     provider_subscription_id: str | None = None,
+    overdue_days: int | None = None,
 ) -> None:
     now = datetime.now(timezone.utc)
     trial_starts_at = now if trial_days is not None else None
     trial_ends_at = (
         now + timedelta(days=trial_days) if trial_days is not None else None
+    )
+    overdue_since = (
+        now - timedelta(days=overdue_days) if overdue_days is not None else None
+    )
+    grace_period_ends_at = (
+        overdue_since + timedelta(days=2) if overdue_since is not None else None
     )
 
     upsert_user_subscription(
@@ -693,6 +817,7 @@ def save_subscription(
             provider_subscription_id=provider_subscription_id,
             provider_payment_id=None,
             status=billing_status,
+            payment_status=get_payment_status_for_test(billing_status),
             plan_name="My Expenses Premium",
             amount=8.99,
             currency="BRL",
@@ -700,9 +825,33 @@ def save_subscription(
             trial_ends_at=trial_ends_at,
             current_period_starts_at=None,
             current_period_ends_at=None,
+            next_payment_at=None,
+            last_payment_at=None,
+            last_payment_status=None,
+            overdue_since=overdue_since,
+            grace_period_ends_at=grace_period_ends_at,
+            blocked_at=None,
+            block_reason=None,
             canceled_at=None,
+            cancel_reason=None,
             checkout_url=None,
             created_at=now,
             updated_at=now,
         )
     )
+
+
+def get_payment_status_for_test(billing_status: str) -> str:
+    if billing_status in {"active", "trialing"}:
+        return "paid"
+
+    if billing_status in {"past_due", "blocked"}:
+        return "overdue"
+
+    if billing_status == "canceled":
+        return "canceled"
+
+    if billing_status == "unknown":
+        return "unknown"
+
+    return "pending"

@@ -69,11 +69,22 @@ export function Paywall({
       };
     }
 
+    if (billing.status === "blocked") {
+      return {
+        title: "Assinatura pausada",
+        description:
+          "Sua assinatura está pausada por pagamento pendente. Regularize para continuar usando o My Expenses.",
+        primaryLabel: "Regularizar pagamento",
+      };
+    }
+
     if (billing.status === "past_due") {
       return {
         title: "Regularize sua assinatura",
         description:
-          "Há uma pendência no pagamento. Regularize pelo Mercado Pago para voltar a usar o app.",
+          billing.days_until_block !== null
+            ? `Não conseguimos confirmar seu pagamento. Regularize em até ${billing.days_until_block} dias para evitar bloqueio.`
+            : "Há uma pendência no pagamento. Regularize pelo Mercado Pago para voltar a usar o app.",
         primaryLabel: "Regularizar assinatura",
       };
     }
@@ -84,7 +95,7 @@ export function Paywall({
         "Comece seu teste grátis de 1 mês. Depois, R$ 8,99/mês.",
       primaryLabel: "Começar teste grátis",
     };
-  }, [billing.status]);
+  }, [billing.days_until_block, billing.status]);
 
   useEffect(() => {
     trackEvent("subscription_screen_viewed", {

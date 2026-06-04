@@ -24,6 +24,7 @@ def create_user_subscriptions_table(connection: Connection) -> None:
             provider_subscription_id TEXT,
             provider_payment_id TEXT,
             status TEXT NOT NULL DEFAULT 'pending',
+            payment_status TEXT NOT NULL DEFAULT 'pending',
             plan_name TEXT NOT NULL DEFAULT 'My Expenses Premium',
             amount NUMERIC(12, 2) NOT NULL DEFAULT 8.99,
             currency TEXT NOT NULL DEFAULT 'BRL',
@@ -31,13 +32,31 @@ def create_user_subscriptions_table(connection: Connection) -> None:
             trial_ends_at TIMESTAMPTZ,
             current_period_starts_at TIMESTAMPTZ,
             current_period_ends_at TIMESTAMPTZ,
+            next_payment_at TIMESTAMPTZ,
+            last_payment_at TIMESTAMPTZ,
+            last_payment_status TEXT,
+            overdue_since TIMESTAMPTZ,
+            grace_period_ends_at TIMESTAMPTZ,
+            blocked_at TIMESTAMPTZ,
+            block_reason TEXT,
             canceled_at TIMESTAMPTZ,
+            cancel_reason TEXT,
             checkout_url TEXT,
             created_at TIMESTAMPTZ NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL
         )
         """
     )
+
+    connection.execute("ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'pending'")
+    connection.execute("ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS next_payment_at TIMESTAMPTZ")
+    connection.execute("ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS last_payment_at TIMESTAMPTZ")
+    connection.execute("ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS last_payment_status TEXT")
+    connection.execute("ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS overdue_since TIMESTAMPTZ")
+    connection.execute("ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS grace_period_ends_at TIMESTAMPTZ")
+    connection.execute("ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMPTZ")
+    connection.execute("ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS block_reason TEXT")
+    connection.execute("ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS cancel_reason TEXT")
 
     connection.execute(
         """
@@ -49,6 +68,19 @@ def create_user_subscriptions_table(connection: Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_user_subscriptions_provider_subscription
         ON user_subscriptions(provider_subscription_id)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_subscriptions_status
+        ON user_subscriptions(status)
+        """
+    )
+    connection.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_user_subscriptions_provider_subscription_unique
+        ON user_subscriptions(provider_subscription_id)
+        WHERE provider_subscription_id IS NOT NULL
         """
     )
 
@@ -86,6 +118,7 @@ def get_user_subscription(user_id: str) -> UserSubscriptionRecord | None:
                 provider_subscription_id,
                 provider_payment_id,
                 status,
+                payment_status,
                 plan_name,
                 amount,
                 currency,
@@ -93,7 +126,15 @@ def get_user_subscription(user_id: str) -> UserSubscriptionRecord | None:
                 trial_ends_at,
                 current_period_starts_at,
                 current_period_ends_at,
+                next_payment_at,
+                last_payment_at,
+                last_payment_status,
+                overdue_since,
+                grace_period_ends_at,
+                blocked_at,
+                block_reason,
                 canceled_at,
+                cancel_reason,
                 checkout_url,
                 created_at,
                 updated_at
@@ -122,6 +163,7 @@ def get_user_subscription_by_provider_subscription_id(
                 provider_subscription_id,
                 provider_payment_id,
                 status,
+                payment_status,
                 plan_name,
                 amount,
                 currency,
@@ -129,7 +171,15 @@ def get_user_subscription_by_provider_subscription_id(
                 trial_ends_at,
                 current_period_starts_at,
                 current_period_ends_at,
+                next_payment_at,
+                last_payment_at,
+                last_payment_status,
+                overdue_since,
+                grace_period_ends_at,
+                blocked_at,
+                block_reason,
                 canceled_at,
+                cancel_reason,
                 checkout_url,
                 created_at,
                 updated_at
@@ -158,6 +208,7 @@ def upsert_user_subscription(
                 provider_subscription_id,
                 provider_payment_id,
                 status,
+                payment_status,
                 plan_name,
                 amount,
                 currency,
@@ -165,18 +216,27 @@ def upsert_user_subscription(
                 trial_ends_at,
                 current_period_starts_at,
                 current_period_ends_at,
+                next_payment_at,
+                last_payment_at,
+                last_payment_status,
+                overdue_since,
+                grace_period_ends_at,
+                blocked_at,
+                block_reason,
                 canceled_at,
+                cancel_reason,
                 checkout_url,
                 created_at,
                 updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (user_id)
             DO UPDATE SET
                 provider = EXCLUDED.provider,
                 provider_subscription_id = EXCLUDED.provider_subscription_id,
                 provider_payment_id = EXCLUDED.provider_payment_id,
                 status = EXCLUDED.status,
+                payment_status = EXCLUDED.payment_status,
                 plan_name = EXCLUDED.plan_name,
                 amount = EXCLUDED.amount,
                 currency = EXCLUDED.currency,
@@ -184,7 +244,15 @@ def upsert_user_subscription(
                 trial_ends_at = EXCLUDED.trial_ends_at,
                 current_period_starts_at = EXCLUDED.current_period_starts_at,
                 current_period_ends_at = EXCLUDED.current_period_ends_at,
+                next_payment_at = EXCLUDED.next_payment_at,
+                last_payment_at = EXCLUDED.last_payment_at,
+                last_payment_status = EXCLUDED.last_payment_status,
+                overdue_since = EXCLUDED.overdue_since,
+                grace_period_ends_at = EXCLUDED.grace_period_ends_at,
+                blocked_at = EXCLUDED.blocked_at,
+                block_reason = EXCLUDED.block_reason,
                 canceled_at = EXCLUDED.canceled_at,
+                cancel_reason = EXCLUDED.cancel_reason,
                 checkout_url = EXCLUDED.checkout_url,
                 updated_at = EXCLUDED.updated_at
             RETURNING
@@ -194,6 +262,7 @@ def upsert_user_subscription(
                 provider_subscription_id,
                 provider_payment_id,
                 status,
+                payment_status,
                 plan_name,
                 amount,
                 currency,
@@ -201,7 +270,15 @@ def upsert_user_subscription(
                 trial_ends_at,
                 current_period_starts_at,
                 current_period_ends_at,
+                next_payment_at,
+                last_payment_at,
+                last_payment_status,
+                overdue_since,
+                grace_period_ends_at,
+                blocked_at,
+                block_reason,
                 canceled_at,
+                cancel_reason,
                 checkout_url,
                 created_at,
                 updated_at
@@ -213,6 +290,7 @@ def upsert_user_subscription(
                 subscription.provider_subscription_id,
                 subscription.provider_payment_id,
                 subscription.status,
+                subscription.payment_status,
                 subscription.plan_name,
                 subscription.amount,
                 subscription.currency,
@@ -220,7 +298,15 @@ def upsert_user_subscription(
                 subscription.trial_ends_at,
                 subscription.current_period_starts_at,
                 subscription.current_period_ends_at,
+                subscription.next_payment_at,
+                subscription.last_payment_at,
+                subscription.last_payment_status,
+                subscription.overdue_since,
+                subscription.grace_period_ends_at,
+                subscription.blocked_at,
+                subscription.block_reason,
                 subscription.canceled_at,
+                subscription.cancel_reason,
                 subscription.checkout_url,
                 subscription.created_at,
                 subscription.updated_at,
@@ -288,6 +374,7 @@ def list_user_subscriptions_by_status(
                 provider_subscription_id,
                 provider_payment_id,
                 status,
+                payment_status,
                 plan_name,
                 amount,
                 currency,
@@ -295,7 +382,15 @@ def list_user_subscriptions_by_status(
                 trial_ends_at,
                 current_period_starts_at,
                 current_period_ends_at,
+                next_payment_at,
+                last_payment_at,
+                last_payment_status,
+                overdue_since,
+                grace_period_ends_at,
+                blocked_at,
+                block_reason,
                 canceled_at,
+                cancel_reason,
                 checkout_url,
                 created_at,
                 updated_at
@@ -320,6 +415,7 @@ def list_trials_ending_within(days: int = 7) -> list[UserSubscriptionRecord]:
                 provider_subscription_id,
                 provider_payment_id,
                 status,
+                payment_status,
                 plan_name,
                 amount,
                 currency,
@@ -327,7 +423,15 @@ def list_trials_ending_within(days: int = 7) -> list[UserSubscriptionRecord]:
                 trial_ends_at,
                 current_period_starts_at,
                 current_period_ends_at,
+                next_payment_at,
+                last_payment_at,
+                last_payment_status,
+                overdue_since,
+                grace_period_ends_at,
+                blocked_at,
+                block_reason,
                 canceled_at,
+                cancel_reason,
                 checkout_url,
                 created_at,
                 updated_at

@@ -22,6 +22,7 @@ const STATUS_LABELS: Record<BillingStatusResponse["status"], string> = {
   active: "Assinatura ativa",
   pending: "Pagamento pendente",
   past_due: "Pagamento pendente",
+  blocked: "Assinatura pausada",
   canceled: "Assinatura cancelada",
   expired: "Teste expirado",
   unknown: "Status em análise",
@@ -42,7 +43,11 @@ export function SubscriptionSettingsCard({
   );
   const canSubscribe = !canCancel;
   const primaryActionLabel =
-    billing.status === "canceled" ? "Assinar novamente" : "Assinar";
+    billing.status === "canceled" || billing.status === "expired"
+      ? "Assinar novamente"
+      : billing.status === "blocked" || billing.status === "past_due"
+        ? "Regularizar pagamento"
+        : "Assinar";
 
   async function handleCheckout() {
     try {
@@ -118,6 +123,12 @@ export function SubscriptionSettingsCard({
         <InfoPill label="Plano" value={billing.plan_name} />
         <InfoPill label="Preço" value="R$ 8,99/mês" />
         <InfoPill label="Status atual" value={STATUS_LABELS[billing.status]} />
+        {billing.days_left_in_trial !== null ? (
+          <InfoPill
+            label="Dias restantes do teste"
+            value={`${billing.days_left_in_trial} dias`}
+          />
+        ) : null}
         {billing.trial_ends_at ? (
           <InfoPill
             label="Fim do teste"
@@ -130,11 +141,36 @@ export function SubscriptionSettingsCard({
             value={formatDate(billing.current_period_ends_at)}
           />
         ) : null}
+        {billing.next_payment_at ? (
+          <InfoPill
+            label="Próxima cobrança"
+            value={formatDate(billing.next_payment_at)}
+          />
+        ) : null}
+        {billing.days_until_block !== null ? (
+          <InfoPill
+            label="Dias até bloqueio"
+            value={`${billing.days_until_block} dias`}
+          />
+        ) : null}
       </div>
 
       {billing.status === "canceled" ? (
         <p className="app-muted mt-4 rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-4 py-3 text-sm font-bold">
           Sua assinatura foi cancelada.
+        </p>
+      ) : null}
+
+      {billing.status === "past_due" ? (
+        <p className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+          Não conseguimos confirmar seu pagamento. Regularize em até{" "}
+          {billing.days_until_block ?? 0} dias para evitar bloqueio.
+        </p>
+      ) : null}
+
+      {billing.status === "blocked" ? (
+        <p className="mt-4 rounded-3xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          Sua assinatura está pausada por pagamento pendente.
         </p>
       ) : null}
 

@@ -46,6 +46,7 @@ import {
   updateUserSettings,
 } from "../lib/api";
 import type { User } from "../types/auth";
+import type { BillingStatusResponse } from "../types/billing";
 import { trackEvent } from "../lib/tracking";
 import type { ExpenseCategory } from "../types/category";
 import type { CreateCreditCardRequest, CreditCard } from "../types/credit-card";
@@ -106,6 +107,8 @@ import { Toast } from "./Toast";
 
 type ExpensesDashboardProps = {
   currentUser: User;
+  billing: BillingStatusResponse;
+  onBillingChange: (billing: BillingStatusResponse) => void;
   onLogout: () => void;
 };
 
@@ -125,6 +128,8 @@ type ToastState = {
 
 export function ExpensesDashboard({
   currentUser,
+  billing,
+  onBillingChange,
   onLogout,
 }: ExpensesDashboardProps) {
   const expenseFormSectionRef = useRef<HTMLDivElement | null>(null);
@@ -1408,12 +1413,16 @@ export function ExpensesDashboard({
         <SettingsPage
           section="appearance"
           currentUser={currentUser}
+          billing={billing}
+          onBillingChange={onBillingChange}
           onLogout={onLogout}
         />
       ) : activeView === "security-settings" ? (
         <SettingsPage
           section="security"
           currentUser={currentUser}
+          billing={billing}
+          onBillingChange={onBillingChange}
           onLogout={onLogout}
         />
       ) : activeView === "businesses" ? (

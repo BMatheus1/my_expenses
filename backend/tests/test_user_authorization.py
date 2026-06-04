@@ -166,6 +166,47 @@ def test_user_cannot_update_or_delete_another_user_expense_category(
     assert "Categoria invadida" not in user_a_category_names
 
 
+def test_user_cannot_access_update_or_delete_another_user_credit_card(
+    client: TestClient,
+) -> None:
+    user_a_token = register_user(client, USER_A)
+    user_b_token = register_user(client, USER_B)
+
+    credit_card = create_credit_card(client, user_a_token)
+
+    user_b_cards_response = client.get(
+        f"{API_PREFIX}/credit-cards",
+        headers=auth_headers(user_b_token),
+    )
+
+    update_response = client.put(
+        f"{API_PREFIX}/credit-cards/{credit_card['id']}",
+        headers=auth_headers(user_b_token),
+        json=credit_card_payload(name="Cartão invadido", last_four_digits="9999"),
+    )
+
+    delete_response = client.delete(
+        f"{API_PREFIX}/credit-cards/{credit_card['id']}",
+        headers=auth_headers(user_b_token),
+    )
+
+    user_a_cards_response = client.get(
+        f"{API_PREFIX}/credit-cards",
+        headers=auth_headers(user_a_token),
+    )
+
+    assert user_b_cards_response.status_code == 200
+    assert user_b_cards_response.json() == []
+    assert update_response.status_code in {403, 404}
+    assert delete_response.status_code in {403, 404}
+    assert user_a_cards_response.status_code == 200
+
+    user_a_cards = user_a_cards_response.json()
+    assert len(user_a_cards) == 1
+    assert user_a_cards[0]["id"] == credit_card["id"]
+    assert user_a_cards[0]["name"] == credit_card["name"]
+
+
 def test_user_cannot_access_or_update_another_user_business(
     client: TestClient,
 ) -> None:
@@ -452,6 +493,33 @@ def create_expense_category(client: TestClient, token: str) -> dict:
     assert response.status_code == 201, response.text
 
     return response.json()
+
+
+def create_credit_card(client: TestClient, token: str) -> dict:
+    response = client.post(
+        f"{API_PREFIX}/credit-cards",
+        headers=auth_headers(token),
+        json=credit_card_payload(),
+    )
+
+    assert response.status_code == 201, response.text
+
+    return response.json()
+
+
+def credit_card_payload(
+    name: str = "Cartão Principal",
+    last_four_digits: str = "1234",
+) -> dict:
+    return {
+        "name": name,
+        "brand": "Visa",
+        "last_four_digits": last_four_digits,
+        "closing_day": 5,
+        "due_day": 12,
+        "limit_amount": 2500,
+        "color": "slate",
+    }
 
 
 def create_business(client: TestClient, token: str) -> dict:

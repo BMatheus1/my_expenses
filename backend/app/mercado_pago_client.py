@@ -18,7 +18,7 @@ def cancel_preapproval(provider_subscription_id: str) -> dict:
     return mercado_pago_request(
         f"/preapproval/{provider_subscription_id}",
         method="PUT",
-        payload={"status": "cancelled"},
+        payload={"status": "canceled"},
     )
 
 
@@ -48,10 +48,10 @@ def mercado_pago_request(
         with request.urlopen(api_request, timeout=20) as response:
             return json.loads(response.read().decode("utf-8"))
     except error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
+        exc.read()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Mercado Pago recusou a solicitação: {detail}",
+            detail="Mercado Pago recusou a solicitação. Tente novamente em alguns instantes.",
         ) from exc
     except error.URLError as exc:
         raise HTTPException(

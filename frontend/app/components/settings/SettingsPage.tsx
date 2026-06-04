@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AccountDeletionSection } from "../AccountDeletionSection";
 import { NotificationSettingsPanel } from "../NotificationSettingsPanel";
+import { SubscriptionSettingsCard } from "../SubscriptionSettingsCard";
 import {
   APP_THEMES,
   type AppColorMode,
@@ -30,6 +31,7 @@ import {
   saveDailyReviewEnabled,
 } from "@/app/lib/daily-review";
 import { getUserSettings, updateUserSettings } from "@/app/lib/api";
+import type { BillingStatusResponse } from "@/app/types/billing";
 
 const DISPLAY_MODES: Array<{
   value: AppColorMode;
@@ -62,12 +64,16 @@ type SettingsSection = "appearance" | "security";
 type SettingsPageProps = {
   section: SettingsSection;
   currentUser: User;
+  billing: BillingStatusResponse;
+  onBillingChange: (billing: BillingStatusResponse) => void;
   onLogout: () => void;
 };
 
 export default function SettingsPage({
   section,
   currentUser,
+  billing,
+  onBillingChange,
   onLogout,
 }: SettingsPageProps) {
   const [selectedTheme, setSelectedTheme] = useState<AppThemeName>("emerald");
@@ -178,6 +184,11 @@ export default function SettingsPage({
         />
 
         <NotificationSettingsPanel currentUser={currentUser} />
+
+        <SubscriptionSettingsCard
+          billing={billing}
+          onBillingChange={onBillingChange}
+        />
 
         <section className="app-card rounded-3xl p-6">
           <SectionHeader

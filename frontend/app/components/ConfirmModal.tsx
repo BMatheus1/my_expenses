@@ -6,6 +6,7 @@ type ConfirmModalProps = {
   description: string;
   confirmLabel: string;
   cancelLabel?: string;
+  loadingLabel?: string;
   variant?: ConfirmModalVariant;
   isLoading?: boolean;
   onConfirm: () => void;
@@ -18,6 +19,7 @@ export function ConfirmModal({
   description,
   confirmLabel,
   cancelLabel = "Cancelar",
+  loadingLabel = "Aguarde...",
   variant = "default",
   isLoading = false,
   onConfirm,
@@ -59,7 +61,7 @@ export function ConfirmModal({
             disabled={isLoading}
             className={`rounded-full px-5 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${confirmButtonClass}`}
           >
-            {isLoading ? "Aguarde..." : confirmLabel}
+            {isLoading ? loadingLabel : confirmLabel}
           </button>
         </div>
       </div>

@@ -2,9 +2,10 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app.billing_repository import upsert_user_subscription
+from app.billing_repository import get_user_subscription, upsert_user_subscription
 from app.billing_schemas import UserSubscriptionRecord
 from app.billing_service import user_has_paid_access
 from app.email_verification_repository import mark_user_email_as_verified
@@ -113,6 +114,176 @@ def test_sync_requires_authenticated_user(client: TestClient) -> None:
     response = client.post(f"{API_PREFIX}/billing/sync")
 
     assert response.status_code in {401, 403}
+
+
+def test_cancel_without_subscription_returns_friendly_error(
+    client: TestClient,
+) -> None:
+    token, _user_id = register_user(client, "cancel-no-subscription@test.com")
+
+    response = client.post(
+        f"{API_PREFIX}/billing/cancel",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 409
+    assert "assinatura Mercado Pago" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("billing_status", ["active", "trialing", "pending"])
+def test_cancel_subscription_calls_mercado_pago_and_blocks_access(
+    client: TestClient,
+    monkeypatch,
+    billing_status: str,
+) -> None:
+    token, user_id = register_user(
+        client,
+        f"cancel-{billing_status}@test.com",
+    )
+    provider_subscription_id = f"preapproval-cancel-{billing_status}"
+    save_subscription(
+        user_id,
+        billing_status,
+        trial_days=30 if billing_status == "trialing" else None,
+        provider_subscription_id=provider_subscription_id,
+    )
+    canceled_provider_ids = []
+
+    def fake_cancel_preapproval(provider_id: str) -> dict:
+        canceled_provider_ids.append(provider_id)
+        return {
+            "id": provider_id,
+            "external_reference": user_id,
+            "status": "canceled",
+        }
+
+    monkeypatch.setattr(
+        "app.billing_service.cancel_preapproval",
+        fake_cancel_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/cancel",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert canceled_provider_ids == [provider_subscription_id]
+    assert response.json()["status"] == "canceled"
+    assert response.json()["is_access_allowed"] is False
+    assert response.json()["can_cancel"] is False
+    stored_subscription = get_user_subscription(user_id)
+    assert stored_subscription is not None
+    assert stored_subscription.status == "canceled"
+    assert stored_subscription.canceled_at is not None
+
+
+def test_cancel_already_canceled_is_idempotent(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    token, user_id = register_user(client, "cancel-idempotent@test.com")
+    save_subscription(
+        user_id,
+        "canceled",
+        provider_subscription_id="preapproval-already-canceled",
+    )
+    cancel_calls = []
+
+    def fake_cancel_preapproval(provider_id: str) -> dict:
+        cancel_calls.append(provider_id)
+        return {"id": provider_id, "status": "canceled"}
+
+    monkeypatch.setattr(
+        "app.billing_service.cancel_preapproval",
+        fake_cancel_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/cancel",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "canceled"
+    assert response.json()["is_access_allowed"] is False
+    assert cancel_calls == []
+
+
+def test_cancel_mercado_pago_error_does_not_mark_local_canceled(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    token, user_id = register_user(client, "cancel-provider-error@test.com")
+    save_subscription(
+        user_id,
+        "active",
+        provider_subscription_id="preapproval-provider-error",
+    )
+
+    def fake_cancel_preapproval(_provider_id: str) -> dict:
+        raise HTTPException(status_code=502, detail="provider failed")
+
+    monkeypatch.setattr(
+        "app.billing_service.cancel_preapproval",
+        fake_cancel_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/cancel",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == (
+        "Não foi possível cancelar agora. Tente novamente em alguns instantes."
+    )
+    stored_subscription = get_user_subscription(user_id)
+    assert stored_subscription is not None
+    assert stored_subscription.status == "active"
+    assert stored_subscription.canceled_at is None
+
+
+def test_cancel_only_uses_current_user_subscription(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    token_a, user_a_id = register_user(client, "cancel-current-user-a@test.com")
+    _token_b, user_b_id = register_user(client, "cancel-current-user-b@test.com")
+    save_subscription(
+        user_a_id,
+        "active",
+        provider_subscription_id="preapproval-current-user-a",
+    )
+    save_subscription(
+        user_b_id,
+        "active",
+        provider_subscription_id="preapproval-current-user-b",
+    )
+    canceled_provider_ids = []
+
+    def fake_cancel_preapproval(provider_id: str) -> dict:
+        canceled_provider_ids.append(provider_id)
+        return {"id": provider_id, "status": "canceled"}
+
+    monkeypatch.setattr(
+        "app.billing_service.cancel_preapproval",
+        fake_cancel_preapproval,
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/billing/cancel",
+        headers=auth_headers(token_a),
+    )
+
+    assert response.status_code == 200, response.text
+    assert canceled_provider_ids == ["preapproval-current-user-a"]
+    subscription_a = get_user_subscription(user_a_id)
+    subscription_b = get_user_subscription(user_b_id)
+    assert subscription_a is not None
+    assert subscription_a.status == "canceled"
+    assert subscription_b is not None
+    assert subscription_b.status == "active"
 
 
 def test_checkout_does_not_grant_access_automatically(
@@ -311,6 +482,42 @@ def test_billing_me_statuses(client: TestClient) -> None:
     )
     assert expired_response.json()["status"] == "expired"
     assert expired_response.json()["is_access_allowed"] is False
+
+
+def test_billing_me_returns_only_current_user_subscription(
+    client: TestClient,
+) -> None:
+    token_a, user_a_id = register_user(client, "billing-owner-a@test.com")
+    token_b, user_b_id = register_user(client, "billing-owner-b@test.com")
+
+    save_subscription(
+        user_a_id,
+        "active",
+        provider_subscription_id="preapproval-owner-a",
+    )
+    save_subscription(
+        user_b_id,
+        "canceled",
+        provider_subscription_id="preapproval-owner-b",
+    )
+
+    response_a = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token_a),
+    )
+    response_b = client.get(
+        f"{API_PREFIX}/billing/me",
+        headers=auth_headers(token_b),
+    )
+
+    assert response_a.status_code == 200, response_a.text
+    assert response_b.status_code == 200, response_b.text
+    assert response_a.json()["status"] == "active"
+    assert response_a.json()["provider_subscription_id"] == "preapproval-owner-a"
+    assert response_a.json()["is_access_allowed"] is True
+    assert response_b.json()["status"] == "canceled"
+    assert response_b.json()["provider_subscription_id"] == "preapproval-owner-b"
+    assert response_b.json()["is_access_allowed"] is False
 
 
 def test_google_login_without_subscription_is_blocked(

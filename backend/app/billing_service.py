@@ -102,20 +102,93 @@ def create_checkout(user: UserResponse) -> BillingCheckoutResponse:
 def cancel_subscription(user: UserResponse) -> BillingStatusResponse:
     subscription = get_user_subscription(user.id)
 
-    if subscription is None or not subscription.provider_subscription_id:
+    if subscription is None:
+        logger.info(
+            "Billing cancel without local subscription",
+            extra={
+                "user_id": user.id,
+                "provider_subscription_id_present": False,
+                "previous_status": "none",
+                "new_status": "none",
+                "mercado_pago_response_status": None,
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Nenhuma assinatura Mercado Pago ativa foi encontrada.",
+            detail="Nenhuma assinatura Mercado Pago foi encontrada para esta conta.",
         )
 
-    response_data = cancel_preapproval(subscription.provider_subscription_id)
+    subscription = refresh_time_based_status(subscription)
+    previous_status = subscription.status
+
+    if subscription.status == "canceled":
+        logger.info(
+            "Billing cancel already canceled",
+            extra={
+                "user_id": user.id,
+                "provider_subscription_id_present": bool(
+                    subscription.provider_subscription_id,
+                ),
+                "previous_status": previous_status,
+                "new_status": "canceled",
+                "mercado_pago_response_status": "skipped_idempotent",
+            },
+        )
+        return to_billing_status_response(subscription)
+
+    if not subscription.provider_subscription_id:
+        logger.info(
+            "Billing cancel without provider subscription",
+            extra={
+                "user_id": user.id,
+                "provider_subscription_id_present": False,
+                "previous_status": previous_status,
+                "new_status": previous_status,
+                "mercado_pago_response_status": None,
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Nenhuma assinatura Mercado Pago ativa foi encontrada para cancelar.",
+        )
+
+    try:
+        response_data = cancel_preapproval(subscription.provider_subscription_id)
+    except HTTPException as exc:
+        logger.warning(
+            "Billing cancel provider request failed",
+            extra={
+                "user_id": user.id,
+                "provider_subscription_id_present": True,
+                "previous_status": previous_status,
+                "new_status": previous_status,
+                "mercado_pago_response_status": exc.status_code,
+            },
+        )
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail="Não foi possível cancelar agora. Tente novamente em alguns instantes.",
+        ) from exc
+
+    provider_status = str(response_data.get("status") or "")
     updated_subscription = update_subscription_from_provider_response(
         subscription,
         response_data,
         forced_status="canceled",
     )
+    billing_status = to_billing_status_response(updated_subscription)
+    logger.info(
+        "Billing cancel completed",
+        extra={
+            "user_id": user.id,
+            "provider_subscription_id_present": True,
+            "previous_status": previous_status,
+            "new_status": billing_status.status,
+            "mercado_pago_response_status": provider_status,
+        },
+    )
 
-    return to_billing_status_response(updated_subscription)
+    return billing_status
 
 
 def sync_billing_status(user: UserResponse) -> BillingStatusResponse:

@@ -352,5 +352,21 @@ export function AuthGate() {
     );
   }
 
-  return <ExpensesDashboard currentUser={currentUser} onLogout={handleLogout} />;
+  if (!billing) {
+    return (
+      <PageLoading
+        title="Conferindo assinatura"
+        description="Estamos validando seu acesso com segurança."
+      />
+    );
+  }
+
+  return (
+    <ExpensesDashboard
+      currentUser={currentUser}
+      billing={billing}
+      onBillingChange={setBilling}
+      onLogout={handleLogout}
+    />
+  );
 }

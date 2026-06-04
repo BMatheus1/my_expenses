@@ -60,6 +60,15 @@ export function Paywall({
       };
     }
 
+    if (billing.status === "canceled") {
+      return {
+        title: "Assinatura cancelada",
+        description:
+          "Sua assinatura foi cancelada. Para voltar a usar o My Expenses completo, assine novamente por R$ 8,99/mês.",
+        primaryLabel: "Assinar novamente",
+      };
+    }
+
     if (billing.status === "past_due") {
       return {
         title: "Regularize sua assinatura",

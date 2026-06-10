@@ -40,6 +40,9 @@ Cada usuário acessa apenas os próprios dados. O sistema foi estruturado para e
 - Cadastro de gastos;
 - Cadastro de ganhos;
 - Categorias personalizadas;
+- Assinatura Mercado Pago com teste gratis de 1 mes e mensalidade de R$ 8,99;
+- Paywall baseado em `/api/billing/me`;
+- Sincronizacao e cancelamento de assinatura;
 - Edição e exclusão de registros;
 - Resumo financeiro;
 - Configurações de aparência e segurança;
@@ -267,13 +270,8 @@ http://127.0.0.1:3000
 
 ```bash
 cd backend
+python -m compileall .
 pytest -q
-```
-
-Também é possível verificar a compilação dos principais arquivos:
-
-```bash
-python -m py_compile app/account_repository.py app/auth_service.py app/routes.py app/schemas.py app/email_service.py
 ```
 
 ### Frontend
@@ -282,7 +280,21 @@ python -m py_compile app/account_repository.py app/auth_service.py app/routes.py
 cd frontend
 npm run lint
 npm run build
+npx tsc --noEmit
 ```
+
+---
+
+## Documentacao de manutencao
+
+Guias operacionais criados para evoluir o projeto com seguranca:
+
+- `docs/MAINTENANCE.md`: manutencao, responsabilidades e checklist antes de deploy;
+- `docs/BILLING_MERCADO_PAGO.md`: assinatura, trial, status internos, sync, webhook e cancelamento;
+- `docs/SECURITY.md`: isolamento por usuario, tokens, cookies, CORS e logs seguros;
+- `docs/DATABASE.md`: tabelas principais, indices e status de assinatura;
+- `docs/DEPLOY.md`: Render, Vercel, variaveis e rollback;
+- `docs/TROUBLESHOOTING.md`: problemas comuns e passos de diagnostico.
 
 ---
 
